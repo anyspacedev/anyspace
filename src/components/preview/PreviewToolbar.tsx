@@ -10,6 +10,8 @@ const DEVICES: Array<{ id: Device; label: string; w: number; h: number }> = [
   { id: "phone", label: "iPhone 15", w: 393, h: 852 },
 ];
 
+export type LoadStatus = "idle" | "loading" | "loaded" | "error";
+
 export function PreviewToolbar({
   url,
   device,
@@ -22,6 +24,8 @@ export function PreviewToolbar({
   onOpenExternal,
   onPickProject,
   watching,
+  loadStatus,
+  loadedAt,
 }: {
   url: string;
   device: Device;
@@ -34,6 +38,8 @@ export function PreviewToolbar({
   onOpenExternal: () => void;
   onPickProject: () => void;
   watching: boolean;
+  loadStatus: LoadStatus;
+  loadedAt: number | null;
 }) {
   const [draft, setDraft] = useState(url);
   useEffect(() => setDraft(url), [url]);
@@ -43,14 +49,17 @@ export function PreviewToolbar({
       <button className="icon-btn" title="Refresh" aria-label="Refresh" onClick={onRefresh}>
         <Icon name="refresh" size={14} />
       </button>
-      <input
-        className="url-input"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onUrl(draft);
-        }}
-      />
+      <div className={`url-input-wrap status-${loadStatus}`}>
+        <span className="url-status-dot" aria-hidden />
+        <input
+          className="url-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onUrl(draft);
+          }}
+        />
+      </div>
       <button
         className="icon-btn"
         title="Open in system browser"
@@ -85,7 +94,31 @@ export function PreviewToolbar({
         {watching ? "Change project" : "Watch folder"}
       </button>
       {framework && <span className="framework-tag">{framework}</span>}
+      {loadedAt && <LastLoaded at={loadedAt} />}
       {watching && <span className="watching-dot" title="watching for file changes" />}
     </div>
   );
+}
+
+function LastLoaded({ at }: { at: number }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => force((n) => n + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <span className="preview-last-loaded" title={new Date(at).toLocaleTimeString()}>
+      {formatAgo(Date.now() - at)}
+    </span>
+  );
+}
+
+function formatAgo(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
 }

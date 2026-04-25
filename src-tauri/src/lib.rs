@@ -29,6 +29,7 @@ pub fn run() {
             pty::commands::pty_kill,
             // Preview
             preview::commands::preview_detect,
+            preview::commands::preview_can_frame,
             preview::commands::preview_watch_start,
             preview::commands::preview_watch_stop,
             // Agent

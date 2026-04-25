@@ -38,6 +38,7 @@ export type DetectedPreview = {
   url: string;
   port: number;
   framework: string;
+  verified: boolean;
 };
 
 export async function previewDetect(
@@ -45,6 +46,31 @@ export async function previewDetect(
 ): Promise<DetectedPreview | null> {
   return rawInvoke<DetectedPreview | null>("preview_detect", { projectPath });
 }
+
+export type FrameabilityReason =
+  | "ok"
+  | "x-frame-options"
+  | "csp-frame-ancestors"
+  | "unreachable"
+  | "non-2xx";
+
+export type FrameabilityReport = {
+  reachable: boolean;
+  framable: boolean;
+  reason: FrameabilityReason;
+  status: number | null;
+};
+
+export async function previewCanFrame(url: string): Promise<FrameabilityReport> {
+  return rawInvoke<FrameabilityReport>("preview_can_frame", { url });
+}
+
+export type PreviewReloadKind = "soft" | "hard";
+
+export type PreviewReloadEvent = {
+  kind: PreviewReloadKind;
+  path: string;
+};
 
 export async function previewWatchStart(
   paneId: string,

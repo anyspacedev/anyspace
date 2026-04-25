@@ -901,11 +901,117 @@
   background: #fff;
   overflow: hidden;
 }
+.preview-iframe-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
 .preview-iframe {
   width: 100%;
   height: 100%;
   border: 0;
   background: #fff;
+}
+
+.preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-direction: column;
+  text-align: center;
+  padding: 24px;
+  background: color-mix(in oklab, var(--bg) 88%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--fg);
+  pointer-events: auto;
+}
+.preview-overlay-loaded { display: none; }
+.preview-overlay-idle { display: none; }
+.preview-overlay-loading {
+  background: color-mix(in oklab, var(--bg) 70%, transparent);
+}
+.preview-overlay-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+}
+.preview-overlay-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.preview-overlay-body {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  word-break: break-all;
+}
+.preview-overlay-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.preview-overlay-error {
+  color: var(--fg);
+}
+.preview-overlay-error .preview-overlay-title { color: var(--danger, #e5484d); }
+
+.preview-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid color-mix(in oklab, var(--fg) 18%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: preview-spin 0.9s linear infinite;
+}
+@keyframes preview-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-spinner { animation-duration: 2.4s; }
+}
+
+.btn-sm {
+  padding: 3px 8px;
+  font-size: var(--font-size-xs);
+}
+
+.url-input-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 160px;
+}
+.url-input-wrap .url-input {
+  flex: 1;
+  padding-left: 22px;
+}
+.url-status-dot {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.url-input-wrap.status-loaded .url-status-dot { background: var(--success); }
+.url-input-wrap.status-error .url-status-dot { background: var(--danger, #e5484d); }
+.url-input-wrap.status-loading .url-status-dot {
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.preview-last-loaded {
+  font-size: var(--font-size-xs);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .preview-empty {
   height: 100%;
