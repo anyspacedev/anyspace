@@ -275,9 +275,25 @@
 
 /* ===== Workspace + panes ===== */
 
+.view-workspace {
+  position: absolute;
+  inset: 0;
+}
+
 .workspace {
   position: absolute;
   inset: 0;
+}
+
+.workspace-tab {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.workspace-tab.active {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .pane {

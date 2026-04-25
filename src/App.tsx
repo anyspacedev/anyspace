@@ -58,7 +58,12 @@ export default function App() {
       <div className="app-main">
         <TabBar />
         <div className="app-content">
-          {view === "workspace" && <WorkspaceView />}
+          <div
+            className="view-workspace"
+            style={view === "workspace" ? undefined : { display: "none" }}
+          >
+            <WorkspaceView />
+          </div>
           {view === "kanban" && <KanbanBoard />}
           {view === "agents" && <AgentManager />}
           {view === "settings" && <Settings />}

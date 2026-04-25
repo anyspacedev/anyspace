@@ -26,7 +26,7 @@ export function WorkspaceView() {
     return () => { u1(); u2(); };
   }, [tab, splitPane]);
 
-  if (!tab) {
+  if (tabs.length === 0) {
     return (
       <div className="welcome">
         <div className="welcome-card">
@@ -81,7 +81,15 @@ export function WorkspaceView() {
 
   return (
     <div className="workspace">
-      <PaneGrid key={tab.id} tab={tab} />
+      {tabs.map((t) => (
+        <div
+          key={t.id}
+          className={"workspace-tab" + (t.id === activeTabId ? " active" : "")}
+          aria-hidden={t.id !== activeTabId}
+        >
+          <PaneGrid tab={t} />
+        </div>
+      ))}
     </div>
   );
 }
