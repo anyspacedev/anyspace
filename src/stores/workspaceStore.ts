@@ -1,0 +1,380 @@
+import { create } from "zustand";
+import type { LayoutNode, Pane, PaneKind, Tab } from "../lib/types";
+
+const newId = () => Math.random().toString(36).slice(2, 10);
+
+const TAB_COLORS = ["#7c5cff", "#5cc8ff", "#2ee29a", "#f7b955", "#ef4f6f", "#c98aff"];
+
+const emptyPane = (kind: PaneKind = "terminal"): Pane => ({
+  id: newId(),
+  kind,
+  payload: {},
+});
+
+const leaf = (paneId: string): LayoutNode => ({ type: "leaf", paneId });
+
+function buildLayout(paneCount: number, paneIds: string[]): LayoutNode {
+  // Layout heuristics for 1, 2, 4, 6, 8, 9, 12, 16
+  if (paneCount === 1) return leaf(paneIds[0]);
+  if (paneCount === 2) {
+    return {
+      type: "split",
+      direction: "horizontal",
+      sizes: [50, 50],
+      children: [leaf(paneIds[0]), leaf(paneIds[1])],
+    };
+  }
+  if (paneCount === 4) {
+    return {
+      type: "split",
+      direction: "vertical",
+      sizes: [50, 50],
+      children: [
+        {
+          type: "split",
+          direction: "horizontal",
+          sizes: [50, 50],
+          children: [leaf(paneIds[0]), leaf(paneIds[1])],
+        },
+        {
+          type: "split",
+          direction: "horizontal",
+          sizes: [50, 50],
+          children: [leaf(paneIds[2]), leaf(paneIds[3])],
+        },
+      ],
+    };
+  }
+  // 6 = 2 rows of 3
+  if (paneCount === 6) {
+    const row = (a: string, b: string, c: string): LayoutNode => ({
+      type: "split",
+      direction: "horizontal",
+      sizes: [33.34, 33.33, 33.33],
+      children: [leaf(a), leaf(b), leaf(c)],
+    });
+    return {
+      type: "split",
+      direction: "vertical",
+      sizes: [50, 50],
+      children: [
+        row(paneIds[0], paneIds[1], paneIds[2]),
+        row(paneIds[3], paneIds[4], paneIds[5]),
+      ],
+    };
+  }
+  // 8 = 2 rows of 4
+  if (paneCount === 8) {
+    const row = (ids: string[]): LayoutNode => ({
+      type: "split",
+      direction: "horizontal",
+      sizes: [25, 25, 25, 25],
+      children: ids.map(leaf),
+    });
+    return {
+      type: "split",
+      direction: "vertical",
+      sizes: [50, 50],
+      children: [row(paneIds.slice(0, 4)), row(paneIds.slice(4, 8))],
+    };
+  }
+  // 9 = 3x3
+  if (paneCount === 9) {
+    const row = (ids: string[]): LayoutNode => ({
+      type: "split",
+      direction: "horizontal",
+      sizes: [33.34, 33.33, 33.33],
+      children: ids.map(leaf),
+    });
+    return {
+      type: "split",
+      direction: "vertical",
+      sizes: [33.34, 33.33, 33.33],
+      children: [row(paneIds.slice(0, 3)), row(paneIds.slice(3, 6)), row(paneIds.slice(6, 9))],
+    };
+  }
+  // 12 = 3 rows of 4
+  if (paneCount === 12) {
+    const row = (ids: string[]): LayoutNode => ({
+      type: "split",
+      direction: "horizontal",
+      sizes: [25, 25, 25, 25],
+      children: ids.map(leaf),
+    });
+    return {
+      type: "split",
+      direction: "vertical",
+      sizes: [33.34, 33.33, 33.33],
+      children: [
+        row(paneIds.slice(0, 4)),
+        row(paneIds.slice(4, 8)),
+        row(paneIds.slice(8, 12)),
+      ],
+    };
+  }
+  // 16 = 4x4
+  if (paneCount === 16) {
+    const row = (ids: string[]): LayoutNode => ({
+      type: "split",
+      direction: "horizontal",
+      sizes: [25, 25, 25, 25],
+      children: ids.map(leaf),
+    });
+    return {
+      type: "split",
+      direction: "vertical",
+      sizes: [25, 25, 25, 25],
+      children: [
+        row(paneIds.slice(0, 4)),
+        row(paneIds.slice(4, 8)),
+        row(paneIds.slice(8, 12)),
+        row(paneIds.slice(12, 16)),
+      ],
+    };
+  }
+  // Fallback: single column
+  return {
+    type: "split",
+    direction: "vertical",
+    sizes: paneIds.map(() => 100 / paneIds.length),
+    children: paneIds.map(leaf),
+  };
+}
+
+type WorkspaceState = {
+  tabs: Tab[];
+  activeTabId: string | null;
+  selectedView: "workspace" | "kanban" | "agents" | "settings";
+
+  setView: (view: WorkspaceState["selectedView"]) => void;
+
+  newTab: (template: number, name?: string) => string;
+  closeTab: (id: string) => void;
+  setActiveTab: (id: string) => void;
+  switchToTabIndex: (i: number) => void;
+  renameTab: (id: string, name: string) => void;
+
+  setActivePane: (tabId: string, paneId: string) => void;
+  setPaneKind: (tabId: string, paneId: string, kind: PaneKind, payload?: Record<string, unknown>) => void;
+  setPanePayload: (tabId: string, paneId: string, payload: Record<string, unknown>) => void;
+  splitPane: (tabId: string, paneId: string, direction: "horizontal" | "vertical") => void;
+  closePane: (tabId: string, paneId: string) => void;
+
+  setLayoutSizes: (tabId: string, path: number[], sizes: number[]) => void;
+};
+
+function findAndMutateLayout(
+  layout: LayoutNode,
+  predicate: (n: LayoutNode) => boolean,
+  mutate: (n: LayoutNode, parent: LayoutNode | null, indexInParent: number) => LayoutNode,
+  parent: LayoutNode | null = null,
+  index = 0,
+): LayoutNode {
+  if (predicate(layout)) {
+    return mutate(layout, parent, index);
+  }
+  if (layout.type === "split") {
+    return {
+      ...layout,
+      children: layout.children.map((c, i) =>
+        findAndMutateLayout(c, predicate, mutate, layout, i),
+      ),
+    };
+  }
+  return layout;
+}
+
+function removeLeaf(layout: LayoutNode, paneId: string): LayoutNode | null {
+  if (layout.type === "leaf") {
+    return layout.paneId === paneId ? null : layout;
+  }
+  const newChildren: LayoutNode[] = [];
+  const newSizes: number[] = [];
+  layout.children.forEach((child, i) => {
+    const result = removeLeaf(child, paneId);
+    if (result) {
+      newChildren.push(result);
+      newSizes.push(layout.sizes[i]);
+    }
+  });
+  if (newChildren.length === 0) return null;
+  if (newChildren.length === 1) return newChildren[0];
+  // Renormalize sizes
+  const total = newSizes.reduce((a, b) => a + b, 0);
+  const normalized = newSizes.map((s) => (s / total) * 100);
+  return { ...layout, children: newChildren, sizes: normalized };
+}
+
+function setSizesAtPath(layout: LayoutNode, path: number[], sizes: number[]): LayoutNode {
+  if (path.length === 0) {
+    if (layout.type === "split") return { ...layout, sizes };
+    return layout;
+  }
+  if (layout.type !== "split") return layout;
+  const [head, ...rest] = path;
+  return {
+    ...layout,
+    children: layout.children.map((c, i) => (i === head ? setSizesAtPath(c, rest, sizes) : c)),
+  };
+}
+
+function makeTab(name: string, template: number): Tab {
+  const count = template;
+  const ids = Array.from({ length: count }, () => newId());
+  const panes = ids.reduce<Record<string, Pane>>((acc, id) => {
+    acc[id] = { id, kind: "terminal", payload: {} };
+    return acc;
+  }, {});
+  const layout = buildLayout(count, ids);
+  return {
+    id: newId(),
+    name,
+    color: TAB_COLORS[Math.floor(Math.random() * TAB_COLORS.length)],
+    layout,
+    panes,
+    activePaneId: ids[0],
+  };
+}
+
+const initial = makeTab("workspace 1", 1);
+
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
+  tabs: [initial],
+  activeTabId: initial.id,
+  selectedView: "workspace",
+  setView: (view) => set({ selectedView: view }),
+  newTab: (template, name) => {
+    const idx = get().tabs.length + 1;
+    const tab = makeTab(name ?? `workspace ${idx}`, template);
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selectedView: "workspace" }));
+    return tab.id;
+  },
+  closeTab: (id) => {
+    set((s) => {
+      const remaining = s.tabs.filter((t) => t.id !== id);
+      if (remaining.length === 0) {
+        const fresh = makeTab("workspace 1", 1);
+        return { tabs: [fresh], activeTabId: fresh.id };
+      }
+      const newActive =
+        s.activeTabId === id ? remaining[remaining.length - 1].id : s.activeTabId;
+      return { tabs: remaining, activeTabId: newActive };
+    });
+  },
+  setActiveTab: (id) => set({ activeTabId: id, selectedView: "workspace" }),
+  switchToTabIndex: (i) => {
+    const t = get().tabs[i];
+    if (t) get().setActiveTab(t.id);
+  },
+  renameTab: (id, name) =>
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, name } : t)) })),
+
+  setActivePane: (tabId, paneId) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, activePaneId: paneId } : t)),
+    })),
+
+  setPaneKind: (tabId, paneId, kind, payload) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              panes: {
+                ...t.panes,
+                [paneId]: {
+                  ...t.panes[paneId],
+                  kind,
+                  payload: payload ?? t.panes[paneId].payload,
+                },
+              },
+            }
+          : t,
+      ),
+    })),
+
+  setPanePayload: (tabId, paneId, payload) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              panes: {
+                ...t.panes,
+                [paneId]: { ...t.panes[paneId], payload: { ...t.panes[paneId].payload, ...payload } },
+              },
+            }
+          : t,
+      ),
+    })),
+
+  splitPane: (tabId, paneId, direction) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== tabId) return t;
+        const newPane = emptyPane("terminal");
+        const newLayout = findAndMutateLayout(
+          t.layout,
+          (n) => n.type === "leaf" && n.paneId === paneId,
+          (n) => ({
+            type: "split",
+            direction,
+            sizes: [50, 50],
+            children: [n, leaf(newPane.id)],
+          }),
+        );
+        return {
+          ...t,
+          panes: { ...t.panes, [newPane.id]: newPane },
+          layout: newLayout,
+          activePaneId: newPane.id,
+        };
+      }),
+    }));
+  },
+
+  closePane: (tabId, paneId) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== tabId) return t;
+        const stripped = removeLeaf(t.layout, paneId);
+        const { [paneId]: _, ...remaining } = t.panes;
+        if (!stripped) {
+          // Last pane closed: create a fresh one to keep the tab alive.
+          const p = emptyPane("terminal");
+          return {
+            ...t,
+            layout: leaf(p.id),
+            panes: { [p.id]: p },
+            activePaneId: p.id,
+          };
+        }
+        const firstRemaining = Object.keys(remaining)[0];
+        return {
+          ...t,
+          layout: stripped,
+          panes: remaining,
+          activePaneId: t.activePaneId === paneId ? firstRemaining : t.activePaneId,
+        };
+      }),
+    }));
+  },
+
+  setLayoutSizes: (tabId, path, sizes) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId ? { ...t, layout: setSizesAtPath(t.layout, path, sizes) } : t,
+      ),
+    })),
+}));
+
+export const TEMPLATES = [
+  { id: 1, label: "Single", panes: 1 },
+  { id: 2, label: "Split", panes: 2 },
+  { id: 4, label: "Quad", panes: 4 },
+  { id: 6, label: "Six", panes: 6 },
+  { id: 8, label: "Eight", panes: 8 },
+  { id: 9, label: "Nine (3×3)", panes: 9 },
+  { id: 12, label: "Twelve", panes: 12 },
+  { id: 16, label: "Sixteen", panes: 16 },
+];
