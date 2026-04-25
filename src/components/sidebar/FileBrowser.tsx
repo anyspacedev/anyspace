@@ -84,12 +84,21 @@ export function FileBrowser({ pane, tabId }: Props) {
             <div
               key={e.path}
               className={"fb-row" + (e.isDir ? " dir" : "")}
+              role="button"
+              tabIndex={0}
               draggable
               onDragStart={(ev) => {
                 ev.dataTransfer.setData("text/plain", e.path);
               }}
               onDoubleClick={() => openInEditor(e)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter" || ev.key === " ") {
+                  ev.preventDefault();
+                  openInEditor(e);
+                }
+              }}
               title={e.path}
+              aria-label={(e.isDir ? "Folder " : "File ") + e.name}
             >
               <span className="fb-icon">
                 <Icon name={e.isDir ? "folder" : "file"} size={13} />
