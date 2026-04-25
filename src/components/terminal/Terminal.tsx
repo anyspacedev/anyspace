@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { SearchAddon } from "@xterm/addon-search";
+import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
 import { ptySpawn, ptyWrite, ptyResize, ptyKill } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
@@ -50,6 +51,10 @@ export function Terminal({ pane, tabId }: Props) {
     term.loadAddon(search);
     term.loadAddon(new ClipboardAddon());
     term.open(containerRef.current);
+    // Harden the RenderService.dimensions getter against post-dispose access
+    // from xterm's own internal timers (Viewport schedules a syncScrollArea
+    // via setTimeout in its constructor that can fire after term.dispose()).
+    hardenRenderService(term);
     // WebGL addon must load after open() — earlier loads crash RenderService on first paint.
     try {
       const webgl = new WebglAddon();
