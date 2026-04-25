@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import type { Agent } from "../../lib/types";
 
@@ -14,20 +14,46 @@ export function AgentManager() {
   const createAgent = useKanbanStore((s) => s.createAgent);
   const updateAgent = useKanbanStore((s) => s.updateAgent);
   const deleteAgent = useKanbanStore((s) => s.deleteAgent);
-  const [draft, setDraft] = useState<Omit<Agent, "id">>(BLANK);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const editing = editingId ? agents.find((a) => a.id === editingId) : null;
-  const current = editing ?? draft;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Omit<Agent, "id">>(BLANK);
+  const [dirty, setDirty] = useState(false);
+
+  // When the user picks a different agent in the list, populate the form from it.
+  useEffect(() => {
+    if (editingId === null) {
+      setDraft(BLANK);
+      setDirty(false);
+      return;
+    }
+    const agent = agents.find((a) => a.id === editingId);
+    if (agent) {
+      const { id: _id, ...rest } = agent;
+      void _id;
+      setDraft(rest);
+      setDirty(false);
+    }
+  }, [editingId, agents]);
+
+  const update = (patch: Partial<Omit<Agent, "id">>) => {
+    setDraft((d) => ({ ...d, ...patch }));
+    setDirty(true);
+  };
 
   const save = async () => {
-    if (!current.name || !current.command) return;
+    if (!draft.name || !draft.command) return;
     if (editingId) {
-      await updateAgent(editingId, current);
+      await updateAgent(editingId, draft);
     } else {
-      await createAgent(current);
+      const created = await createAgent(draft);
+      setEditingId(created.id);
     }
-    setDraft(BLANK);
+    setDirty(false);
+  };
+
+  const onDelete = async () => {
+    if (!editingId) return;
+    await deleteAgent(editingId);
     setEditingId(null);
   };
 
@@ -47,30 +73,26 @@ export function AgentManager() {
         ))}
         <button
           className="btn btn-ghost agent-new"
-          onClick={() => { setEditingId(null); setDraft(BLANK); }}
+          onClick={() => setEditingId(null)}
         >
           + New agent
         </button>
       </div>
       <div className="agent-form">
-        <div className="section-title">{editing ? "Edit agent" : "New agent"}</div>
+        <div className="section-title">{editingId ? "Edit agent" : "New agent"}</div>
         <div className="form-row">
           <label>Name</label>
           <input
-            value={current.name}
-            onChange={(e) => editing
-              ? updateLocal({ name: e.target.value })
-              : setDraft((d) => ({ ...d, name: e.target.value }))}
+            value={draft.name}
+            onChange={(e) => update({ name: e.target.value })}
           />
         </div>
         <div className="form-row">
           <label>Command</label>
           <input
-            value={current.command}
+            value={draft.command}
             placeholder="e.g. claude --resume {task_file}"
-            onChange={(e) => editing
-              ? updateLocal({ command: e.target.value })
-              : setDraft((d) => ({ ...d, command: e.target.value }))}
+            onChange={(e) => update({ command: e.target.value })}
           />
           <div className="hint muted">
             Use <code>{"{task_file}"}</code> placeholder or <code>$TEAMSHIP_TASK_FILE</code> env var.
@@ -79,33 +101,27 @@ export function AgentManager() {
         <div className="form-row">
           <label>System prompt</label>
           <textarea
-            value={current.systemPrompt}
+            value={draft.systemPrompt}
             rows={4}
-            onChange={(e) => editing
-              ? updateLocal({ systemPrompt: e.target.value })
-              : setDraft((d) => ({ ...d, systemPrompt: e.target.value }))}
+            onChange={(e) => update({ systemPrompt: e.target.value })}
           />
         </div>
         <div className="modal-actions">
-          {editing && (
-            <button
-              className="btn btn-danger"
-              onClick={async () => { await deleteAgent(editing.id); setEditingId(null); }}
-            >
+          {editingId && (
+            <button className="btn btn-danger" onClick={onDelete}>
               Delete
             </button>
           )}
           <div style={{ flex: 1 }} />
-          <button className="btn btn-primary" onClick={save}>
-            {editing ? "Save" : "Create"}
+          <button
+            className="btn btn-primary"
+            disabled={!dirty || !draft.name || !draft.command}
+            onClick={save}
+          >
+            {editingId ? (dirty ? "Save changes" : "Saved") : "Create"}
           </button>
         </div>
       </div>
     </div>
   );
-
-  function updateLocal(patch: Partial<Agent>) {
-    if (!editing) return;
-    void updateAgent(editing.id, patch);
-  }
 }
