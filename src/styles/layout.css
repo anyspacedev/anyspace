@@ -379,6 +379,31 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.terminal-search {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+.terminal-search input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  width: 200px;
+}
+
 /* ===== Editor ===== */
 
 .editor-wrap {

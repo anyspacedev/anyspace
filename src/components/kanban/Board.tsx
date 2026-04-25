@@ -58,6 +58,8 @@ export function KanbanBoard() {
       const paneId = Object.keys(created.panes)[0];
       setPanePayload(tabId, paneId, {
         pendingCommand: plan.command,
+        spawnEnv: plan.env,
+        spawnCwd: task.projectPath,
         title: `▶ ${task.title}`,
       });
     }

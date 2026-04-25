@@ -3,6 +3,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
+import { SearchAddon } from "@xterm/addon-search";
 import { Channel } from "@tauri-apps/api/core";
 import { ptySpawn, ptyWrite, ptyResize, ptyKill } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
@@ -10,6 +11,7 @@ import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { applyEvent, parseOsc133Payload, type CommandBlock } from "./osc133";
 import { CommandBlocks } from "./CommandBlocks";
+import { registerShortcut } from "../../lib/shortcuts";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -17,10 +19,13 @@ export function Terminal({ pane, tabId }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const searchRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const [blocks, setBlocks] = useState<CommandBlock[]>([]);
   const blocksRef = useRef<CommandBlock[]>([]);
   const [overlay, setOverlay] = useState({ rowHeight: 16, scrollTop: 0, height: 0 });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const theme = useThemeStore((s) => s.current);
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
 
@@ -38,7 +43,9 @@ export function Terminal({ pane, tabId }: Props) {
     });
 
     const fit = new FitAddon();
+    const search = new SearchAddon();
     term.loadAddon(fit);
+    term.loadAddon(search);
     term.loadAddon(new ClipboardAddon());
     try {
       const webgl = new WebglAddon();
@@ -52,6 +59,7 @@ export function Terminal({ pane, tabId }: Props) {
 
     termRef.current = term;
     fitRef.current = fit;
+    searchRef.current = search;
 
     // OSC 133 handler.
     term.parser.registerOscHandler(133, (raw: string) => {
@@ -89,7 +97,9 @@ export function Terminal({ pane, tabId }: Props) {
     const cols = term.cols;
     const rows = term.rows;
     let disposed = false;
-    void ptySpawn({ cols, rows }, channel)
+    const spawnEnv = (pane.payload?.spawnEnv as Record<string, string> | undefined) ?? {};
+    const spawnCwd = pane.payload?.spawnCwd as string | undefined;
+    void ptySpawn({ cols, rows, env: spawnEnv, cwd: spawnCwd }, channel)
       .then((sid) => {
         if (disposed) {
           ptyKill(sid).catch(() => {});
@@ -156,19 +166,40 @@ export function Terminal({ pane, tabId }: Props) {
     t.options.theme = theme.terminal;
   }, [theme]);
 
-  // Auto-fire pending command after spawn (for agent-launched panes).
+  // Cmd+F opens in-terminal search (only when this pane is focused).
   useEffect(() => {
-    const cmd = pane.payload?.pendingCommand as string | undefined;
-    if (!cmd) return;
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    // Wait one tick to let the shell prompt settle.
+    const u = registerShortcut("search", () => {
+      // Best-effort: if this pane's container has focus, open the search bar.
+      const node = containerRef.current;
+      if (!node) return;
+      const active = document.activeElement;
+      if (node.contains(active) || node === active) {
+        setSearchOpen(true);
+      }
+    });
+    return u;
+  }, []);
+
+  const runSearch = (q: string, dir: "next" | "prev") => {
+    const s = searchRef.current;
+    if (!s) return;
+    if (dir === "next") s.findNext(q, { caseSensitive: false, wholeWord: false });
+    else s.findPrevious(q, { caseSensitive: false, wholeWord: false });
+  };
+
+  // Auto-fire pending command after spawn (for agent-launched panes).
+  // Depends on sessionId too: if pendingCommand is set before spawn, we re-evaluate
+  // once the session arrives and fire then.
+  const pendingCommand = pane.payload?.pendingCommand as string | undefined;
+  const sessionId = pane.payload?.sessionId as string | undefined;
+  useEffect(() => {
+    if (!pendingCommand || !sessionId) return;
     const id = window.setTimeout(() => {
-      void ptyWrite(sid, new TextEncoder().encode(cmd + "\n"));
+      void ptyWrite(sessionId, new TextEncoder().encode(pendingCommand + "\n"));
       setPanePayload(tabId, pane.id, { pendingCommand: undefined });
     }, 600);
     return () => clearTimeout(id);
-  }, [pane.payload?.pendingCommand, pane.id, tabId, setPanePayload]);
+  }, [pendingCommand, sessionId, pane.id, tabId, setPanePayload]);
 
   const toggleBlock = (id: string) => {
     blocksRef.current = blocksRef.current.map((b) =>
@@ -178,7 +209,7 @@ export function Terminal({ pane, tabId }: Props) {
   };
 
   return (
-    <div className="terminal-wrap" ref={containerRef}>
+    <div className="terminal-wrap" ref={containerRef} tabIndex={0}>
       <CommandBlocks
         blocks={blocks}
         rowHeight={overlay.rowHeight}
@@ -186,6 +217,26 @@ export function Terminal({ pane, tabId }: Props) {
         containerHeight={overlay.height}
         onToggle={toggleBlock}
       />
+      {searchOpen && (
+        <div className="terminal-search">
+          <input
+            autoFocus
+            placeholder="Search…"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              runSearch(e.target.value, "next");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setSearchOpen(false);
+              if (e.key === "Enter") runSearch(searchQuery, e.shiftKey ? "prev" : "next");
+            }}
+          />
+          <button className="icon-btn" onClick={() => runSearch(searchQuery, "prev")}>↑</button>
+          <button className="icon-btn" onClick={() => runSearch(searchQuery, "next")}>↓</button>
+          <button className="icon-btn" onClick={() => setSearchOpen(false)}>×</button>
+        </div>
+      )}
     </div>
   );
 }
