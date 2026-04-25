@@ -10,7 +10,6 @@ use tauri::ipc::Channel;
 pub type SessionId = String;
 
 pub struct PtySession {
-    pub id: SessionId,
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
@@ -18,7 +17,7 @@ pub struct PtySession {
 
 impl PtySession {
     pub fn spawn(
-        id: SessionId,
+        id: &SessionId,
         cwd: Option<String>,
         env: HashMap<String, String>,
         cols: u16,
@@ -64,7 +63,7 @@ impl PtySession {
         let master: Box<dyn MasterPty + Send> = pair.master;
 
         // Reader pump → channel
-        let id_for_thread = id.clone();
+        let id_for_thread = id.to_string();
         thread::spawn(move || {
             let mut buf = [0u8; 4096];
             loop {
@@ -84,7 +83,6 @@ impl PtySession {
         });
 
         Ok(Self {
-            id,
             master: Arc::new(Mutex::new(master)),
             writer: Arc::new(Mutex::new(writer)),
             child: Arc::new(Mutex::new(child)),
