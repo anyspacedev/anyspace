@@ -12,6 +12,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { applyEvent, parseOsc133Payload, type CommandBlock } from "./osc133";
 import { CommandBlocks } from "./CommandBlocks";
 import { registerShortcut } from "../../lib/shortcuts";
+import { Icon } from "../ui/Icon";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -219,6 +220,9 @@ export function Terminal({ pane, tabId }: Props) {
       />
       {searchOpen && (
         <div className="terminal-search">
+          <span className="terminal-search-prefix" aria-hidden="true">
+            <Icon name="search" size={14} />
+          </span>
           <input
             autoFocus
             placeholder="Search…"
@@ -232,9 +236,27 @@ export function Terminal({ pane, tabId }: Props) {
               if (e.key === "Enter") runSearch(searchQuery, e.shiftKey ? "prev" : "next");
             }}
           />
-          <button className="icon-btn" onClick={() => runSearch(searchQuery, "prev")}>↑</button>
-          <button className="icon-btn" onClick={() => runSearch(searchQuery, "next")}>↓</button>
-          <button className="icon-btn" onClick={() => setSearchOpen(false)}>×</button>
+          <button
+            className="icon-btn"
+            onClick={() => runSearch(searchQuery, "prev")}
+            aria-label="Previous match"
+          >
+            <Icon name="chevron-up" size={14} />
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => runSearch(searchQuery, "next")}
+            aria-label="Next match"
+          >
+            <Icon name="chevron-down" size={14} />
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => setSearchOpen(false)}
+            aria-label="Close search"
+          >
+            <Icon name="x" size={14} />
+          </button>
         </div>
       )}
     </div>

@@ -16,8 +16,12 @@ export type IconName =
   | "plus"
   | "x"
   | "chevron-down"
+  | "chevron-up"
   | "chevron-left"
   | "chevron-right"
+  | "check"
+  | "alert-circle"
+  | "dot"
   | "split-horizontal"
   | "split-vertical"
   | "play"
@@ -138,8 +142,19 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   "chevron-down": <path d="m6 9 6 6 6-6" />,
+  "chevron-up": <path d="m6 15 6-6 6 6" />,
   "chevron-left": <path d="m15 6-6 6 6 6" />,
   "chevron-right": <path d="m9 6 6 6-6 6" />,
+  check: <path d="m5 12 4 4 10-10" />,
+  "alert-circle": (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v6" />
+      <path d="M12 17h.01" />
+    </>
+  ),
+  // `dot` intentionally fills (rest are stroke-only) — used as a small status pip.
+  dot: <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />,
   "split-horizontal": (
     <>
       <rect x="3" y="3" width="18" height="18" rx="2" />
