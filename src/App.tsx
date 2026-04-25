@@ -21,12 +21,14 @@ export default function App() {
   const closeTab = useWorkspaceStore((s) => s.closeTab);
   const switchToTabIndex = useWorkspaceStore((s) => s.switchToTabIndex);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
+  const hydrateWorkspace = useWorkspaceStore((s) => s.hydrate);
   const loadKanban = useKanbanStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
+    void hydrateWorkspace();
     void loadKanban().catch((e) => console.warn("[kanban] load failed", e));
-  }, [loadTheme, loadKanban]);
+  }, [loadTheme, hydrateWorkspace, loadKanban]);
 
   useEffect(() => {
     const detach = attachGlobalShortcuts();

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { LayoutNode, Pane, PaneKind, Tab } from "../lib/types";
+import { settingsGet, settingsSet } from "../lib/tauri";
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
@@ -153,8 +154,10 @@ type WorkspaceState = {
   tabs: Tab[];
   activeTabId: string | null;
   selectedView: "workspace" | "kanban" | "agents" | "settings";
+  hydrated: boolean;
 
   setView: (view: WorkspaceState["selectedView"]) => void;
+  hydrate: () => Promise<void>;
 
   newTab: (template: number, name?: string, presets?: PanePreset[]) => string;
   closeTab: (id: string) => void;
@@ -258,11 +261,58 @@ function makeTab(name: string, template: number, presets: PanePreset[] = []): Ta
 
 const initial = makeTab("workspace 1", 1);
 
+const PERSIST_KEY = "workspaceSnapshot";
+
+type Snapshot = { tabs: Tab[]; activeTabId: string | null };
+
+// Strip ephemeral session refs from payload before persisting — old session IDs
+// are stale across launches and would confuse the terminal pane.
+const EPHEMERAL_KEYS = new Set(["sessionId", "pendingCommand"]);
+function stripEphemeral(payload: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!payload) return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(payload)) {
+    if (!EPHEMERAL_KEYS.has(k)) out[k] = v;
+  }
+  return out;
+}
+function snapshot(state: WorkspaceState): Snapshot {
+  const tabs = state.tabs.map((t) => ({
+    ...t,
+    panes: Object.fromEntries(
+      Object.entries(t.panes).map(([id, p]) => [id, { ...p, payload: stripEphemeral(p.payload) }]),
+    ),
+  }));
+  return { tabs, activeTabId: state.activeTabId };
+}
+
+let saveTimer: number | undefined;
+function persist(state: WorkspaceState) {
+  if (!state.hydrated) return;
+  if (saveTimer !== undefined) clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    void settingsSet(PERSIST_KEY, snapshot(state)).catch(() => {});
+  }, 400);
+}
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   tabs: [initial],
   activeTabId: initial.id,
   selectedView: "workspace",
+  hydrated: false,
   setView: (view) => set({ selectedView: view }),
+  hydrate: async () => {
+    try {
+      const snap = await settingsGet<Snapshot>(PERSIST_KEY);
+      if (snap && snap.tabs && snap.tabs.length > 0) {
+        set({ tabs: snap.tabs, activeTabId: snap.activeTabId ?? snap.tabs[0].id, hydrated: true });
+        return;
+      }
+    } catch {
+      // fall through to default
+    }
+    set({ hydrated: true });
+  },
   newTab: (template, name, presets) => {
     const idx = get().tabs.length + 1;
     const tab = makeTab(name ?? `workspace ${idx}`, template, presets);
@@ -387,6 +437,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ),
     })),
 }));
+
+// Persist tabs/activeTabId on every change once the store has hydrated.
+// The persist() helper already debounces (400ms), so calling on every set is fine.
+useWorkspaceStore.subscribe((state) => {
+  if (state.hydrated) persist(state);
+});
 
 export const TEMPLATES = [
   { id: 1, label: "Single", panes: 1 },
