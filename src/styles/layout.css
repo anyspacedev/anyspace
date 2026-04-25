@@ -701,6 +701,40 @@
 .template-label { font-weight: 600; }
 .template-sub { font-size: var(--font-size-xs); color: var(--fg-muted); }
 
+.modal.wide { min-width: 640px; max-width: 880px; }
+
+.agent-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--pad-sm);
+  max-height: 320px;
+  overflow: auto;
+  padding: 4px;
+}
+.agent-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--pad-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.agent-slot-num {
+  font-size: var(--font-size-xs);
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.agent-slot select {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+}
+
 /* ===== Quick Open ===== */
 
 .quickopen { min-width: 540px; padding: var(--pad-md); gap: var(--pad-sm); }

@@ -18,8 +18,6 @@ export function KanbanBoard() {
   const agents = useKanbanStore((s) => s.agents);
   const moveTask = useKanbanStore((s) => s.moveTask);
   const newTab = useWorkspaceStore((s) => s.newTab);
-  const tabs = useWorkspaceStore((s) => s.tabs);
-  const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
   const setView = useWorkspaceStore((s) => s.setView);
 
@@ -50,19 +48,16 @@ export function KanbanBoard() {
       taskBody: task.body,
       systemPrompt: agent.systemPrompt,
     });
-    // Spawn a new workspace tab with a single terminal, queue the agent command.
-    const tabId = newTab(1, `▶ ${task.title}`);
-    // After tab created, set its single pane's payload.
-    const created = tabs.find((t) => t.id === tabId) ?? useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
-    if (created) {
-      const paneId = Object.keys(created.panes)[0];
-      setPanePayload(tabId, paneId, {
+    // Spawn a new workspace tab with a single terminal preconfigured to fire the agent.
+    const tabId = newTab(1, `▶ ${task.title}`, [
+      {
+        kind: "terminal",
         pendingCommand: plan.command,
         spawnEnv: plan.env,
         spawnCwd: task.projectPath,
         title: `▶ ${task.title}`,
-      });
-    }
+      },
+    ]);
     setActiveTab(tabId);
     setView("workspace");
   };

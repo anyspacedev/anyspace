@@ -141,6 +141,14 @@ function buildLayout(paneCount: number, paneIds: string[]): LayoutNode {
   };
 }
 
+export type PanePreset = {
+  kind?: PaneKind;
+  pendingCommand?: string;
+  spawnEnv?: Record<string, string>;
+  spawnCwd?: string;
+  title?: string;
+};
+
 type WorkspaceState = {
   tabs: Tab[];
   activeTabId: string | null;
@@ -148,7 +156,7 @@ type WorkspaceState = {
 
   setView: (view: WorkspaceState["selectedView"]) => void;
 
-  newTab: (template: number, name?: string) => string;
+  newTab: (template: number, name?: string, presets?: PanePreset[]) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   switchToTabIndex: (i: number) => void;
@@ -218,11 +226,23 @@ function setSizesAtPath(layout: LayoutNode, path: number[], sizes: number[]): La
   };
 }
 
-function makeTab(name: string, template: number): Tab {
+function makeTab(name: string, template: number, presets: PanePreset[] = []): Tab {
   const count = template;
   const ids = Array.from({ length: count }, () => newId());
-  const panes = ids.reduce<Record<string, Pane>>((acc, id) => {
-    acc[id] = { id, kind: "terminal", payload: {} };
+  const panes = ids.reduce<Record<string, Pane>>((acc, id, i) => {
+    const preset = presets[i];
+    acc[id] = {
+      id,
+      kind: preset?.kind ?? "terminal",
+      payload: preset
+        ? {
+            pendingCommand: preset.pendingCommand,
+            spawnEnv: preset.spawnEnv,
+            spawnCwd: preset.spawnCwd,
+            title: preset.title,
+          }
+        : {},
+    };
     return acc;
   }, {});
   const layout = buildLayout(count, ids);
@@ -243,9 +263,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeTabId: initial.id,
   selectedView: "workspace",
   setView: (view) => set({ selectedView: view }),
-  newTab: (template, name) => {
+  newTab: (template, name, presets) => {
     const idx = get().tabs.length + 1;
-    const tab = makeTab(name ?? `workspace ${idx}`, template);
+    const tab = makeTab(name ?? `workspace ${idx}`, template, presets);
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selectedView: "workspace" }));
     return tab.id;
   },
