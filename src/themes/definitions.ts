@@ -368,7 +368,7 @@ const extras: Theme[] = [
   mk({
     id: "ghost", name: "Ghost", kind: "dark",
     bg: "#0a0a0a", bgElev: "#141414", bgElev2: "#1f1f1f",
-    fg: "#e8e8e8", fgMuted: "#9a9a9a", fgDim: "#555",
+    fg: "#e8e8e8", fgMuted: "#9a9a9a", fgDim: "#555555",
     border: "#262626", borderStrong: "#3a3a3a",
     accent: "#a8a8a8", accentFg: "#0a0a0a",
     success: "#7fbf7f", warning: "#d8a85a", danger: "#d97070", info: "#7faecf",

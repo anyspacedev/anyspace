@@ -29,6 +29,12 @@ export function applyTheme(theme: Theme) {
   root.style.colorScheme = theme.kind;
 }
 
+/** Strip "#" and expand 3-char hex to 6 — Monaco rejects 3-char tokens. */
+function hex6(value: string): string {
+  const v = value.replace("#", "");
+  return v.length === 3 ? v.split("").map((c) => c + c).join("") : v;
+}
+
 /** Build a Monaco theme definition from a Teamship theme. */
 export function monacoThemeFor(theme: Theme): {
   name: string;
@@ -42,11 +48,11 @@ export function monacoThemeFor(theme: Theme): {
     base: theme.kind === "dark" ? "vs-dark" : "vs",
     inherit: true,
     rules: [
-      { token: "comment", foreground: theme.ui.fgDim.replace("#", ""), fontStyle: "italic" },
-      { token: "keyword", foreground: theme.ui.accent.replace("#", "") },
-      { token: "string", foreground: theme.terminal.green.replace("#", "") },
-      { token: "number", foreground: theme.terminal.yellow.replace("#", "") },
-      { token: "type", foreground: theme.terminal.cyan.replace("#", "") },
+      { token: "comment", foreground: hex6(theme.ui.fgDim), fontStyle: "italic" },
+      { token: "keyword", foreground: hex6(theme.ui.accent) },
+      { token: "string", foreground: hex6(theme.terminal.green) },
+      { token: "number", foreground: hex6(theme.terminal.yellow) },
+      { token: "type", foreground: hex6(theme.terminal.cyan) },
     ],
     colors: {
       "editor.background": theme.ui.bg,

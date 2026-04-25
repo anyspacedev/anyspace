@@ -49,6 +49,8 @@ export function Terminal({ pane, tabId }: Props) {
     term.loadAddon(fit);
     term.loadAddon(search);
     term.loadAddon(new ClipboardAddon());
+    term.open(containerRef.current);
+    // WebGL addon must load after open() — earlier loads crash RenderService on first paint.
     try {
       const webgl = new WebglAddon();
       webgl.onContextLoss(() => webgl.dispose());
@@ -56,7 +58,6 @@ export function Terminal({ pane, tabId }: Props) {
     } catch {
       // WebGL unavailable — canvas fallback is automatic.
     }
-    term.open(containerRef.current);
     fit.fit();
 
     termRef.current = term;
