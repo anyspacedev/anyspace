@@ -1,6 +1,7 @@
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useState } from "react";
 import { TemplatePickerTrigger } from "./TemplatePicker";
+import { Icon } from "../ui/Icon";
 
 export function TabBar() {
   const tabs = useWorkspaceStore((s) => s.tabs);
@@ -56,12 +57,13 @@ export function TabBar() {
             )}
             <button
               className="tab-close"
+              aria-label="Close tab"
               onClick={(e) => {
                 e.stopPropagation();
                 closeTab(tab.id);
               }}
             >
-              ×
+              <Icon name="x" size={12} />
             </button>
           </div>
         ))}

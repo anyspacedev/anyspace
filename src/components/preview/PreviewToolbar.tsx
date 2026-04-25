@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Icon } from "../ui/Icon";
 
 export type Device = "desktop" | "tablet" | "phone" | "fluid";
 
@@ -39,7 +40,9 @@ export function PreviewToolbar({
 
   return (
     <div className="preview-toolbar">
-      <button className="icon-btn" title="Refresh" onClick={onRefresh}>↻</button>
+      <button className="icon-btn" title="Refresh" aria-label="Refresh" onClick={onRefresh}>
+        <Icon name="refresh" size={14} />
+      </button>
       <input
         className="url-input"
         value={draft}
@@ -48,7 +51,14 @@ export function PreviewToolbar({
           if (e.key === "Enter") onUrl(draft);
         }}
       />
-      <button className="icon-btn" title="Open in system browser" onClick={onOpenExternal}>↗</button>
+      <button
+        className="icon-btn"
+        title="Open in system browser"
+        aria-label="Open in system browser"
+        onClick={onOpenExternal}
+      >
+        <Icon name="external-link" size={14} />
+      </button>
       <span className="toolbar-divider" />
       <select
         value={device}

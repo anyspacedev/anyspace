@@ -17,8 +17,10 @@ body {
   color: var(--fg);
   font-family: var(--font-sans);
   font-size: var(--font-size);
+  font-feature-settings: var(--font-feature-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   overflow: hidden;
   user-select: none;
 }
@@ -31,6 +33,10 @@ button {
   border: none;
   padding: 0;
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 input,
@@ -47,6 +53,11 @@ textarea::placeholder {
   color: var(--fg-dim);
 }
 
+select {
+  font-family: inherit;
+  color: inherit;
+}
+
 kbd {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -57,6 +68,40 @@ kbd {
   color: var(--fg-muted);
 }
 
+/* Use tabular numerals wherever numbers appear in chrome (counters, status). */
+.statusbar,
+.nav-badge,
+.kanban-col-count,
+.tab,
+.editor-status {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: var(--font-feature-num);
+}
+
+/* Global focus-visible — applies to any interactive element that doesn't
+   define its own. Uses a 2-stop ring so it stays readable on every theme. */
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+button:focus-visible,
+.tab:focus-visible,
+.nav-item:focus-visible,
+.kanban-card:focus-visible,
+.template-card:focus-visible,
+.theme-card:focus-visible {
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+/* Scrollbars — slim, theme-aware. */
 .scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -67,9 +112,18 @@ kbd {
 .scrollbar::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 .scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
+  background-clip: padding-box;
+}
+
+/* Selection color — mirrors the accent. */
+::selection {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  color: var(--fg);
 }
 
 /* xterm overrides */
@@ -78,4 +132,15 @@ kbd {
 }
 .xterm .xterm-viewport {
   background-color: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

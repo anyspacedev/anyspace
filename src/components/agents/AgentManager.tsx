@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import type { Agent } from "../../lib/types";
+import { Icon } from "../ui/Icon";
 
 const BLANK: Omit<Agent, "id"> = {
   name: "",
@@ -61,6 +62,12 @@ export function AgentManager() {
     <div className="agent-manager">
       <div className="agent-list">
         <div className="section-title">Agents</div>
+        {agents.length === 0 && (
+          <div className="agent-list-empty">
+            <Icon name="sparkles" size={18} />
+            <div>No agents yet. Create one to launch via task or pane.</div>
+          </div>
+        )}
         {agents.map((a) => (
           <div
             key={a.id}
@@ -72,10 +79,11 @@ export function AgentManager() {
           </div>
         ))}
         <button
-          className="btn btn-ghost agent-new"
+          className="btn btn-ghost agent-new btn-with-icon"
           onClick={() => setEditingId(null)}
         >
-          + New agent
+          <Icon name="plus" size={14} />
+          <span>New agent</span>
         </button>
       </div>
       <div className="agent-form">

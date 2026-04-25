@@ -4,6 +4,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { fsListDirRecursive, settingsGet, settingsSet, type FileEntry } from "../../lib/tauri";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { registerShortcut } from "../../lib/shortcuts";
+import { Icon } from "../ui/Icon";
 
 export function QuickOpen() {
   const [open, setOpen] = useState(false);
@@ -76,21 +77,31 @@ export function QuickOpen() {
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div className="modal quickopen" onClick={(e) => e.stopPropagation()}>
         <div className="quickopen-input-row">
-          <input
-            ref={inputRef}
-            placeholder={root ? "Search files…" : "Pick a folder first"}
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setHighlight(0); }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setOpen(false);
-              if (e.key === "ArrowDown") { setHighlight((h) => Math.min(h + 1, results.length - 1)); e.preventDefault(); }
-              if (e.key === "ArrowUp") { setHighlight((h) => Math.max(0, h - 1)); e.preventDefault(); }
-              if (e.key === "Enter") { const r = results[highlight]; if (r) openFile(r); }
-            }}
-          />
+          <div className="quickopen-input-wrap">
+            <span className="quickopen-input-icon">
+              <Icon name="search" size={14} />
+            </span>
+            <input
+              ref={inputRef}
+              placeholder={root ? "Search files…" : "Pick a folder first"}
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setHighlight(0); }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setOpen(false);
+                if (e.key === "ArrowDown") { setHighlight((h) => Math.min(h + 1, results.length - 1)); e.preventDefault(); }
+                if (e.key === "ArrowUp") { setHighlight((h) => Math.max(0, h - 1)); e.preventDefault(); }
+                if (e.key === "Enter") { const r = results[highlight]; if (r) openFile(r); }
+              }}
+            />
+          </div>
           <button className="btn btn-ghost" onClick={pickRoot}>{root ? "Change root" : "Pick folder"}</button>
         </div>
-        {!root && <div className="quickopen-empty">No folder. Pick one to index files.</div>}
+        {!root && (
+          <div className="quickopen-empty">
+            <Icon name="folder" size={20} />
+            <div>Pick a project folder to index its files for fast search.</div>
+          </div>
+        )}
         {root && (
           <div className="quickopen-list scrollbar">
             {results.map((r, i) => (
@@ -104,9 +115,16 @@ export function QuickOpen() {
                 <span className="qo-path">{r.path.replace(root, "").replace(/^\//, "")}</span>
               </div>
             ))}
-            {results.length === 0 && <div className="quickopen-empty">No matches</div>}
+            {results.length === 0 && query && (
+              <div className="quickopen-empty">No matches for “{query}”</div>
+            )}
           </div>
         )}
+        <div className="quickopen-footer">
+          <span><kbd>↑↓</kbd> navigate</span>
+          <span><kbd>↵</kbd> open</span>
+          <span><kbd>Esc</kbd> close</span>
+        </div>
       </div>
     </div>
   );

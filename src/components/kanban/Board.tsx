@@ -12,6 +12,7 @@ import { Column } from "./Column";
 import { TaskEditor } from "./TaskEditor";
 import { agentLaunch } from "../../lib/tauri";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { Icon } from "../ui/Icon";
 
 export function KanbanBoard() {
   const tasks = useKanbanStore((s) => s.tasks);
@@ -49,13 +50,13 @@ export function KanbanBoard() {
       systemPrompt: agent.systemPrompt,
     });
     // Spawn a new workspace tab with a single terminal preconfigured to fire the agent.
-    const tabId = newTab(1, `▶ ${task.title}`, [
+    const tabId = newTab(1, task.title, [
       {
         kind: "terminal",
         pendingCommand: plan.command,
         spawnEnv: plan.env,
         spawnCwd: task.projectPath,
-        title: `▶ ${task.title}`,
+        title: task.title,
       },
     ]);
     setActiveTab(tabId);
@@ -65,7 +66,10 @@ export function KanbanBoard() {
   return (
     <div className="kanban">
       <div className="kanban-toolbar">
-        <button className="btn" onClick={() => setCreating(true)}>+ New task</button>
+        <button className="btn btn-primary btn-with-icon" onClick={() => setCreating(true)}>
+          <Icon name="plus" size={14} />
+          <span>New task</span>
+        </button>
       </div>
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="kanban-cols">

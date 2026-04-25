@@ -8,6 +8,7 @@ import { monacoThemeFor } from "../../themes/apply";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { languageFor } from "./languages";
+import { Icon } from "../ui/Icon";
 
 // Wire monaco loader to use the bundled instance (offline-capable).
 loader.config({ monaco });
@@ -74,21 +75,27 @@ export function Editor({ pane, tabId }: Props) {
   if (!path) {
     return (
       <div className="editor-empty">
+        <div className="editor-empty-icon">
+          <Icon name="file-edit" size={24} />
+        </div>
         <div className="editor-empty-title">No file open</div>
         <div className="editor-empty-sub">
-          Press <kbd>⌘P</kbd> to open Quick Open or pick a file:
+          Open a file from disk, or press <kbd>⌘P</kbd> for Quick Open.
         </div>
-        <button
-          className="btn"
-          onClick={async () => {
-            const selected = await openDialog({ multiple: false });
-            if (typeof selected === "string") {
-              setPanePayload(tabId, pane.id, { path: selected });
-            }
-          }}
-        >
-          Open file…
-        </button>
+        <div className="editor-empty-actions">
+          <button
+            className="btn btn-primary btn-with-icon"
+            onClick={async () => {
+              const selected = await openDialog({ multiple: false });
+              if (typeof selected === "string") {
+                setPanePayload(tabId, pane.id, { path: selected });
+              }
+            }}
+          >
+            <Icon name="file" size={14} />
+            <span>Open file…</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -98,7 +105,13 @@ export function Editor({ pane, tabId }: Props) {
       <div className="editor-bar">
         <span className="editor-path">{path}</span>
         <span className="editor-status">
-          {dirty ? "● modified" : savedAt ? "saved" : ""}
+          {dirty && (
+            <>
+              <span className="editor-dirty-dot" />
+              <span>Modified</span>
+            </>
+          )}
+          {!dirty && savedAt && <span className="editor-status-ok">Saved</span>}
         </span>
       </div>
       <div className="editor-host">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import type { Task } from "../../lib/types";
+import { Icon } from "../ui/Icon";
 
 export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
   const create = useKanbanStore((s) => s.createTask);
@@ -42,7 +43,10 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} />
         </div>
         <div className="form-row">
-          <label>Agent</label>
+          <label className="label-with-icon">
+            <Icon name="sparkles" size={12} />
+            <span>Agent</span>
+          </label>
           <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
             <option value="">— none —</option>
             {agents.map((a) => (

@@ -7,6 +7,7 @@ import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { PreviewToolbar, type Device } from "./PreviewToolbar";
 import { DeviceFrame } from "./DeviceFrame";
+import { Icon } from "../ui/Icon";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -70,25 +71,36 @@ export function PreviewPane({ pane, tabId }: Props) {
   if (!url) {
     return (
       <div className="preview-empty">
+        <div className="preview-empty-icon">
+          <Icon name="globe" size={24} />
+        </div>
         <div className="preview-empty-title">Live preview</div>
         <div className="preview-empty-sub">
           Auto-detects local dev servers (Vite, Next, Astro, SvelteKit, …) and reloads on file changes.
         </div>
-        {detecting && <div className="muted">Probing localhost ports…</div>}
+        {detecting && (
+          <div className="preview-empty-detecting">
+            <span className="watching-dot" />
+            <span>Probing localhost ports…</span>
+          </div>
+        )}
         <div className="preview-empty-actions">
-          <button className="btn" onClick={pickProject}>Pick project folder…</button>
-          <span className="muted">or paste a URL:</span>
-          <input
-            placeholder="http://localhost:5173"
-            className="url-input"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const v = (e.target as HTMLInputElement).value.trim();
-                if (v) setUrl(v);
-              }
-            }}
-          />
+          <button className="btn btn-primary btn-with-icon" onClick={pickProject}>
+            <Icon name="folder" size={14} />
+            <span>Pick project folder</span>
+          </button>
         </div>
+        <div className="preview-empty-divider"><span>or paste a URL</span></div>
+        <input
+          placeholder="http://localhost:5173"
+          className="url-input preview-empty-url"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              const v = (e.target as HTMLInputElement).value.trim();
+              if (v) setUrl(v);
+            }
+          }}
+        />
       </div>
     );
   }

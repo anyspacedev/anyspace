@@ -3,6 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { fsListDirRecursive, type FileEntry } from "../../lib/tauri";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { Icon } from "../ui/Icon";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -90,7 +91,9 @@ export function FileBrowser({ pane, tabId }: Props) {
               onDoubleClick={() => openInEditor(e)}
               title={e.path}
             >
-              <span className="fb-icon">{e.isDir ? "▸" : "·"}</span>
+              <span className="fb-icon">
+                <Icon name={e.isDir ? "folder" : "file"} size={13} />
+              </span>
               <span className="fb-name">{e.name}</span>
             </div>
           ))}

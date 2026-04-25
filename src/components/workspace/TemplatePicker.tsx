@@ -3,6 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { TEMPLATES, useWorkspaceStore, type PanePreset } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { agentLaunch } from "../../lib/tauri";
+import { Icon } from "../ui/Icon";
 
 type Step = "template" | "agents";
 
@@ -100,8 +101,13 @@ export function TemplatePickerTrigger() {
 
   return (
     <>
-      <button className="btn btn-ghost" onClick={() => setOpen(true)} title="New workspace (Cmd+T)">
-        + Workspace
+      <button
+        className="btn btn-ghost btn-with-icon"
+        onClick={() => setOpen(true)}
+        title="New workspace (Cmd+T)"
+      >
+        <Icon name="plus" size={14} />
+        <span>Workspace</span>
       </button>
       {open && (
         <div className="modal-backdrop" onClick={reset}>
@@ -172,14 +178,14 @@ export function TemplatePickerTrigger() {
                       >
                         <option value="">— Plain shell —</option>
                         <optgroup label="Other pane kinds">
-                          <option value="preview">◉ Live preview</option>
-                          <option value="editor">✎ Editor</option>
-                          <option value="files">▣ File browser</option>
+                          <option value="preview">Live preview</option>
+                          <option value="editor">Editor</option>
+                          <option value="files">File browser</option>
                         </optgroup>
                         {agents.length > 0 && (
                           <optgroup label="Agents">
                             {agents.map((a) => (
-                              <option key={a.id} value={`agent:${a.id}`}>✦ {a.name}</option>
+                              <option key={a.id} value={`agent:${a.id}`}>{a.name}</option>
                             ))}
                           </optgroup>
                         )}
@@ -189,7 +195,10 @@ export function TemplatePickerTrigger() {
                 </div>
 
                 <div className="modal-actions">
-                  <button className="btn btn-ghost" onClick={() => setStep("template")}>← Back</button>
+                  <button className="btn btn-ghost btn-with-icon" onClick={() => setStep("template")}>
+                    <Icon name="chevron-left" size={14} />
+                    <span>Back</span>
+                  </button>
                   <div style={{ flex: 1 }} />
                   <button
                     className="btn btn-ghost"

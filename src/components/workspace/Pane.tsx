@@ -5,6 +5,7 @@ import { Editor } from "../editor/Editor";
 import { PreviewPane } from "../preview/PreviewPane";
 import { FileBrowser } from "../sidebar/FileBrowser";
 import { PaneHeader } from "./PaneHeader";
+import { Icon, type IconName } from "../ui/Icon";
 
 export function Pane({ pane, tabId }: { pane: PaneType; tabId: string }) {
   const setActivePane = useWorkspaceStore((s) => s.setActivePane);
@@ -35,6 +36,39 @@ function PaneBody({ kind, pane, tabId }: { kind: PaneKind; pane: PaneType; tabId
     case "filebrowser": return <FileBrowser pane={pane} tabId={tabId} />;
     case "empty":
     default:
-      return <div className="empty-pane">Empty pane</div>;
+      return <EmptyPane pane={pane} tabId={tabId} />;
   }
+}
+
+const QUICK_PICKS: Array<{ kind: PaneKind; label: string; icon: IconName; hint: string }> = [
+  { kind: "terminal", label: "Terminal", icon: "terminal", hint: "Run a shell" },
+  { kind: "editor", label: "Editor", icon: "file-edit", hint: "Edit code" },
+  { kind: "preview", label: "Preview", icon: "globe", hint: "Live web preview" },
+  { kind: "filebrowser", label: "Files", icon: "folder-tree", hint: "Browse a folder" },
+];
+
+function EmptyPane({ pane, tabId }: { pane: PaneType; tabId: string }) {
+  const setPaneKind = useWorkspaceStore((s) => s.setPaneKind);
+  return (
+    <div className="empty-pane">
+      <div className="empty-pane-card">
+        <div className="empty-pane-title">Choose a pane kind</div>
+        <div className="empty-pane-grid">
+          {QUICK_PICKS.map((p) => (
+            <button
+              key={p.kind}
+              className="empty-pane-pick"
+              onClick={() => setPaneKind(tabId, pane.id, p.kind, {})}
+            >
+              <span className="empty-pane-pick-icon">
+                <Icon name={p.icon} size={18} />
+              </span>
+              <span className="empty-pane-pick-label">{p.label}</span>
+              <span className="empty-pane-pick-hint">{p.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
