@@ -17,6 +17,13 @@ import { Icon } from "../ui/Icon";
 
 type Props = { pane: Pane; tabId: string };
 
+// Browsers cap active WebGL contexts (Chromium ~16, WebKit ~8) and evict the
+// oldest when exceeded, spamming the console. Cap WebGL terminals well below
+// that — extra panes use xterm's default DOM renderer, which is slower but has
+// no per-pane GPU cost.
+const MAX_WEBGL_TERMINALS = 6;
+let activeWebglTerminals = 0;
+
 export function Terminal({ pane, tabId }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
@@ -56,12 +63,28 @@ export function Terminal({ pane, tabId }: Props) {
     // via setTimeout in its constructor that can fire after term.dispose()).
     hardenRenderService(term);
     // WebGL addon must load after open() — earlier loads crash RenderService on first paint.
-    try {
-      const webgl = new WebglAddon();
-      webgl.onContextLoss(() => webgl.dispose());
-      term.loadAddon(webgl);
-    } catch {
-      // WebGL unavailable — canvas fallback is automatic.
+    // Cap concurrent WebGL contexts; the rest use xterm's default DOM renderer.
+    let webglClaimed = false;
+    if (activeWebglTerminals < MAX_WEBGL_TERMINALS) {
+      try {
+        const webgl = new WebglAddon();
+        activeWebglTerminals += 1;
+        webglClaimed = true;
+        webgl.onContextLoss(() => {
+          if (webglClaimed) {
+            webglClaimed = false;
+            activeWebglTerminals = Math.max(0, activeWebglTerminals - 1);
+          }
+          webgl.dispose();
+        });
+        term.loadAddon(webgl);
+      } catch {
+        if (webglClaimed) {
+          webglClaimed = false;
+          activeWebglTerminals = Math.max(0, activeWebglTerminals - 1);
+        }
+        // WebGL unavailable — DOM renderer fallback is automatic.
+      }
     }
 
     termRef.current = term;
@@ -181,6 +204,10 @@ export function Terminal({ pane, tabId }: Props) {
       const sid = sessionIdRef.current;
       if (sid) ptyKill(sid).catch(() => {});
       term.dispose();
+      if (webglClaimed) {
+        webglClaimed = false;
+        activeWebglTerminals = Math.max(0, activeWebglTerminals - 1);
+      }
       termRef.current = null;
       fitRef.current = null;
     };
