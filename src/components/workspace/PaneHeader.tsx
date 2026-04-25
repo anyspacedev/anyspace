@@ -73,7 +73,7 @@ export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
           aria-label="Split horizontal"
           onClick={() => splitPane(tabId, pane.id, "horizontal")}
         >
-          <Icon name="split-horizontal" size={14} />
+          <Icon name="split-vertical" size={14} />
         </button>
         <button
           className="icon-btn"
@@ -81,7 +81,7 @@ export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
           aria-label="Split vertical"
           onClick={() => splitPane(tabId, pane.id, "vertical")}
         >
-          <Icon name="split-vertical" size={14} />
+          <Icon name="split-horizontal" size={14} />
         </button>
         <button
           className="icon-btn"
