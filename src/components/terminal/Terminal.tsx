@@ -58,11 +58,21 @@ export function Terminal({ pane, tabId }: Props) {
     } catch {
       // WebGL unavailable — canvas fallback is automatic.
     }
-    fit.fit();
 
     termRef.current = term;
     fitRef.current = fit;
     searchRef.current = search;
+
+    // Defer the first fit: calling fit.fit() synchronously after open()
+    // races the renderer init and crashes on `_renderer.value.dimensions`.
+    const safeFit = () => {
+      try {
+        fit.fit();
+      } catch {
+        /* renderer not ready yet */
+      }
+    };
+    const initialFitRaf = requestAnimationFrame(safeFit);
 
     // OSC 133 handler.
     term.parser.registerOscHandler(133, (raw: string) => {
@@ -77,17 +87,20 @@ export function Terminal({ pane, tabId }: Props) {
 
     // Track scroll + size for overlay positioning.
     const updateGeom = () => {
-      const el = containerRef.current?.querySelector(".xterm-viewport") as HTMLElement | null;
-      const rowH = (term as unknown as { _core?: { _renderService?: { dimensions?: { css?: { cell?: { height: number } } } } } })._core?._renderService?.dimensions?.css?.cell?.height ?? 16;
-      setOverlay({
-        rowHeight: rowH,
-        scrollTop: el?.scrollTop ?? 0,
-        height: containerRef.current?.clientHeight ?? 0,
-      });
+      try {
+        const el = containerRef.current?.querySelector(".xterm-viewport") as HTMLElement | null;
+        const rowH = (term as unknown as { _core?: { _renderService?: { dimensions?: { css?: { cell?: { height: number } } } } } })._core?._renderService?.dimensions?.css?.cell?.height ?? 16;
+        setOverlay({
+          rowHeight: rowH,
+          scrollTop: el?.scrollTop ?? 0,
+          height: containerRef.current?.clientHeight ?? 0,
+        });
+      } catch {
+        /* renderer not ready yet */
+      }
     };
     term.onScroll(updateGeom);
     term.onRender(updateGeom);
-    updateGeom();
 
     // Spawn PTY
     const channel = new Channel<Uint8Array>();
@@ -123,14 +136,19 @@ export function Terminal({ pane, tabId }: Props) {
       void ptyWrite(sid, bytes).catch(() => {});
     });
 
-    // Forward resize on container resize
+    // Forward resize on container resize. Defer to rAF so we don't race
+    // the renderer when the observer fires synchronously on observe().
+    let resizeRaf = 0;
     const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        const sid = sessionIdRef.current;
-        if (sid) void ptyResize(sid, term.cols, term.rows).catch(() => {});
-        updateGeom();
-      } catch {/* noop */}
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        try {
+          fit.fit();
+          const sid = sessionIdRef.current;
+          if (sid) void ptyResize(sid, term.cols, term.rows).catch(() => {});
+          updateGeom();
+        } catch {/* noop */}
+      });
     });
     ro.observe(containerRef.current);
 
@@ -149,6 +167,8 @@ export function Terminal({ pane, tabId }: Props) {
 
     return () => {
       disposed = true;
+      cancelAnimationFrame(initialFitRaf);
+      cancelAnimationFrame(resizeRaf);
       dataDisp.dispose();
       ro.disconnect();
       node.removeEventListener("drop", dropHandler);

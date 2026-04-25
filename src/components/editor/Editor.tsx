@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import MonacoEditor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
+import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
+import HtmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
+import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useThemeStore } from "../../stores/themeStore";
@@ -9,6 +14,30 @@ import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { languageFor } from "./languages";
 import { Icon } from "../ui/Icon";
+
+// Monaco needs a real Worker per language. Without this, JSON/TS modes
+// fall through to the AMD loader path and crash on `moduleIdToUrl.toUrl`.
+(self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
+  getWorker(_workerId, label) {
+    switch (label) {
+      case "json":
+        return new JsonWorker();
+      case "css":
+      case "scss":
+      case "less":
+        return new CssWorker();
+      case "html":
+      case "handlebars":
+      case "razor":
+        return new HtmlWorker();
+      case "typescript":
+      case "javascript":
+        return new TsWorker();
+      default:
+        return new EditorWorker();
+    }
+  },
+};
 
 // Wire monaco loader to use the bundled instance (offline-capable).
 loader.config({ monaco });
