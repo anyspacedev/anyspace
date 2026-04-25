@@ -35,11 +35,17 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
       <div className="modal task-editor" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{task ? "Edit task" : "New task"}</div>
         <div className="form-row">
-          <label>Title</label>
+          <label className="label-with-icon">
+            <Icon name="file-edit" size={12} />
+            <span>Title</span>
+          </label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         </div>
         <div className="form-row">
-          <label>Body</label>
+          <label className="label-with-icon">
+            <Icon name="list-checks" size={12} />
+            <span>Body</span>
+          </label>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} />
         </div>
         <div className="form-row">
@@ -55,10 +61,16 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
           </select>
         </div>
         <div className="form-row">
-          <label>Project path</label>
+          <label className="label-with-icon">
+            <Icon name="folder" size={12} />
+            <span>Project path</span>
+          </label>
           <div className="form-row-inline">
             <input value={projectPath} onChange={(e) => setProjectPath(e.target.value)} placeholder="optional" />
-            <button className="btn btn-ghost" onClick={pickProject}>Pick…</button>
+            <button className="btn btn-ghost btn-with-icon" onClick={pickProject}>
+              <Icon name="folder" size={14} />
+              <span>Pick…</span>
+            </button>
           </div>
         </div>
         <div className="modal-actions">

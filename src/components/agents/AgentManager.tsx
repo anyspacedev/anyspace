@@ -74,8 +74,13 @@ export function AgentManager() {
             className={"agent-row" + (a.id === editingId ? " active" : "")}
             onClick={() => setEditingId(a.id)}
           >
-            <div className="agent-row-name">{a.name}</div>
-            <div className="agent-row-cmd">{a.command}</div>
+            <div className="agent-row-icon">
+              <Icon name="terminal" size={14} />
+            </div>
+            <div className="agent-row-text">
+              <div className="agent-row-name">{a.name}</div>
+              <div className="agent-row-cmd">{a.command}</div>
+            </div>
           </div>
         ))}
         <button
@@ -89,25 +94,34 @@ export function AgentManager() {
       <div className="agent-form">
         <div className="section-title">{editingId ? "Edit agent" : "New agent"}</div>
         <div className="form-row">
-          <label>Name</label>
+          <label className="label-with-icon">
+            <Icon name="file-edit" size={12} />
+            <span>Name</span>
+          </label>
           <input
             value={draft.name}
             onChange={(e) => update({ name: e.target.value })}
           />
         </div>
         <div className="form-row">
-          <label>Command</label>
+          <label className="label-with-icon">
+            <Icon name="terminal" size={12} />
+            <span>Command</span>
+          </label>
           <input
             value={draft.command}
             placeholder="e.g. claude --resume {task_file}"
             onChange={(e) => update({ command: e.target.value })}
           />
-          <div className="hint muted">
+          <div className="hint">
             Use <code>{"{task_file}"}</code> placeholder or <code>$TEAMSHIP_TASK_FILE</code> env var.
           </div>
         </div>
         <div className="form-row">
-          <label>System prompt</label>
+          <label className="label-with-icon">
+            <Icon name="sparkles" size={12} />
+            <span>System prompt</span>
+          </label>
           <textarea
             value={draft.systemPrompt}
             rows={4}
@@ -116,17 +130,19 @@ export function AgentManager() {
         </div>
         <div className="modal-actions">
           {editingId && (
-            <button className="btn btn-danger" onClick={onDelete}>
-              Delete
+            <button className="btn btn-danger btn-with-icon" onClick={onDelete}>
+              <Icon name="x" size={14} />
+              <span>Delete</span>
             </button>
           )}
           <div style={{ flex: 1 }} />
           <button
-            className="btn btn-primary"
+            className="btn btn-primary btn-with-icon"
             disabled={!dirty || !draft.name || !draft.command}
             onClick={save}
           >
-            {editingId ? (dirty ? "Save changes" : "Saved") : "Create"}
+            <Icon name={editingId ? "check" : "plus"} size={14} />
+            <span>{editingId ? (dirty ? "Save changes" : "Saved") : "Create"}</span>
           </button>
         </div>
       </div>

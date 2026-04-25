@@ -94,7 +94,10 @@ export function QuickOpen() {
               }}
             />
           </div>
-          <button className="btn btn-ghost" onClick={pickRoot}>{root ? "Change root" : "Pick folder"}</button>
+          <button className="btn btn-ghost btn-with-icon" onClick={pickRoot}>
+            <Icon name="folder" size={14} />
+            <span>{root ? "Change root" : "Pick folder"}</span>
+          </button>
         </div>
         {!root && (
           <div className="quickopen-empty">
