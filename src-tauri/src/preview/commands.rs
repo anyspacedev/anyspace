@@ -7,8 +7,11 @@ use std::time::Duration;
 use tauri::{AppHandle, State};
 
 #[tauri::command]
-pub async fn preview_detect(project_path: String) -> Result<Option<DetectedPreview>, String> {
-    detect(project_path).await
+pub async fn preview_detect(
+    app: AppHandle,
+    project_path: String,
+) -> Result<Option<DetectedPreview>, String> {
+    detect(&app, project_path).await
 }
 
 #[derive(Debug, Serialize)]
@@ -25,8 +28,9 @@ pub struct FrameabilityReport {
 /// We GET (rather than HEAD) because some dev servers don't implement HEAD and return 404 — and
 /// we need the response headers anyway.
 #[tauri::command]
-pub async fn preview_can_frame(url: String) -> Result<FrameabilityReport, String> {
-    let client = reqwest::Client::builder()
+pub async fn preview_can_frame(app: AppHandle, url: String) -> Result<FrameabilityReport, String> {
+    let client = crate::net::http_client_builder(&app)
+        .map_err(|e| e.to_string())?
         .timeout(Duration::from_secs(3))
         .redirect(reqwest::redirect::Policy::limited(3))
         .build()

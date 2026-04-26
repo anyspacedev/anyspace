@@ -11,7 +11,7 @@ pub struct AiChatArgs {
 }
 
 #[tauri::command]
-pub async fn ai_chat(args: AiChatArgs) -> Result<String, String> {
+pub async fn ai_chat(app: tauri::AppHandle, args: AiChatArgs) -> Result<String, String> {
     let url = format!(
         "{}/chat/completions",
         args.endpoint.trim_end_matches('/')
@@ -25,7 +25,8 @@ pub async fn ai_chat(args: AiChatArgs) -> Result<String, String> {
         ],
     });
 
-    let resp = reqwest::Client::new()
+    let client = crate::net::http_client(&app).map_err(|e| format!("client: {e}"))?;
+    let resp = client
         .post(&url)
         .bearer_auth(&args.api_key)
         .json(&body)

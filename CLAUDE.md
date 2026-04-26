@@ -33,6 +33,8 @@ Every Rust command in `src-tauri/src/*/commands.rs` has a typed wrapper in `src/
 
 Skip any of these and the command silently fails at runtime.
 
+Commands that need to read settings, build proxy-aware HTTP clients, or emit events should take `app: tauri::AppHandle` as their first parameter (Tauri injects it automatically — no frontend change needed). Several commands already follow this convention (`preview_detect`, `preview_can_frame`, `stt_transcribe`, `ai_chat`).
+
 ### PTY streaming uses Channels, not events
 
 `tauri::ipc::Channel<Vec<u8>>` carries terminal output from the Rust reader thread to the React side. Each `pty_spawn` call accepts a frontend-allocated `Channel`; Rust spawns a `std::thread` that pumps `portable_pty::Reader` → 4KB chunks → `channel.send`. Don't switch to `app.emit()` for PTY data — it serializes through every listener.
@@ -54,6 +56,8 @@ Frontend parses those sequences in `src/components/terminal/osc133.ts` (`registe
 `src/lib/types.ts` defines `LayoutNode = { type: "leaf", paneId } | { type: "split", direction, sizes, children }`. The store in `src/stores/workspaceStore.ts` mutates this tree for splits and pane closes — **renormalizing `sizes` after removal** is critical or the resize handles drift. `buildLayout(paneCount, ids)` synthesizes the canonical 1/2/4/6/8/9/12/16 templates.
 
 `PaneGrid.tsx` recursively maps the tree to nested `<PanelGroup>` from `react-resizable-panels`. The `path: number[]` argument tracks the position so resize callbacks can set sizes at the right depth via `setSizesAtPath`.
+
+**Pane drag uses pointer events, not HTML5 drag.** WKWebView and Tauri's WebView swallow native `drop` events on iframe-bearing pages, so pane header drag-to-swap/re-split is implemented manually via `pointerdown` → `setPointerCapture` → `pointermove` → `pointerup`. Don't reach for `draggable` / `ondragstart` here.
 
 ### Panes are portaled into stable hosts
 
@@ -98,6 +102,18 @@ Monaco instances register themselves into `src/components/stt/editorRegistry.ts`
 
 Settings live under the `"stt"` key via `settings_get/set` — same pattern as theme. Provider/endpoint/model/key are persisted plaintext in `app_config_dir/settings.json`.
 
+### AI chat mirrors STT
+
+`ai_chat` (`src-tauri/src/ai/commands.rs`) powers the *Explain* action on terminal command blocks. It POSTs to a user-configured OpenAI-compatible `/chat/completions` endpoint. Settings live under the `"ai"` key. `aiStore.load()` seeds the API key from STT settings on first run, so it deliberately awaits `useSttStore.load()` if STT hasn't finished hydrating — preserve that ordering when refactoring `App.tsx`'s mount effect.
+
+### Network proxy is centralized
+
+Every outbound `reqwest` call goes through `src-tauri/src/net/mod.rs` — `http_client(&app)` / `http_client_builder(&app)` read the `"proxy"` settings key per call and apply HTTP/SOCKS5 proxy + `NoProxy` rules. Adding another network site means using these helpers, not `reqwest::Client::new()`.
+
+`localhost,127.0.0.1,::1` are always added to `NoProxy` regardless of user config — `preview_detect`'s loopback probes and any local AI/STT endpoints must reach the host directly.
+
+Out of scope for the proxy: the `<iframe>` in `PreviewPane`, the `tauri-plugin-updater` HTTP client, and shell processes spawned by PTY (those inherit the parent process env). The Settings UI says so. `reqwest`'s `socks` cargo feature is required for SOCKS5 — already enabled.
+
 ### SQLite schema gotcha
 
 The `tasks` table column is `column_name`, not `column`. SQLite tolerates `column` as an identifier in some contexts but it's a reserved word and `tauri-plugin-sql`'s parser bails. The `Task["column"]` TS field stays `column` — `kanbanStore.ts` translates with `rowToTask`.
@@ -127,7 +143,7 @@ The script also re-runs on every iframe `load`, so `PreviewPane.onIframeLoad` re
 
 ### Frontend state
 
-Four Zustand stores in `src/stores/` (`themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`). None are global singletons that auto-load — `App.tsx`'s mount effect explicitly calls each one's `load()`/`hydrate()`. Forgetting to await before reading is a common pitfall (the stores expose `loaded: boolean`).
+Zustand stores in `src/stores/` — `themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`, `aiStore`, `proxyStore` (plus the in-memory-only `paneDragStore`). None are global singletons that auto-load — `App.tsx`'s mount effect explicitly calls each one's `load()`/`hydrate()`. Forgetting to await before reading is a common pitfall (the stores expose `loaded: boolean`).
 
 ### Build artifacts
 

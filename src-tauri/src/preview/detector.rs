@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::path::Path;
 use std::time::Duration;
+use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -199,7 +200,10 @@ fn verify_framework(body: &str, headers: &reqwest::header::HeaderMap, framework:
     }
 }
 
-pub async fn detect(project_path: String) -> Result<Option<DetectedPreview>, String> {
+pub async fn detect(
+    app: &AppHandle,
+    project_path: String,
+) -> Result<Option<DetectedPreview>, String> {
     let path = Path::new(&project_path);
     let framework = detect_framework(path);
 
@@ -210,7 +214,8 @@ pub async fn detect(project_path: String) -> Result<Option<DetectedPreview>, Str
     for p in ports_for(framework) { if !ports.contains(&p) { ports.push(p); } }
     for p in PROBE_PORTS_GENERIC { if !ports.contains(p) { ports.push(*p); } }
 
-    let client = reqwest::Client::builder()
+    let client = crate::net::http_client_builder(app)
+        .map_err(|e| e.to_string())?
         .timeout(Duration::from_millis(400))
         // Some dev servers redirect /; follow once so we can read the body.
         .redirect(reqwest::redirect::Policy::limited(2))

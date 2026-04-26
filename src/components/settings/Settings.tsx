@@ -5,6 +5,7 @@ import type { Theme } from "../../themes/definitions";
 import { Icon } from "../ui/Icon";
 import { useSttStore, type SttSettings } from "../../stores/sttStore";
 import { useAiStore, type AiSettings } from "../../stores/aiStore";
+import { useProxyStore, type ProxySettings } from "../../stores/proxyStore";
 
 export function Settings() {
   const theme = useThemeStore((s) => s.current);
@@ -44,6 +45,8 @@ export function Settings() {
       <SttSettingsSection />
 
       <AiSettingsSection />
+
+      <ProxySettingsSection />
 
       <div className="settings-section">
         <div className="settings-section-head">
@@ -574,6 +577,108 @@ function AiSettingsSection() {
             spellCheck={false}
           />
         </label>
+      </div>
+    </div>
+  );
+}
+
+function ProxySettingsSection() {
+  const settings = useProxyStore((s) => s.settings);
+  const update = useProxyStore((s) => s.updateSettings);
+  const [showAdvanced, setShowAdvanced] = useState(
+    () => Boolean(settings.httpUrl || settings.httpsUrl),
+  );
+
+  const setMode = (mode: ProxySettings["mode"]) => void update({ mode });
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <div className="settings-section-title">Network proxy</div>
+        <div className="settings-section-sub">
+          Routes API calls (STT, AI, preview probes) through an HTTP or SOCKS5
+          proxy. Loopback addresses are always reached directly. The browser
+          preview iframe and auto-updater use a direct connection.
+        </div>
+      </div>
+
+      <div className="stt-form">
+        <label className="stt-field">
+          <span className="stt-field-label">Mode</span>
+          <select
+            value={settings.mode}
+            onChange={(e) => setMode(e.target.value as ProxySettings["mode"])}
+          >
+            <option value="off">Off — direct connection</option>
+            <option value="manual">Manual</option>
+          </select>
+        </label>
+
+        {settings.mode === "manual" && (
+          <>
+            <label className="stt-field">
+              <span className="stt-field-label">Proxy URL</span>
+              <input
+                type="text"
+                value={settings.url}
+                placeholder="http://host:port — or socks5://user:pass@host:port"
+                onChange={(e) => void update({ url: e.target.value })}
+                spellCheck={false}
+                autoComplete="off"
+                disabled={Boolean(settings.httpUrl || settings.httpsUrl)}
+              />
+            </label>
+
+            <label className="stt-field">
+              <span className="stt-field-label">No-proxy list</span>
+              <input
+                type="text"
+                value={settings.noProxy}
+                placeholder="comma-separated, e.g. *.internal,10.0.0.0/8"
+                onChange={(e) => void update({ noProxy: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
+
+            <label className="stt-field">
+              <span className="stt-field-label">Per-scheme overrides</span>
+              <button
+                type="button"
+                className="stt-hotkey-btn"
+                onClick={() => setShowAdvanced((v) => !v)}
+              >
+                {showAdvanced ? "Hide" : "Show"}
+              </button>
+            </label>
+
+            {showAdvanced && (
+              <>
+                <label className="stt-field">
+                  <span className="stt-field-label">HTTP proxy</span>
+                  <input
+                    type="text"
+                    value={settings.httpUrl}
+                    placeholder="http://host:port (overrides URL above)"
+                    onChange={(e) => void update({ httpUrl: e.target.value })}
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="stt-field">
+                  <span className="stt-field-label">HTTPS proxy</span>
+                  <input
+                    type="text"
+                    value={settings.httpsUrl}
+                    placeholder="http://host:port (overrides URL above)"
+                    onChange={(e) => void update({ httpsUrl: e.target.value })}
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                </label>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

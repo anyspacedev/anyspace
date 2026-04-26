@@ -5,6 +5,7 @@ mod ai;
 mod fs_ops;
 mod git;
 mod kanban;
+mod net;
 mod preview;
 mod pty;
 mod settings;

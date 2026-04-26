@@ -43,7 +43,7 @@ parking_lot = "0.12"
 dashmap = "6"
 
 # http probe for preview port detection
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks"] }
 
 # WebKitGTK isn't shown navigator.mediaDevices unless we toggle enable-media-stream
 # on the WebView at startup and answer the permission-request signal — needed by

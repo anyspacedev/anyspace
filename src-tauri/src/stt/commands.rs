@@ -25,7 +25,10 @@ pub struct TranscribeArgs {
 }
 
 #[tauri::command]
-pub async fn stt_transcribe(args: TranscribeArgs) -> Result<String, String> {
+pub async fn stt_transcribe(
+    app: tauri::AppHandle,
+    args: TranscribeArgs,
+) -> Result<String, String> {
     let url = format!(
         "{}/audio/transcriptions",
         args.endpoint.trim_end_matches('/')
@@ -47,7 +50,8 @@ pub async fn stt_transcribe(args: TranscribeArgs) -> Result<String, String> {
         }
     }
 
-    let resp = reqwest::Client::new()
+    let client = crate::net::http_client(&app).map_err(|e| format!("client: {e}"))?;
+    let resp = client
         .post(&url)
         .bearer_auth(&args.api_key)
         .multipart(form)

@@ -4,6 +4,7 @@ import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
+import { useProxyStore } from "./stores/proxyStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
@@ -28,6 +29,7 @@ export default function App() {
   const loadKanban = useKanbanStore((s) => s.load);
   const loadStt = useSttStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
+  const loadProxy = useProxyStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
@@ -35,7 +37,8 @@ export default function App() {
     void loadKanban().catch((e) => console.warn("[kanban] load failed", e));
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi]);
+    void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy]);
 
   useEffect(() => {
     const detach = attachGlobalShortcuts();
