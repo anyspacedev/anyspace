@@ -138,4 +138,16 @@ export async function sttTranscribe(args: SttTranscribeArgs): Promise<string> {
   });
 }
 
+export type AiChatArgs = {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  systemPrompt: string;
+  userMessage: string;
+};
+
+export async function aiChat(args: AiChatArgs): Promise<string> {
+  return rawInvoke<string>("ai_chat", { args });
+}
+
 export { Channel };

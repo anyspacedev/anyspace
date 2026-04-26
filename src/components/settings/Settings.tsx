@@ -4,6 +4,7 @@ import { themes } from "../../themes/definitions";
 import type { Theme } from "../../themes/definitions";
 import { Icon } from "../ui/Icon";
 import { useSttStore, type SttSettings } from "../../stores/sttStore";
+import { useAiStore, type AiSettings } from "../../stores/aiStore";
 
 export function Settings() {
   const theme = useThemeStore((s) => s.current);
@@ -94,6 +95,8 @@ export function Settings() {
       </div>
 
       <SttSettingsSection />
+
+      <AiSettingsSection />
 
       <div className="settings-section">
         <div className="settings-section-head">
@@ -313,6 +316,128 @@ function SttSettingsSection() {
             onChange={(e) => void update({ language: e.target.value })}
             spellCheck={false}
             maxLength={5}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+const AI_PRESETS: Record<
+  AiSettings["presetId"],
+  { endpoint: string; model: string; label: string }
+> = {
+  openai: {
+    endpoint: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
+    label: "OpenAI",
+  },
+  groq: {
+    endpoint: "https://api.groq.com/openai/v1",
+    model: "llama-3.3-70b-versatile",
+    label: "Groq",
+  },
+  openrouter: {
+    endpoint: "https://openrouter.ai/api/v1",
+    model: "anthropic/claude-3.5-haiku",
+    label: "OpenRouter",
+  },
+  custom: { endpoint: "", model: "", label: "Custom" },
+};
+
+function AiSettingsSection() {
+  const settings = useAiStore((s) => s.settings);
+  const update = useAiStore((s) => s.updateSettings);
+  const [revealKey, setRevealKey] = useState(false);
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <div className="settings-section-title">AI</div>
+        <div className="settings-section-sub">
+          Powers the <em>Explain</em> action on terminal command blocks. Uses an
+          OpenAI-compatible <code>/chat/completions</code> endpoint.
+        </div>
+      </div>
+
+      <div className="stt-form">
+        <label className="stt-field">
+          <span className="stt-field-label">Provider</span>
+          <select
+            value={settings.presetId}
+            onChange={(e) => {
+              const id = e.target.value as AiSettings["presetId"];
+              const preset = AI_PRESETS[id];
+              if (id === "custom") {
+                void update({ presetId: id });
+              } else {
+                void update({
+                  presetId: id,
+                  endpoint: preset.endpoint,
+                  model: preset.model,
+                });
+              }
+            }}
+          >
+            {Object.entries(AI_PRESETS).map(([id, p]) => (
+              <option key={id} value={id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">Endpoint</span>
+          <input
+            type="url"
+            value={settings.endpoint}
+            placeholder="https://api.openai.com/v1"
+            onChange={(e) => void update({ endpoint: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">API key</span>
+          <div className="stt-field-inline">
+            <input
+              type={revealKey ? "text" : "password"}
+              value={settings.apiKey}
+              placeholder="sk-…"
+              onChange={(e) => void update({ apiKey: e.target.value })}
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={revealKey ? "Hide API key" : "Show API key"}
+              onClick={() => setRevealKey((v) => !v)}
+            >
+              <Icon name={revealKey ? "x" : "dot"} size={14} />
+            </button>
+          </div>
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">Model</span>
+          <input
+            type="text"
+            value={settings.model}
+            placeholder="gpt-4o-mini"
+            onChange={(e) => void update({ model: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">System prompt</span>
+          <textarea
+            value={settings.systemPrompt}
+            rows={3}
+            onChange={(e) => void update({ systemPrompt: e.target.value })}
+            spellCheck={false}
           />
         </label>
       </div>

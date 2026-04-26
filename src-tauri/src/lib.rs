@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod agent;
+mod ai;
 mod fs_ops;
 mod kanban;
 mod preview;
@@ -42,6 +43,8 @@ pub fn run() {
             settings::commands::settings_set,
             // STT
             stt::commands::stt_transcribe,
+            // AI
+            ai::commands::ai_chat,
             // Workspace persistence
             workspace::commands::workspace_save,
             workspace::commands::workspace_load,

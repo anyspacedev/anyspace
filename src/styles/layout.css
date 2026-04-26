@@ -2138,6 +2138,17 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
 }
+.stt-field textarea {
+  min-height: 64px;
+  padding: var(--pad-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  resize: vertical;
+}
 .stt-field-inline {
   display: flex;
   gap: 4px;

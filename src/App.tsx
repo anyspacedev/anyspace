@@ -3,6 +3,7 @@ import { useThemeStore } from "./stores/themeStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useSttStore } from "./stores/sttStore";
+import { useAiStore } from "./stores/aiStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
@@ -26,13 +27,15 @@ export default function App() {
   const hydrateWorkspace = useWorkspaceStore((s) => s.hydrate);
   const loadKanban = useKanbanStore((s) => s.load);
   const loadStt = useSttStore((s) => s.load);
+  const loadAi = useAiStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
     void hydrateWorkspace();
     void loadKanban().catch((e) => console.warn("[kanban] load failed", e));
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt]);
+    void loadAi().catch((e) => console.warn("[ai] load failed", e));
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi]);
 
   useEffect(() => {
     const detach = attachGlobalShortcuts();
