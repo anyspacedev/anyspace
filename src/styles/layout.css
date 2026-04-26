@@ -1548,6 +1548,19 @@
 .template-sub { font-size: var(--font-size-xs); color: var(--fg-muted); }
 
 .modal.wide { min-width: 640px; max-width: 880px; }
+.modal.narrow { min-width: 360px; max-width: 460px; }
+.modal-body {
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  line-height: 1.5;
+}
+.modal-body code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
 
 .agent-slot-grid {
   display: grid;

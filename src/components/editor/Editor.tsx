@@ -14,7 +14,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { languageFor } from "./languages";
 import { Icon } from "../ui/Icon";
 import { registerEditor, unregisterEditor } from "../stt/editorRegistry";
-import { editorFilesFrom } from "./editorPayload";
+import { editorFilesFrom, basename } from "./editorPayload";
 import { EditorTabs } from "./EditorTabs";
 
 // Monaco needs a real Worker per language. Without this, JSON/TS modes
@@ -62,6 +62,7 @@ export function Editor({ pane, tabId }: Props) {
     new Map<string, monaco.editor.ICodeEditorViewState | null>(),
   );
   const [tick, setTick] = useState(0);
+  const [confirmClose, setConfirmClose] = useState<{ path: string } | null>(null);
 
   const { files, activePath } = editorFilesFrom(pane.payload);
 
@@ -225,7 +226,7 @@ export function Editor({ pane, tabId }: Props) {
     setPayload({ files, activePath: path });
   };
 
-  const closeTab = (path: string) => {
+  const doCloseTab = (path: string) => {
     const remaining = files.filter((p) => p !== path);
     let nextActive: string | null = activePath;
     if (activePath === path) {
@@ -234,6 +235,44 @@ export function Editor({ pane, tabId }: Props) {
     }
     setPayload({ files: remaining, activePath: nextActive });
     viewStatesRef.current.delete(path);
+  };
+
+  const closeTab = (path: string) => {
+    if (isModelDirty(path)) {
+      setConfirmClose({ path });
+      return;
+    }
+    doCloseTab(path);
+  };
+
+  const saveAndClose = async (path: string) => {
+    const model = monaco.editor.getModel(monaco.Uri.file(path));
+    if (model) {
+      try {
+        await writeTextFile(path, model.getValue());
+        savedVersions.set(path, model.getAlternativeVersionId());
+      } catch (e) {
+        console.warn("[editor] save failed", e);
+        return; // leave the tab + dialog up so the user notices
+      }
+    }
+    doCloseTab(path);
+    setConfirmClose(null);
+  };
+
+  const discardAndClose = async (path: string) => {
+    const model = monaco.editor.getModel(monaco.Uri.file(path));
+    if (model) {
+      try {
+        const disk = await readTextFile(path);
+        model.setValue(disk);
+        savedVersions.set(path, model.getAlternativeVersionId());
+      } catch (e) {
+        console.warn("[editor] discard re-read failed", e);
+      }
+    }
+    doCloseTab(path);
+    setConfirmClose(null);
   };
 
   const addTab = async () => {
@@ -286,6 +325,67 @@ export function Editor({ pane, tabId }: Props) {
         onAdd={addTab}
       />
       <div className="editor-host" ref={containerRef} />
+      {confirmClose && (
+        <UnsavedConfirm
+          path={confirmClose.path}
+          onCancel={() => setConfirmClose(null)}
+          onDiscard={() => void discardAndClose(confirmClose.path)}
+          onSave={() => void saveAndClose(confirmClose.path)}
+        />
+      )}
+    </div>
+  );
+}
+
+function UnsavedConfirm({
+  path,
+  onCancel,
+  onDiscard,
+  onSave,
+}: {
+  path: string;
+  onCancel: () => void;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div className="modal-backdrop" onClick={onCancel}>
+      <div
+        className="modal narrow"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-title">Unsaved changes</div>
+        <div className="modal-body">
+          <code>{basename(path)}</code> has unsaved changes. Save them before
+          closing?
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={onDiscard}>
+            Discard
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onSave}
+            autoFocus
+          >
+            Save
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
