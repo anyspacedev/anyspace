@@ -39,26 +39,40 @@ fn enable_media_capture(window: &tauri::WebviewWindow) {
 
 #[cfg(target_os = "macos")]
 fn enable_media_capture(window: &tauri::WebviewWindow) {
-    use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
-    use objc2_web_kit::WKWebView;
+    use std::panic::AssertUnwindSafe;
+
+    use objc2::exception;
+    use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding, NSString};
+    use objc2_web_kit::{WKPreferences, WKWebView};
 
     let _ = window.with_webview(|webview| {
         let wv_ptr = webview.inner() as *const WKWebView;
         if wv_ptr.is_null() {
             return;
         }
+        // Private WKPreferences SPI — without these `navigator.mediaDevices`
+        // is undefined on Tauri's custom-scheme origin. wry's WKUIDelegate
+        // already grants requestMediaCapturePermissionForOrigin, so flipping
+        // the keys is enough to make hold-to-talk work.
+        //
+        // The available keys differ between WebKit versions (e.g. macOS 14+
+        // dropped `mediaDevicesEnabled`), and an unknown key raises
+        // NSUndefinedKeyException — which would abort the process across the
+        // objc_msgSend boundary. Catch each one individually so we set
+        // whatever the running WebKit recognizes and skip the rest.
+        let set = |prefs: &WKPreferences, key: &NSString, value: &NSNumber| {
+            let _ = exception::catch(AssertUnwindSafe(|| unsafe {
+                prefs.setValue_forKey(Some(value), key);
+            }));
+        };
         unsafe {
             let wv = &*wv_ptr;
             let prefs = wv.configuration().preferences();
             let yes = NSNumber::numberWithBool(true);
             let no = NSNumber::numberWithBool(false);
-            // Private WKPreferences SPI — without these `navigator.mediaDevices`
-            // is undefined on Tauri's custom-scheme origin. wry's WKUIDelegate
-            // already grants requestMediaCapturePermissionForOrigin, so flipping
-            // the keys is enough to make hold-to-talk work.
-            prefs.setValue_forKey(Some(&yes), ns_string!("mediaDevicesEnabled"));
-            prefs.setValue_forKey(Some(&no), ns_string!("mediaCaptureRequiresSecureConnection"));
-            prefs.setValue_forKey(Some(&no), ns_string!("getUserMediaRequiresUserGesture"));
+            set(&prefs, ns_string!("mediaDevicesEnabled"), &yes);
+            set(&prefs, ns_string!("mediaCaptureRequiresSecureConnection"), &no);
+            set(&prefs, ns_string!("getUserMediaRequiresUserGesture"), &no);
         }
     });
 }

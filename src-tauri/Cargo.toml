@@ -55,6 +55,7 @@ webkit2gtk = { version = "2.0", features = ["v2_38"] }
 # We poke the private WKPreferences keys at startup so the API is exposed; wry's
 # WKUIDelegate already grants requestMediaCapturePermissionForOrigin.
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", features = ["exception"] }
 objc2-foundation = { version = "0.3", features = ["NSValue", "NSString"] }
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKPreferences", "objc2-app-kit"] }
 
