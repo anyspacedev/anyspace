@@ -297,6 +297,7 @@
 }
 
 .pane {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -323,8 +324,11 @@
   height: 28px;
   font-size: var(--font-size-xs);
   position: relative;
+  cursor: grab;
+  user-select: none;
   transition: border-bottom-color var(--duration-fast) var(--ease-out);
 }
+.pane-header:active { cursor: grabbing; }
 .pane-kind-btn {
   display: flex;
   align-items: center;
@@ -416,6 +420,24 @@
   min-width: 0;
   overflow: hidden;
 }
+
+.pane-drop-hint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+  border: 1px dashed color-mix(in oklab, var(--accent) 75%, transparent);
+  border-radius: var(--radius);
+  z-index: 4;
+  transition:
+    clip-path 0.08s var(--ease-out),
+    background 0.08s var(--ease-out);
+}
+.pane-drop-hint.zone-swap   { clip-path: inset(0 0 0 0); }
+.pane-drop-hint.zone-top    { clip-path: inset(0 0 50% 0); }
+.pane-drop-hint.zone-bottom { clip-path: inset(50% 0 0 0); }
+.pane-drop-hint.zone-left   { clip-path: inset(0 50% 0 0); }
+.pane-drop-hint.zone-right  { clip-path: inset(0 0 0 50%); }
 
 .pane-slot,
 .pane-host {

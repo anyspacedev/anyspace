@@ -142,6 +142,8 @@ function buildLayout(paneCount: number, paneIds: string[]): LayoutNode {
   };
 }
 
+export type DropEdge = "top" | "right" | "bottom" | "left";
+
 export type PanePreset = {
   kind?: PaneKind;
   pendingCommand?: string;
@@ -175,6 +177,8 @@ type WorkspaceState = {
     preset?: PanePreset,
   ) => void;
   closePane: (tabId: string, paneId: string) => void;
+  swapPanes: (tabId: string, paneIdA: string, paneIdB: string) => void;
+  movePaneToEdge: (tabId: string, sourceId: string, targetId: string, edge: DropEdge) => void;
 
   setLayoutSizes: (tabId: string, path: number[], sizes: number[]) => void;
 };
@@ -219,6 +223,40 @@ function removeLeaf(layout: LayoutNode, paneId: string): LayoutNode | null {
   const total = newSizes.reduce((a, b) => a + b, 0);
   const normalized = newSizes.map((s) => (s / total) * 100);
   return { ...layout, children: newChildren, sizes: normalized };
+}
+
+function swapLeavesInLayout(layout: LayoutNode, idA: string, idB: string): LayoutNode {
+  if (layout.type === "leaf") {
+    if (layout.paneId === idA) return { type: "leaf", paneId: idB };
+    if (layout.paneId === idB) return { type: "leaf", paneId: idA };
+    return layout;
+  }
+  return { ...layout, children: layout.children.map((c) => swapLeavesInLayout(c, idA, idB)) };
+}
+
+function movePaneToEdgeInLayout(
+  layout: LayoutNode,
+  sourceId: string,
+  targetId: string,
+  edge: DropEdge,
+): LayoutNode | null {
+  const stripped = removeLeaf(layout, sourceId);
+  if (!stripped) return null;
+  const direction: "horizontal" | "vertical" =
+    edge === "top" || edge === "bottom" ? "vertical" : "horizontal";
+  const sourceFirst = edge === "top" || edge === "left";
+  return findAndMutateLayout(
+    stripped,
+    (n) => n.type === "leaf" && n.paneId === targetId,
+    (n) => ({
+      type: "split",
+      direction,
+      sizes: [50, 50],
+      children: sourceFirst
+        ? [{ type: "leaf", paneId: sourceId }, n]
+        : [n, { type: "leaf", paneId: sourceId }],
+    }),
+  );
 }
 
 function setSizesAtPath(layout: LayoutNode, path: number[], sizes: number[]): LayoutNode {
@@ -439,6 +477,29 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           panes: remaining,
           activePaneId: t.activePaneId === paneId ? firstRemaining : t.activePaneId,
         };
+      }),
+    }));
+  },
+
+  swapPanes: (tabId, paneIdA, paneIdB) => {
+    if (paneIdA === paneIdB) return;
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId
+          ? { ...t, layout: swapLeavesInLayout(t.layout, paneIdA, paneIdB) }
+          : t,
+      ),
+    }));
+  },
+
+  movePaneToEdge: (tabId, sourceId, targetId, edge) => {
+    if (sourceId === targetId) return;
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== tabId) return t;
+        const next = movePaneToEdgeInLayout(t.layout, sourceId, targetId, edge);
+        if (!next) return t;
+        return { ...t, layout: next, activePaneId: sourceId };
       }),
     }));
   },

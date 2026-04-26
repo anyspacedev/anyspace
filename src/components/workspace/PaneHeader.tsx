@@ -19,6 +19,8 @@ const KIND_ICONS: Record<PaneKind, IconName> = {
   empty: "square-dashed",
 };
 
+export const SWAP_MIME = "application/x-teamship-pane";
+
 export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
   const setPaneKind = useWorkspaceStore((s) => s.setPaneKind);
   const splitPane = useWorkspaceStore((s) => s.splitPane);
@@ -31,7 +33,23 @@ export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
     KIND_LABELS[pane.kind];
 
   return (
-    <div className="pane-header">
+    <div
+      className="pane-header"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(
+          SWAP_MIME,
+          JSON.stringify({ tabId, paneId: pane.id }),
+        );
+        e.dataTransfer.effectAllowed = "move";
+        document.body.dataset.dragPaneId = pane.id;
+        document.body.classList.add("is-dragging-pane");
+      }}
+      onDragEnd={() => {
+        delete document.body.dataset.dragPaneId;
+        document.body.classList.remove("is-dragging-pane");
+      }}
+    >
       <button
         className="pane-kind-btn"
         onClick={() => setMenuOpen((o) => !o)}
