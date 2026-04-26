@@ -22,7 +22,9 @@ export type ShortcutAction =
   | "switchTab8"
   | "switchTab9"
   | "themeNext"
-  | "togglePreview";
+  | "togglePreview"
+  | "jumpBlockPrev"
+  | "jumpBlockNext";
 
 const handlers = new Map<ShortcutAction, () => void>();
 
@@ -59,6 +61,8 @@ export function attachGlobalShortcuts() {
       case "7": dispatch("switchTab7"); e.preventDefault(); break;
       case "8": dispatch("switchTab8"); e.preventDefault(); break;
       case "9": dispatch("switchTab9"); e.preventDefault(); break;
+      case "[": dispatch("jumpBlockPrev"); e.preventDefault(); break;
+      case "]": dispatch("jumpBlockNext"); e.preventDefault(); break;
     }
   };
   window.addEventListener("keydown", onKey);

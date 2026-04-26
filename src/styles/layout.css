@@ -674,8 +674,14 @@
   pointer-events: auto;
 }
 .cmd-block:hover .cmd-block-actions,
+.cmd-block.focused .cmd-block-actions,
 .cmd-block-actions.menu-open {
   opacity: 1;
+}
+.cmd-block.focused {
+  outline: 1px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: -1px;
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
 }
 .cmd-block-action-btn {
   display: grid;

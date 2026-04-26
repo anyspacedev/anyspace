@@ -49,6 +49,8 @@ export function Terminal({ pane, tabId }: Props) {
   const [overlay, setOverlay] = useState({ rowHeight: 16, scrollTop: 0, height: 0 });
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+  const focusedBlockIdRef = useRef<string | null>(null);
   const theme = useThemeStore((s) => s.current);
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
 
@@ -269,6 +271,47 @@ export function Terminal({ pane, tabId }: Props) {
     return u;
   }, []);
 
+  // Cmd+[ / Cmd+] jump between command blocks (focus-gated to this pane).
+  useEffect(() => {
+    const focusedHere = () => {
+      const node = containerRef.current;
+      if (!node) return false;
+      const active = document.activeElement;
+      return node.contains(active) || node === active;
+    };
+    const jump = (dir: "prev" | "next") => {
+      if (!focusedHere()) return;
+      const term = termRef.current;
+      if (!term) return;
+      const sorted = [...blocksRef.current].sort((a, b) => a.startRow - b.startRow);
+      if (sorted.length === 0) return;
+      const currentIdx = focusedBlockIdRef.current
+        ? sorted.findIndex((b) => b.id === focusedBlockIdRef.current)
+        : -1;
+      let nextIdx: number;
+      if (currentIdx < 0) {
+        nextIdx = dir === "prev" ? sorted.length - 1 : 0;
+      } else {
+        nextIdx = dir === "prev"
+          ? Math.max(0, currentIdx - 1)
+          : Math.min(sorted.length - 1, currentIdx + 1);
+      }
+      const target = sorted[nextIdx];
+      if (!target) return;
+      try {
+        // Put the block top a couple of rows below the viewport top.
+        term.scrollToLine(Math.max(0, target.startRow - 2));
+      } catch {
+        /* eviction or pre-paint — silently no-op */
+      }
+      focusedBlockIdRef.current = target.id;
+      setFocusedBlockId(target.id);
+    };
+    const uPrev = registerShortcut("jumpBlockPrev", () => jump("prev"));
+    const uNext = registerShortcut("jumpBlockNext", () => jump("next"));
+    return () => { uPrev(); uNext(); };
+  }, []);
+
   const runSearch = (q: string, dir: "next" | "prev") => {
     const s = searchRef.current;
     if (!s) return;
@@ -340,6 +383,7 @@ export function Terminal({ pane, tabId }: Props) {
         containerHeight={overlay.height}
         onToggle={toggleBlock}
         onAction={handleAction}
+        focusedBlockId={focusedBlockId}
       />
       {searchOpen && (
         <div className="terminal-search">

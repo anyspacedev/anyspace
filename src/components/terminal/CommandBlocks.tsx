@@ -18,6 +18,7 @@ export function CommandBlocks({
   containerHeight,
   onToggle,
   onAction,
+  focusedBlockId,
 }: {
   blocks: CommandBlock[];
   rowHeight: number;
@@ -25,6 +26,7 @@ export function CommandBlocks({
   containerHeight: number;
   onToggle: (id: string) => void;
   onAction: (action: BlockAction, blockId: string) => void;
+  focusedBlockId: string | null;
 }) {
   return (
     <div className="cmd-blocks-overlay" style={{ pointerEvents: "none" }}>
@@ -53,7 +55,12 @@ export function CommandBlocks({
         return (
           <div
             key={b.id}
-            className={"cmd-block " + status + (b.collapsed ? " collapsed" : "")}
+            className={
+              "cmd-block " +
+              status +
+              (b.collapsed ? " collapsed" : "") +
+              (b.id === focusedBlockId ? " focused" : "")
+            }
             style={{
               transform: `translateY(${Math.max(0, top)}px)`,
               height: `${height}px`,
