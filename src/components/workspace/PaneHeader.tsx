@@ -37,16 +37,24 @@ export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
       className="pane-header"
       draggable
       onDragStart={(e) => {
-        e.dataTransfer.setData(
-          SWAP_MIME,
-          JSON.stringify({ tabId, paneId: pane.id }),
-        );
+        // WKWebView (macOS) requires a built-in MIME for the drag to be a
+        // valid drop source. The actual source identity is read from
+        // body dataset because dataTransfer.types/getData behave
+        // inconsistently across WebKit/Chromium.
+        try {
+          e.dataTransfer.setData("text/plain", pane.id);
+          e.dataTransfer.setData(SWAP_MIME, pane.id);
+        } catch {
+          // some WebViews reject custom MIME — ignore, dataset is the source of truth
+        }
         e.dataTransfer.effectAllowed = "move";
         document.body.dataset.dragPaneId = pane.id;
+        document.body.dataset.dragTabId = tabId;
         document.body.classList.add("is-dragging-pane");
       }}
       onDragEnd={() => {
         delete document.body.dataset.dragPaneId;
+        delete document.body.dataset.dragTabId;
         document.body.classList.remove("is-dragging-pane");
       }}
     >

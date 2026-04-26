@@ -5,7 +5,7 @@ import { Terminal } from "../terminal/Terminal";
 import { Editor } from "../editor/Editor";
 import { PreviewPane } from "../preview/PreviewPane";
 import { FileBrowser } from "../sidebar/FileBrowser";
-import { PaneHeader, SWAP_MIME } from "./PaneHeader";
+import { PaneHeader } from "./PaneHeader";
 import { Icon, type IconName } from "../ui/Icon";
 
 type DropZone = "swap" | "top" | "right" | "bottom" | "left";
@@ -42,8 +42,9 @@ export function Pane({ pane, tabId }: { pane: PaneType; tabId: string }) {
       className={"pane" + (isActive ? " active" : "")}
       onMouseDown={() => setActivePane(tabId, pane.id)}
       onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(SWAP_MIME)) return;
-        if (document.body.dataset.dragPaneId === pane.id) return;
+        const sourceId = document.body.dataset.dragPaneId;
+        const sourceTab = document.body.dataset.dragTabId;
+        if (!sourceId || sourceTab !== tabId || sourceId === pane.id) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         const zone = detectDropZone(
@@ -59,22 +60,16 @@ export function Pane({ pane, tabId }: { pane: PaneType; tabId: string }) {
         setDropZone(null);
       }}
       onDrop={(e) => {
-        const raw = e.dataTransfer.getData(SWAP_MIME);
+        const sourceId = document.body.dataset.dragPaneId;
+        const sourceTab = document.body.dataset.dragTabId;
+        const zone = dropZone;
         setDropZone(null);
-        if (!raw) return;
+        if (!sourceId || sourceTab !== tabId || sourceId === pane.id) return;
         e.preventDefault();
-        let payload: { tabId?: string; paneId?: string };
-        try {
-          payload = JSON.parse(raw);
-        } catch {
-          return;
-        }
-        if (payload.tabId !== tabId || !payload.paneId) return;
-        if (payload.paneId === pane.id) return;
-        if (!dropZone || dropZone === "swap") {
-          swapPanes(tabId, payload.paneId, pane.id);
+        if (!zone || zone === "swap") {
+          swapPanes(tabId, sourceId, pane.id);
         } else {
-          movePaneToEdge(tabId, payload.paneId, pane.id, dropZone);
+          movePaneToEdge(tabId, sourceId, pane.id, zone);
         }
       }}
     >
