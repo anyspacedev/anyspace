@@ -1,5 +1,17 @@
 use serde::Deserialize;
 
+/// Update which key the macOS NSEvent monitor intercepts. No-op on other
+/// platforms — non-Mac targets drive the hotkey purely through the JS
+/// keydown listener, which doesn't trigger the IMK log spam this monitor was
+/// added to suppress.
+#[tauri::command]
+pub fn stt_hotkey_set(code: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    crate::stt::hotkey_monitor::set_hotkey(&code);
+    let _ = code;
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscribeArgs {

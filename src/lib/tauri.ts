@@ -146,6 +146,13 @@ export async function sttTranscribe(args: SttTranscribeArgs): Promise<string> {
   });
 }
 
+// macOS-only: tells the Rust NSEvent monitor which modifier to intercept so
+// the IMK log spam is suppressed. No-op on Linux/Windows. Safe to call on any
+// platform — Rust ignores it off-Mac.
+export async function sttHotkeySet(code: string): Promise<void> {
+  return rawInvoke("stt_hotkey_set", { code });
+}
+
 export type AiChatArgs = {
   endpoint: string;
   apiKey: string;

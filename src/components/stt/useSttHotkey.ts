@@ -2,8 +2,16 @@
 // The hotkey is configurable in settings (e.g. ControlRight on Linux/Windows,
 // AltRight on Mac). Cancels on any other key, on window blur, and on tab
 // visibility loss.
+//
+// On macOS the modifier path is also driven by the Rust NSEvent monitor (see
+// `stt/hotkey_monitor.rs`) emitting `stt://hotkey-down`/`up`. WebKit never
+// dispatches the JS keydown for an intercepted modifier — that's the point,
+// since IMK consultation on those events is what spams stderr — so we mirror
+// the same heldRef state from both paths and let `startListening`/`cancel`/
+// `stopAndTranscribe` dedupe at the store level.
 
 import { useEffect, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useSttStore } from "../../stores/sttStore";
 
 type ModFlag = "ctrlKey" | "altKey" | "metaKey" | "shiftKey" | null;
@@ -86,11 +94,36 @@ export function useSttHotkey() {
       }
     };
 
+    // macOS NSEvent monitor path. Linux/Windows builds never emit these
+    // events, so the listeners just sit idle there.
+    let cancelled = false;
+    const unlisten: Array<() => void> = [];
+    void listen<null>("stt://hotkey-down", () => {
+      if (cancelled) return;
+      if (heldRef.current) return;
+      heldRef.current = true;
+      void store.getState().startListening();
+    }).then((u) => {
+      if (cancelled) u();
+      else unlisten.push(u);
+    });
+    void listen<null>("stt://hotkey-up", () => {
+      if (cancelled) return;
+      if (!heldRef.current) return;
+      heldRef.current = false;
+      void store.getState().stopAndTranscribe();
+    }).then((u) => {
+      if (cancelled) u();
+      else unlisten.push(u);
+    });
+
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      cancelled = true;
+      for (const u of unlisten) u();
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
       window.removeEventListener("blur", onBlur);

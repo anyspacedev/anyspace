@@ -54,10 +54,16 @@ webkit2gtk = { version = "2.0", features = ["v2_38"] }
 # macOS WKWebView hides navigator.mediaDevices on non-https origins by default.
 # We poke the private WKPreferences keys at startup so the API is exposed; wry's
 # WKUIDelegate already grants requestMediaCapturePermissionForOrigin.
+#
+# objc2-app-kit/block2 are for the hold-to-talk NSEvent local monitor — see
+# stt/hotkey_monitor.rs for why we intercept modifier keys at the AppKit layer
+# instead of letting them reach WebKit.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.6", features = ["exception"] }
 objc2-foundation = { version = "0.3", features = ["NSValue", "NSString"] }
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKPreferences", "objc2-app-kit"] }
+objc2-app-kit = { version = "0.3", features = ["NSEvent", "block2"] }
+block2 = "0.6"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { settingsGet, settingsSet, sttTranscribe } from "../lib/tauri";
+import { settingsGet, settingsSet, sttHotkeySet, sttTranscribe } from "../lib/tauri";
 import {
   cancelRecording,
   isRecording,
@@ -127,11 +127,20 @@ export const useSttStore = create<SttState>((set, get) => ({
     } catch {
       set({ loaded: true });
     }
+    void sttHotkeySet(get().settings.hotkey).catch(() => {
+      /* best-effort — Rust monitor falls back to its idle state */
+    });
   },
 
   updateSettings: async (partial) => {
-    const next = { ...get().settings, ...partial };
+    const prev = get().settings;
+    const next = { ...prev, ...partial };
     set({ settings: next });
+    if (next.hotkey !== prev.hotkey) {
+      void sttHotkeySet(next.hotkey).catch(() => {
+        /* best-effort */
+      });
+    }
     try {
       await settingsSet(SETTINGS_KEY, next);
     } catch {

@@ -116,6 +116,7 @@ pub fn run() {
             settings::commands::settings_set,
             // STT
             stt::commands::stt_transcribe,
+            stt::commands::stt_hotkey_set,
             // AI
             ai::commands::ai_chat,
             // Workspace persistence
@@ -128,6 +129,8 @@ pub fn run() {
             window.open_devtools();
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             enable_media_capture(&window);
+            #[cfg(target_os = "macos")]
+            stt::hotkey_monitor::install(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())
