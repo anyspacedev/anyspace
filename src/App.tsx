@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useThemeStore } from "./stores/themeStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useKanbanStore } from "./stores/kanbanStore";
+import { useSttStore } from "./stores/sttStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
@@ -12,6 +13,7 @@ import { Settings } from "./components/settings/Settings";
 import { StatusBar } from "./components/workspace/StatusBar";
 import { TemplatePicker } from "./components/workspace/TemplatePicker";
 import { QuickOpen } from "./components/sidebar/QuickOpen";
+import { SttBubble } from "./components/stt/SttBubble";
 
 export default function App() {
   const loadTheme = useThemeStore((s) => s.load);
@@ -23,12 +25,14 @@ export default function App() {
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const hydrateWorkspace = useWorkspaceStore((s) => s.hydrate);
   const loadKanban = useKanbanStore((s) => s.load);
+  const loadStt = useSttStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
     void hydrateWorkspace();
     void loadKanban().catch((e) => console.warn("[kanban] load failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban]);
+    void loadStt().catch((e) => console.warn("[stt] load failed", e));
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt]);
 
   useEffect(() => {
     const detach = attachGlobalShortcuts();
@@ -72,6 +76,7 @@ export default function App() {
       </div>
       <TemplatePicker />
       <QuickOpen />
+      <SttBubble />
     </div>
   );
 }

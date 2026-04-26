@@ -14,6 +14,7 @@ import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { languageFor } from "./languages";
 import { Icon } from "../ui/Icon";
+import { registerEditor, unregisterEditor } from "../stt/editorRegistry";
 
 // Monaco needs a real Worker per language. Without this, JSON/TS modes
 // fall through to the AMD loader path and crash on `moduleIdToUrl.toUrl`.
@@ -80,6 +81,12 @@ export function Editor({ pane, tabId }: Props) {
         setContent(`// failed to read ${path}\n// ${e}`);
       });
   }, [path]);
+
+  // Unregister this pane's editor from the STT registry on unmount.
+  useEffect(() => {
+    const id = pane.id;
+    return () => unregisterEditor(id);
+  }, [pane.id]);
 
   // Cmd/Ctrl+S to save.
   useEffect(() => {
@@ -154,6 +161,7 @@ export function Editor({ pane, tabId }: Props) {
           }}
           onMount={(editor) => {
             editorRef.current = editor;
+            registerEditor(pane.id, editor);
           }}
           options={{
             fontSize: 13,

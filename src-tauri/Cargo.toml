@@ -43,7 +43,7 @@ parking_lot = "0.12"
 dashmap = "6"
 
 # http probe for preview port detection
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

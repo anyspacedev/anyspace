@@ -7,6 +7,7 @@ mod preview;
 mod pty;
 mod settings;
 mod shell_integration;
+mod stt;
 mod workspace;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,6 +40,8 @@ pub fn run() {
             // Settings
             settings::commands::settings_get,
             settings::commands::settings_set,
+            // STT
+            stt::commands::stt_transcribe,
             // Workspace persistence
             workspace::commands::workspace_save,
             workspace::commands::workspace_load,

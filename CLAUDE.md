@@ -29,7 +29,7 @@ Every Rust command in `src-tauri/src/*/commands.rs` has a typed wrapper in `src/
 
 1. `#[tauri::command]` function in the appropriate module
 2. Register it in `tauri::generate_handler![...]` inside `src-tauri/src/lib.rs`
-3. Grant permission in `src-tauri/capabilities/default.json` (and add a `tauri.ts` wrapper)
+3. Grant permission in `src-tauri/capabilities/default.json` *(only required when the command comes from a Tauri plugin — project-defined commands are covered by `core:default`)*, and add a `tauri.ts` wrapper.
 
 Skip any of these and the command silently fails at runtime.
 
@@ -38,6 +38,10 @@ Skip any of these and the command silently fails at runtime.
 `tauri::ipc::Channel<Vec<u8>>` carries terminal output from the Rust reader thread to the React side. Each `pty_spawn` call accepts a frontend-allocated `Channel`; Rust spawns a `std::thread` that pumps `portable_pty::Reader` → 4KB chunks → `channel.send`. Don't switch to `app.emit()` for PTY data — it serializes through every listener.
 
 `portable-pty` is used instead of `node-pty` (mentioned in marketing copy). It's pure Rust, ships in the binary, and uses ConPTY on Windows automatically. **Do not** introduce a Node sidecar.
+
+**xterm WebGL is capped at 6.** Browsers limit total active WebGL contexts (Chromium ~16, WebKit ~8) and silently evict the oldest when the limit is hit — which spams console errors and corrupts other terminals. `Terminal.tsx` tracks `activeWebglTerminals` and falls back to xterm's DOM renderer past `MAX_WEBGL_TERMINALS = 6`. Don't raise the cap without testing eviction behavior on Linux/Chromium.
+
+**Renderer dimensions race.** xterm's `_core._renderService.dimensions` getter crashes if read before the first paint. Any code that touches it (block-overlay geometry, fit-addon math) must `try/catch` and treat undefined as "renderer not ready yet" — see `updateGeom` in `Terminal.tsx`. Fit/resize is also deferred to `requestAnimationFrame` after a `ResizeObserver` fires for the same reason.
 
 ### OSC 133 is auto-injected, not opt-in
 
@@ -50,6 +54,12 @@ Frontend parses those sequences in `src/components/terminal/osc133.ts` (`registe
 `src/lib/types.ts` defines `LayoutNode = { type: "leaf", paneId } | { type: "split", direction, sizes, children }`. The store in `src/stores/workspaceStore.ts` mutates this tree for splits and pane closes — **renormalizing `sizes` after removal** is critical or the resize handles drift. `buildLayout(paneCount, ids)` synthesizes the canonical 1/2/4/6/8/9/12/16 templates.
 
 `PaneGrid.tsx` recursively maps the tree to nested `<PanelGroup>` from `react-resizable-panels`. The `path: number[]` argument tracks the position so resize callbacks can set sizes at the right depth via `setSizesAtPath`.
+
+### Panes are portaled into stable hosts
+
+`PaneGrid.tsx` does not render `<Pane />` directly into the layout tree. Each pane gets an owned `<div class="pane-host">` that lives outside the tree; the Pane component is `createPortal`'d into that host once and the layout tree's `PaneSlot` adopts the host via `appendChild`. This is what keeps xterm/PTY state, Monaco view state, and iframe history alive across split/close/swap restructures — the React subtree never unmounts.
+
+Implication: do not move the `createPortal` call inside the tree, do not key panes by index, and do not destroy a host when its slot remounts. The `useEffect` cleanup in `PaneGrid.tsx` that prunes hosts whose pane was deleted is the only legitimate teardown.
 
 ### Pane kinds are a closed discriminated union
 
@@ -69,6 +79,18 @@ Forgetting any one leaves dead branches; TS catches the union but not the icon/l
 
 The `TEAMSHIP_TASK_FILE` env var is **only** set if you wire it via the agent's stored `envJson` field — `agent_launch` returns it in `env` but the current spawn path doesn't merge that into `pty_spawn`'s env. Either substitute via `{task_file}` in the command, or extend `runTask` to pass env through.
 
+### Speech-to-text dispatches by active pane
+
+Hold-to-talk (Right Ctrl, window-scoped) records via `getUserMedia` → `MediaRecorder`, posts the audio to an OpenAI-compatible `/audio/transcriptions` endpoint through the Rust `stt_transcribe` command (uses the existing `reqwest` dep with `multipart` + `json` features), then injects text based on the snapshotted active pane:
+
+- `terminal` → `ptyWrite` UTF-8 bytes (no `\n` — never auto-execute)
+- `editor` → `monaco.executeEdits` at the current selection
+- everything else → clipboard fallback + toast
+
+Monaco instances register themselves into `src/components/stt/editorRegistry.ts` on mount because the STT injector needs cross-component access without plumbing refs through the workspace tree. If you add another text-input pane kind, extend the dispatch in `inject.ts` and not the registry.
+
+Settings live under the `"stt"` key via `settings_get/set` — same pattern as theme. Provider/endpoint/model/key are persisted plaintext in `app_config_dir/settings.json`.
+
 ### SQLite schema gotcha
 
 The `tasks` table column is `column_name`, not `column`. SQLite tolerates `column` as an identifier in some contexts but it's a reserved word and `tauri-plugin-sql`'s parser bails. The `Task["column"]` TS field stays `column` — `kanbanStore.ts` translates with `rowToTask`.
@@ -87,7 +109,7 @@ Adding a theme = one entry in `definitions.ts`. The 5 shipping themes (Void, Dra
 
 ### Frontend state
 
-Five Zustand stores in `src/stores/`. None are global singletons that auto-load — `App.tsx`'s mount effect explicitly calls `themeStore.load()` and `kanbanStore.load()`. Forgetting to await `load()` before reading is a common pitfall (the stores expose `loaded: boolean`).
+Four Zustand stores in `src/stores/` (`themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`). None are global singletons that auto-load — `App.tsx`'s mount effect explicitly calls each one's `load()`/`hydrate()`. Forgetting to await before reading is a common pitfall (the stores expose `loaded: boolean`).
 
 ### Build artifacts
 

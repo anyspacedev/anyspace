@@ -3,6 +3,7 @@ import { useThemeStore } from "../../stores/themeStore";
 import { themes } from "../../themes/definitions";
 import type { Theme } from "../../themes/definitions";
 import { Icon } from "../ui/Icon";
+import { useSttStore, type SttSettings } from "../../stores/sttStore";
 
 export function Settings() {
   const theme = useThemeStore((s) => s.current);
@@ -91,6 +92,8 @@ export function Settings() {
           <Row k="⌘S" v="Save file (in editor)" />
         </div>
       </div>
+
+      <SttSettingsSection />
 
       <div className="settings-section">
         <div className="settings-section-head">
@@ -194,6 +197,125 @@ function Row({ k, v }: { k: string; v: string }) {
     <div className="kbd-row">
       <kbd>{k}</kbd>
       <span>{v}</span>
+    </div>
+  );
+}
+
+const STT_PRESETS: Record<
+  SttSettings["presetId"],
+  { endpoint: string; model: string; label: string }
+> = {
+  groq: {
+    endpoint: "https://api.groq.com/openai/v1",
+    model: "whisper-large-v3-turbo",
+    label: "Groq",
+  },
+  openai: {
+    endpoint: "https://api.openai.com/v1",
+    model: "whisper-1",
+    label: "OpenAI",
+  },
+  custom: { endpoint: "", model: "", label: "Custom" },
+};
+
+function SttSettingsSection() {
+  const settings = useSttStore((s) => s.settings);
+  const update = useSttStore((s) => s.updateSettings);
+  const [revealKey, setRevealKey] = useState(false);
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <div className="settings-section-title">Speech to text</div>
+        <div className="settings-section-sub">
+          Hold <kbd>Right Ctrl</kbd> to dictate. Transcribed text is pasted into the
+          focused terminal or editor pane.
+        </div>
+      </div>
+
+      <div className="stt-form">
+        <label className="stt-field">
+          <span className="stt-field-label">Provider</span>
+          <select
+            value={settings.presetId}
+            onChange={(e) => {
+              const id = e.target.value as SttSettings["presetId"];
+              const preset = STT_PRESETS[id];
+              if (id === "custom") {
+                void update({ presetId: id });
+              } else {
+                void update({
+                  presetId: id,
+                  endpoint: preset.endpoint,
+                  model: preset.model,
+                });
+              }
+            }}
+          >
+            {Object.entries(STT_PRESETS).map(([id, p]) => (
+              <option key={id} value={id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">Endpoint</span>
+          <input
+            type="url"
+            value={settings.endpoint}
+            placeholder="https://api.groq.com/openai/v1"
+            onChange={(e) => void update({ endpoint: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">API key</span>
+          <div className="stt-field-inline">
+            <input
+              type={revealKey ? "text" : "password"}
+              value={settings.apiKey}
+              placeholder="sk-…"
+              onChange={(e) => void update({ apiKey: e.target.value })}
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={revealKey ? "Hide API key" : "Show API key"}
+              onClick={() => setRevealKey((v) => !v)}
+            >
+              <Icon name={revealKey ? "x" : "dot"} size={14} />
+            </button>
+          </div>
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">Model</span>
+          <input
+            type="text"
+            value={settings.model}
+            placeholder="whisper-large-v3-turbo"
+            onChange={(e) => void update({ model: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">Language (optional)</span>
+          <input
+            type="text"
+            value={settings.language}
+            placeholder="auto-detect — e.g. en, es, zh"
+            onChange={(e) => void update({ language: e.target.value })}
+            spellCheck={false}
+            maxLength={5}
+          />
+        </label>
+      </div>
     </div>
   );
 }

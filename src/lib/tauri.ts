@@ -122,4 +122,20 @@ export async function settingsSet(key: string, value: unknown): Promise<void> {
   return rawInvoke("settings_set", { key, value });
 }
 
+export type SttTranscribeArgs = {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  audio: Uint8Array;
+  mime?: string;
+  filename?: string;
+  language?: string;
+};
+
+export async function sttTranscribe(args: SttTranscribeArgs): Promise<string> {
+  return rawInvoke<string>("stt_transcribe", {
+    args: { ...args, audio: Array.from(args.audio) },
+  });
+}
+
 export { Channel };
