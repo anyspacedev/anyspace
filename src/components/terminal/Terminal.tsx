@@ -6,6 +6,7 @@ import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { SearchAddon } from "@xterm/addon-search";
 import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ptySpawn, ptyWrite, ptyResize, ptyKill } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
 import type { Pane } from "../../lib/types";
@@ -23,6 +24,10 @@ type Props = { pane: Pane; tabId: string };
 // no per-pane GPU cost.
 const MAX_WEBGL_TERMINALS = 6;
 let activeWebglTerminals = 0;
+
+function quoteShellPath(p: string): string {
+  return `'${p.replace(/'/g, `'\\''`)}'`;
+}
 
 export function Terminal({ pane, tabId }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -180,18 +185,28 @@ export function Terminal({ pane, tabId }: Props) {
     });
     ro.observe(containerRef.current);
 
-    // Drag-and-drop file path → write path bytes to PTY.
-    const dropHandler = (ev: DragEvent) => {
-      ev.preventDefault();
-      const path = ev.dataTransfer?.getData("text/plain");
-      if (!path) return;
-      const sid = sessionIdRef.current;
-      if (sid) void ptyWrite(sid, new TextEncoder().encode(path));
-    };
-    const dragOverHandler = (ev: DragEvent) => ev.preventDefault();
-    const node = containerRef.current;
-    node.addEventListener("drop", dropHandler);
-    node.addEventListener("dragover", dragOverHandler);
+    // OS drag-drop: Tauri intercepts at the window level (HTML5 drop never fires, and dataTransfer would lack absolute paths anyway), so subscribe to the native event and hit-test against this pane's rect.
+    let dragUnlisten: (() => void) | null = null;
+    let dragCancelled = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        const node = containerRef.current;
+        const sid = sessionIdRef.current;
+        if (!node || !sid) return;
+        const rect = node.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const x = event.payload.position.x / dpr;
+        const y = event.payload.position.y / dpr;
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
+        const text = event.payload.paths.map(quoteShellPath).join(" ");
+        void ptyWrite(sid, new TextEncoder().encode(text));
+      })
+      .then((fn) => {
+        if (dragCancelled) fn();
+        else dragUnlisten = fn;
+      })
+      .catch(() => {/* noop */});
 
     return () => {
       disposed = true;
@@ -199,8 +214,8 @@ export function Terminal({ pane, tabId }: Props) {
       cancelAnimationFrame(resizeRaf);
       dataDisp.dispose();
       ro.disconnect();
-      node.removeEventListener("drop", dropHandler);
-      node.removeEventListener("dragover", dragOverHandler);
+      dragCancelled = true;
+      dragUnlisten?.();
       const sid = sessionIdRef.current;
       if (sid) ptyKill(sid).catch(() => {});
       term.dispose();
