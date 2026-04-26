@@ -1,19 +1,41 @@
 import { Icon } from "../ui/Icon";
 import { basename } from "./editorPayload";
+import type { GitStatusLetter } from "../../lib/tauri";
 
 type Props = {
   files: string[];
   activePath: string | null;
   dirtyMap: Record<string, boolean>;
+  gitMap: Record<string, GitStatusLetter>;
   onSwitch: (path: string) => void;
   onClose: (path: string) => void;
   onAdd: () => void;
+};
+
+const GIT_TITLES: Record<GitStatusLetter, string> = {
+  M: "Modified",
+  A: "Added",
+  D: "Deleted",
+  R: "Renamed",
+  C: "Copied",
+  "?": "Untracked",
+  U: "Unmerged",
+};
+const GIT_CLASS: Record<GitStatusLetter, string> = {
+  M: "m",
+  A: "a",
+  D: "d",
+  R: "r",
+  C: "c",
+  "?": "untracked",
+  U: "u",
 };
 
 export function EditorTabs({
   files,
   activePath,
   dirtyMap,
+  gitMap,
   onSwitch,
   onClose,
   onAdd,
@@ -23,6 +45,7 @@ export function EditorTabs({
       {files.map((f) => {
         const active = f === activePath;
         const dirty = !!dirtyMap[f];
+        const git = gitMap[f];
         const name = basename(f);
         return (
           <div
@@ -36,6 +59,15 @@ export function EditorTabs({
               onClick={() => onSwitch(f)}
             >
               <span className="editor-tab-name">{name}</span>
+              {git && (
+                <span
+                  className={"editor-tab-git git-" + GIT_CLASS[git]}
+                  title={GIT_TITLES[git]}
+                  aria-label={GIT_TITLES[git]}
+                >
+                  {git}
+                </span>
+              )}
               {dirty && (
                 <span
                   className="editor-tab-dirty"

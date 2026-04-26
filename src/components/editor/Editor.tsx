@@ -14,8 +14,9 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { languageFor } from "./languages";
 import { Icon } from "../ui/Icon";
 import { registerEditor, unregisterEditor } from "../stt/editorRegistry";
-import { editorFilesFrom, basename } from "./editorPayload";
+import { editorFilesFrom, basename, parentDir } from "./editorPayload";
 import { EditorTabs } from "./EditorTabs";
+import { gitStatus, type GitStatusLetter } from "../../lib/tauri";
 
 // Monaco needs a real Worker per language. Without this, JSON/TS modes
 // fall through to the AMD loader path and crash on `moduleIdToUrl.toUrl`.
@@ -63,8 +64,10 @@ export function Editor({ pane, tabId }: Props) {
   );
   const [tick, setTick] = useState(0);
   const [confirmClose, setConfirmClose] = useState<{ path: string } | null>(null);
+  const [gitMap, setGitMap] = useState<Record<string, GitStatusLetter>>({});
 
   const { files, activePath } = editorFilesFrom(pane.payload);
+  const filesKey = files.join("\0");
 
   // Mount the editor once per pane.
   useEffect(() => {
@@ -183,6 +186,44 @@ export function Editor({ pane, tabId }: Props) {
     };
   }, []);
 
+  // Poll git status for the parent dirs of all open files. Re-runs when
+  // the file set changes; refreshGit() is also called after each save so
+  // a Modified file flips to clean immediately.
+  const refreshGit = async () => {
+    if (files.length === 0) {
+      setGitMap({});
+      return;
+    }
+    const dirs = new Set(files.map(parentDir));
+    const maps = await Promise.all(
+      [...dirs].map((d) => gitStatus(d).catch(() => ({}))),
+    );
+    const merged: Record<string, GitStatusLetter> = {};
+    for (const m of maps) Object.assign(merged, m);
+    setGitMap(merged);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (files.length === 0) {
+      setGitMap({});
+      return;
+    }
+    const dirs = new Set(files.map(parentDir));
+    void Promise.all(
+      [...dirs].map((d) => gitStatus(d).catch(() => ({}))),
+    ).then((maps) => {
+      if (cancelled) return;
+      const merged: Record<string, GitStatusLetter> = {};
+      for (const m of maps) Object.assign(merged, m);
+      setGitMap(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filesKey]);
+
   // Cmd/Ctrl+S to save the active file.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -204,6 +245,7 @@ export function Editor({ pane, tabId }: Props) {
         .then(() => {
           savedVersions.set(activePath, model.getAlternativeVersionId());
           setTick((t) => t + 1);
+          void refreshGit();
         })
         .catch((err) => console.warn("[editor] save failed", err));
     };
@@ -258,6 +300,7 @@ export function Editor({ pane, tabId }: Props) {
     }
     doCloseTab(path);
     setConfirmClose(null);
+    void refreshGit();
   };
 
   const discardAndClose = async (path: string) => {
@@ -320,6 +363,7 @@ export function Editor({ pane, tabId }: Props) {
         files={files}
         activePath={activePath}
         dirtyMap={dirtyMap}
+        gitMap={gitMap}
         onSwitch={switchTab}
         onClose={closeTab}
         onAdd={addTab}

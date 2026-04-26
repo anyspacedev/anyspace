@@ -114,6 +114,14 @@ export async function fsListDirRecursive(
   return rawInvoke<FileEntry[]>("fs_list_dir_recursive", { path, maxDepth });
 }
 
+export type GitStatusLetter = "M" | "A" | "D" | "R" | "C" | "?" | "U";
+
+export async function gitStatus(dir: string): Promise<Record<string, GitStatusLetter>> {
+  return rawInvoke<Record<string, GitStatusLetter>>("git_status", {
+    args: { dir },
+  });
+}
+
 export async function settingsGet<T = unknown>(key: string): Promise<T | null> {
   return rawInvoke<T | null>("settings_get", { key });
 }

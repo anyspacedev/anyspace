@@ -3,6 +3,7 @@ use tauri::Manager;
 mod agent;
 mod ai;
 mod fs_ops;
+mod git;
 mod kanban;
 mod preview;
 mod pty;
@@ -38,6 +39,8 @@ pub fn run() {
             agent::commands::agent_launch,
             // FS (helpers beyond plugin scope)
             fs_ops::commands::fs_list_dir_recursive,
+            // Git
+            git::commands::git_status,
             // Settings
             settings::commands::settings_get,
             settings::commands::settings_set,

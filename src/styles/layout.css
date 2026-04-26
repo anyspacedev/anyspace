@@ -967,6 +967,22 @@
   background: var(--accent);
   flex-shrink: 0;
 }
+.editor-tab-git {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.editor-tab-git.git-m { color: var(--warning); background: color-mix(in oklab, var(--warning) 16%, transparent); }
+.editor-tab-git.git-a { color: var(--success); background: color-mix(in oklab, var(--success) 16%, transparent); }
+.editor-tab-git.git-d { color: var(--danger);  background: color-mix(in oklab, var(--danger) 16%, transparent); }
+.editor-tab-git.git-r { color: var(--accent);  background: color-mix(in oklab, var(--accent) 16%, transparent); }
+.editor-tab-git.git-c { color: var(--accent);  background: color-mix(in oklab, var(--accent) 16%, transparent); }
+.editor-tab-git.git-u { color: var(--danger);  background: color-mix(in oklab, var(--danger) 16%, transparent); }
+.editor-tab-git.git-untracked { color: var(--fg-dim); background: color-mix(in oklab, var(--fg) 8%, transparent); }
 .editor-tab-close {
   display: grid;
   place-items: center;
