@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useThemeStore } from "../../stores/themeStore";
 import { themes } from "../../themes/definitions";
 import type { Theme } from "../../themes/definitions";
@@ -9,19 +9,9 @@ import { useAiStore, type AiSettings } from "../../stores/aiStore";
 export function Settings() {
   const theme = useThemeStore((s) => s.current);
   const setTheme = useThemeStore((s) => s.setTheme);
-  const [filter, setFilter] = useState("");
 
-  const { dark, light } = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    const match = (t: Theme) =>
-      !q || t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
-    return {
-      dark: themes.filter((t) => t.kind === "dark" && match(t)),
-      light: themes.filter((t) => t.kind === "light" && match(t)),
-    };
-  }, [filter]);
-
-  const totalShown = dark.length + light.length;
+  const darkCount = themes.filter((t) => t.kind === "dark").length;
+  const lightCount = themes.length - darkCount;
 
   return (
     <div className="settings">
@@ -29,54 +19,10 @@ export function Settings() {
         <div className="settings-section-head">
           <div className="settings-section-title">Appearance</div>
           <div className="settings-section-sub">
-            {themes.length} themes — {themes.filter((t) => t.kind === "dark").length} dark,{" "}
-            {themes.filter((t) => t.kind === "light").length} light
+            {themes.length} themes — {darkCount} dark, {lightCount} light.
           </div>
         </div>
-
-        <div className="theme-search">
-          <span className="theme-search-icon" aria-hidden="true">
-            <Icon name="search" size={14} />
-          </span>
-          <input
-            aria-label="Filter themes"
-            placeholder="Filter themes…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            spellCheck={false}
-          />
-          {filter && (
-            <button
-              className="icon-btn"
-              onClick={() => setFilter("")}
-              aria-label="Clear filter"
-            >
-              <Icon name="x" size={14} />
-            </button>
-          )}
-        </div>
-
-        {totalShown === 0 ? (
-          <div className="theme-empty">
-            <Icon name="search" size={20} />
-            <div>No themes match “{filter}”.</div>
-          </div>
-        ) : (
-          <>
-            {dark.length > 0 && (
-              <>
-                <div className="settings-subhead">Dark</div>
-                <ThemeGrid items={dark} activeId={theme.id} onPick={setTheme} />
-              </>
-            )}
-            {light.length > 0 && (
-              <>
-                <div className="settings-subhead">Light</div>
-                <ThemeGrid items={light} activeId={theme.id} onPick={setTheme} />
-              </>
-            )}
-          </>
-        )}
+        <ThemeSelect value={theme} onChange={setTheme} />
       </div>
 
       <div className="settings-section">
@@ -112,86 +58,209 @@ export function Settings() {
   );
 }
 
-function ThemeGrid({
-  items,
-  activeId,
-  onPick,
-}: {
-  items: Theme[];
-  activeId: string;
-  onPick: (id: string) => void;
-}) {
+function ThemeSwatch({ theme }: { theme: Theme }) {
+  const { ui } = theme;
   return (
-    <div className="theme-grid">
-      {items.map((t) => {
-        const active = t.id === activeId;
-        return (
-          <button
-            key={t.id}
-            className={"theme-card" + (active ? " active" : "")}
-            onClick={() => onPick(t.id)}
-            aria-pressed={active}
-          >
-            <ThemePreview theme={t} />
-            <div className="theme-swatch">
-              <span style={{ background: t.ui.bg }} />
-              <span style={{ background: t.ui.bgElev }} />
-              <span style={{ background: t.ui.accent }} />
-              <span style={{ background: t.ui.success }} />
-              <span style={{ background: t.ui.danger }} />
-              <span style={{ background: t.ui.warning }} />
-            </div>
-            <div className="theme-card-foot">
-              <div className="theme-card-foot-text">
-                <div className="theme-name">{t.name}</div>
-                <div className="theme-kind">{t.kind}</div>
-              </div>
-              {active && (
-                <div className="theme-active-pill" aria-hidden="true">
-                  <Icon name="check" size={12} />
-                  <span>Active</span>
-                </div>
-              )}
-            </div>
-          </button>
-        );
-      })}
-    </div>
+    <span className="theme-swatch-mini" aria-hidden="true">
+      <span style={{ background: ui.bg }} />
+      <span style={{ background: ui.bgElev }} />
+      <span style={{ background: ui.accent }} />
+      <span style={{ background: ui.success }} />
+      <span style={{ background: ui.danger }} />
+    </span>
   );
 }
 
-function ThemePreview({ theme }: { theme: Theme }) {
-  const { ui } = theme;
-  return (
-    <div
-      className="theme-preview"
-      style={{ background: ui.bg, borderColor: ui.border }}
-      aria-hidden="true"
-    >
-      <div
-        className="theme-preview-sidebar"
-        style={{ background: ui.bgElev, borderRightColor: ui.border }}
+function ThemeSelect({
+  value,
+  onChange,
+}: {
+  value: Theme;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const filterRef = useRef<HTMLInputElement | null>(null);
+  const listboxId = useId();
+
+  const groups = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    const match = (t: Theme) =>
+      !q || t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
+    return {
+      dark: themes.filter((t) => t.kind === "dark" && match(t)),
+      light: themes.filter((t) => t.kind === "light" && match(t)),
+    };
+  }, [filter]);
+
+  const flat = useMemo(
+    () => [...groups.dark, ...groups.light],
+    [groups.dark, groups.light],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const tgt = e.target as Node;
+      if (
+        !triggerRef.current?.contains(tgt) &&
+        !panelRef.current?.contains(tgt)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setFilter("");
+    const dark = themes.filter((t) => t.kind === "dark");
+    const light = themes.filter((t) => t.kind === "light");
+    const ordered = [...dark, ...light];
+    const idx = ordered.findIndex((t) => t.id === value.id);
+    setActiveIndex(idx >= 0 ? idx : 0);
+    requestAnimationFrame(() => filterRef.current?.focus());
+  }, [open, value.id]);
+
+  useEffect(() => {
+    if (activeIndex >= flat.length) setActiveIndex(Math.max(0, flat.length - 1));
+  }, [flat.length, activeIndex]);
+
+  const choose = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(flat.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(0, i - 1));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActiveIndex(Math.max(0, flat.length - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const t = flat[activeIndex];
+      if (t) choose(t.id);
+    }
+  };
+
+  const renderRow = (t: Theme) => {
+    const idx = flat.indexOf(t);
+    const selected = t.id === value.id;
+    const highlighted = idx === activeIndex;
+    return (
+      <button
+        key={t.id}
+        type="button"
+        role="option"
+        aria-selected={selected}
+        className={
+          "theme-option" +
+          (highlighted ? " hl" : "") +
+          (selected ? " sel" : "")
+        }
+        onClick={() => choose(t.id)}
+        onMouseEnter={() => setActiveIndex(idx)}
       >
-        <span style={{ background: ui.accent }} />
-        <span style={{ background: ui.fgDim }} />
-        <span style={{ background: ui.fgDim }} />
-      </div>
-      <div className="theme-preview-main">
+        <ThemeSwatch theme={t} />
+        <span className="theme-option-name">{t.name}</span>
+        <span className="theme-option-kind">{t.kind}</span>
+        {selected && (
+          <span className="theme-option-check" aria-hidden="true">
+            <Icon name="check" size={12} />
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  return (
+    <div className="theme-select">
+      <button
+        ref={triggerRef}
+        type="button"
+        className={"theme-select-trigger" + (open ? " open" : "")}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <ThemeSwatch theme={value} />
+        <span className="theme-select-label">
+          <span className="theme-select-name">{value.name}</span>
+          <span className="theme-select-kind">{value.kind}</span>
+        </span>
+        <span className="theme-select-chevron" aria-hidden="true">
+          <Icon name={open ? "chevron-up" : "chevron-down"} size={14} />
+        </span>
+      </button>
+
+      {open && (
         <div
-          className="theme-preview-row"
-          style={{ background: ui.bgElev, borderLeftColor: ui.success }}
-        />
-        <div
-          className="theme-preview-row"
-          style={{ background: ui.bgElev, borderLeftColor: ui.danger }}
-        />
-        <div
-          className="theme-preview-btn"
-          style={{ background: ui.accent, color: ui.accentFg }}
+          ref={panelRef}
+          className="theme-select-panel"
+          onKeyDown={onKeyDown}
         >
-          Run
+          <div className="theme-select-search">
+            <span className="theme-select-search-icon" aria-hidden="true">
+              <Icon name="search" size={14} />
+            </span>
+            <input
+              ref={filterRef}
+              placeholder="Filter themes…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              spellCheck={false}
+              aria-label="Filter themes"
+              aria-controls={listboxId}
+            />
+          </div>
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-label="Themes"
+            className="theme-select-list"
+          >
+            {flat.length === 0 ? (
+              <div className="theme-select-empty">
+                No themes match “{filter}”.
+              </div>
+            ) : (
+              <>
+                {groups.dark.length > 0 && (
+                  <>
+                    <div className="theme-select-group">Dark</div>
+                    {groups.dark.map(renderRow)}
+                  </>
+                )}
+                {groups.light.length > 0 && (
+                  <>
+                    <div className="theme-select-group">Light</div>
+                    {groups.light.map(renderRow)}
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
