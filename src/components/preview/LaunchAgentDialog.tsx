@@ -116,6 +116,7 @@ export function LaunchAgentDialog({ capture, tabId, paneId, defaultCwd, onClose 
         agentId,
         taskTitle,
         taskBody: composedBody,
+        taskColumn: "todo",
         cwd: cwd || undefined,
       });
       if (!ok) setToast("Agent not found");
@@ -139,8 +140,10 @@ export function LaunchAgentDialog({ capture, tabId, paneId, defaultCwd, onClose 
       const ok = await launchAgent({
         mode: "new-tab",
         agentId,
+        taskId: task.id,
         taskTitle: task.title,
         taskBody: task.body,
+        taskColumn: task.column,
         cwd: task.projectPath,
       });
       if (!ok) setToast("Agent not found");

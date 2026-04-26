@@ -85,9 +85,12 @@ export async function previewWatchStop(paneId: string): Promise<void> {
 
 export type LaunchArgs = {
   agentCommand: string;
+  taskId?: string;
   taskTitle: string;
   taskBody: string;
+  taskColumn?: string;
   systemPrompt?: string;
+  envJson?: string;
 };
 
 export type LaunchPlan = {

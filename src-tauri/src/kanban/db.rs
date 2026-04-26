@@ -14,5 +14,11 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/002_seed.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "update_default_agent_commands",
+            sql: include_str!("../../migrations/003_update_default_agents.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

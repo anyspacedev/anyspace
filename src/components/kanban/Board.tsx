@@ -48,8 +48,10 @@ export function KanbanBoard() {
     const tabId = await launchAgent({
       mode: "new-tab",
       agentId: task.agentId,
+      taskId: task.id,
       taskTitle: task.title,
       taskBody: task.body,
+      taskColumn: task.column,
       cwd: task.projectPath,
     });
     if (!tabId) setToast("That agent is no longer available — pick another.");

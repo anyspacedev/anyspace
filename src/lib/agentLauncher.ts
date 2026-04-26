@@ -1,11 +1,14 @@
 import { agentLaunch } from "./tauri";
 import { useKanbanStore } from "../stores/kanbanStore";
 import { useWorkspaceStore } from "../stores/workspaceStore";
+import type { Task } from "./types";
 
 export type LaunchAgentInput = {
   agentId: string;
+  taskId?: string;
   taskTitle: string;
   taskBody: string;
+  taskColumn?: Task["column"];
   cwd?: string;
 } & (
   | { mode: "new-tab" }
@@ -31,9 +34,12 @@ export async function launchAgent(input: LaunchAgentInput): Promise<string | nul
 
   const plan = await agentLaunch({
     agentCommand: agent.command,
+    taskId: input.taskId ?? "",
     taskTitle: input.taskTitle,
     taskBody: input.taskBody,
+    taskColumn: input.taskColumn ?? "",
     systemPrompt: agent.systemPrompt,
+    envJson: agent.envJson,
   });
 
   const ws = useWorkspaceStore.getState();
