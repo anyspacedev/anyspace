@@ -44,11 +44,14 @@ let blockCounter = 0;
 const newBlockId = () => `blk_${++blockCounter}`;
 
 /** Mutates `blocks` based on an event. Caller supplies the absolute row at the
- *  time the event fires (terminal.buffer.active.cursorY + ydisp). */
+ *  time the event fires (terminal.buffer.active.cursorY + ydisp).
+ *  `capturedCommand` is consumed only for outputStart — it's the typed command
+ *  text the caller extracted from the buffer right before output begins. */
 export function applyEvent(
   blocks: CommandBlock[],
   evt: OscEvent,
   absRow: number,
+  capturedCommand?: string,
 ): CommandBlock[] {
   switch (evt.kind) {
     case "promptStart":
@@ -71,7 +74,12 @@ export function applyEvent(
       if (!last) return blocks;
       return [
         ...blocks.slice(0, -1),
-        { ...last, outputStartRow: absRow, state: "running" },
+        {
+          ...last,
+          outputStartRow: absRow,
+          state: "running",
+          command: capturedCommand ?? last.command,
+        },
       ];
     }
     case "commandEnd": {

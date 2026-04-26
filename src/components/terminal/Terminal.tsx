@@ -12,6 +12,7 @@ import { useThemeStore } from "../../stores/themeStore";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { applyEvent, parseOsc133Payload, type CommandBlock } from "./osc133";
+import { extractCommand } from "./blockBuffer";
 import { CommandBlocks } from "./CommandBlocks";
 import { registerShortcut } from "../../lib/shortcuts";
 import { Icon } from "../ui/Icon";
@@ -113,7 +114,17 @@ export function Terminal({ pane, tabId }: Props) {
       if (!evt) return false;
       const buf = term.buffer.active;
       const absRow = buf.baseY + buf.cursorY;
-      blocksRef.current = applyEvent(blocksRef.current, evt, absRow);
+      // At the C boundary the prompt+command rows are guaranteed live —
+      // capture the typed command before any further output can scroll
+      // them out of the buffer.
+      let captured: string | undefined;
+      if (evt.kind === "outputStart") {
+        const last = blocksRef.current[blocksRef.current.length - 1];
+        if (last) {
+          captured = extractCommand(term, last.startRow, absRow) ?? undefined;
+        }
+      }
+      blocksRef.current = applyEvent(blocksRef.current, evt, absRow, captured);
       setBlocks(blocksRef.current);
       return true;
     });
