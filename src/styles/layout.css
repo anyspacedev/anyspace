@@ -662,6 +662,88 @@
   box-shadow: var(--focus-ring);
 }
 
+.cmd-block-actions {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  pointer-events: auto;
+}
+.cmd-block:hover .cmd-block-actions,
+.cmd-block-actions.menu-open {
+  opacity: 1;
+}
+.cmd-block-action-btn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: color-mix(in oklab, var(--bg-elev) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+.cmd-block-action-btn:hover:not(:disabled) {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+.cmd-block-action-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.cmd-block-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.cmd-block-action-menu {
+  position: relative;
+}
+.copy-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  z-index: 30;
+}
+.copy-menu button {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.copy-menu button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+.copy-menu button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .terminal-search {
   position: absolute;
   top: 8px;

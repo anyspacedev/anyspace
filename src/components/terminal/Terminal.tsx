@@ -12,8 +12,9 @@ import { useThemeStore } from "../../stores/themeStore";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { applyEvent, parseOsc133Payload, type CommandBlock } from "./osc133";
-import { extractCommand } from "./blockBuffer";
+import { extractCommand, extractOutput } from "./blockBuffer";
 import { CommandBlocks } from "./CommandBlocks";
+import type { BlockAction } from "./BlockActions";
 import { registerShortcut } from "../../lib/shortcuts";
 import { Icon } from "../ui/Icon";
 
@@ -28,6 +29,13 @@ let activeWebglTerminals = 0;
 
 function quoteShellPath(p: string): string {
   return `'${p.replace(/'/g, `'\\''`)}'`;
+}
+
+function formatBlockMarkdown(block: CommandBlock, output: string): string {
+  const cmd = block.command ?? "(unknown command)";
+  const exit = block.exitCode;
+  const exitLine = exit !== undefined ? `\n\n_exit ${exit}_` : "";
+  return "```bash\n$ " + cmd + "\n" + output + "\n```" + exitLine;
 }
 
 export function Terminal({ pane, tabId }: Props) {
@@ -289,6 +297,40 @@ export function Terminal({ pane, tabId }: Props) {
     setBlocks(blocksRef.current);
   };
 
+  const handleAction = (action: BlockAction, blockId: string) => {
+    const term = termRef.current;
+    const block = blocksRef.current.find((b) => b.id === blockId);
+    if (!block || !term) return;
+    switch (action) {
+      case "rerun": {
+        const sid = sessionIdRef.current;
+        if (!sid || !block.command) return;
+        // Ctrl-U clears any half-typed input on the live prompt before we
+        // submit, so re-running never appends to whatever the user was
+        // mid-typing.
+        const payload = "\x15" + block.command + "\n";
+        void ptyWrite(sid, new TextEncoder().encode(payload)).catch(() => {});
+        break;
+      }
+      case "copyCmd":
+        void navigator.clipboard.writeText(block.command ?? "");
+        break;
+      case "copyOut": {
+        const out = extractOutput(term, block) ?? "(scrolled out of buffer)";
+        void navigator.clipboard.writeText(out);
+        break;
+      }
+      case "copyMd": {
+        const out = extractOutput(term, block) ?? "(scrolled out of buffer)";
+        void navigator.clipboard.writeText(formatBlockMarkdown(block, out));
+        break;
+      }
+      case "explain":
+        // Wired in a follow-up commit.
+        break;
+    }
+  };
+
   return (
     <div className="terminal-wrap" ref={containerRef} tabIndex={0}>
       <CommandBlocks
@@ -297,6 +339,7 @@ export function Terminal({ pane, tabId }: Props) {
         scrollTop={overlay.scrollTop}
         containerHeight={overlay.height}
         onToggle={toggleBlock}
+        onAction={handleAction}
       />
       {searchOpen && (
         <div className="terminal-search">

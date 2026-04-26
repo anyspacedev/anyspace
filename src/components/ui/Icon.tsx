@@ -31,7 +31,8 @@ export type IconName =
   | "folder"
   | "file"
   | "circle"
-  | "mic";
+  | "mic"
+  | "clipboard";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -202,6 +203,12 @@ const paths: Record<IconName, ReactElement> = {
       <path d="M5 11a7 7 0 0 0 14 0" />
       <path d="M12 18v3" />
       <path d="M9 21h6" />
+    </>
+  ),
+  clipboard: (
+    <>
+      <rect x="8" y="3" width="8" height="4" rx="1" />
+      <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
     </>
   ),
 };

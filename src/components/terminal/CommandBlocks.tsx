@@ -1,5 +1,6 @@
 import type { CommandBlock } from "./osc133";
 import { Icon, type IconName } from "../ui/Icon";
+import { BlockActions, type BlockAction } from "./BlockActions";
 
 type Status = "ok" | "fail" | "running" | "pending";
 
@@ -16,12 +17,14 @@ export function CommandBlocks({
   scrollTop,
   containerHeight,
   onToggle,
+  onAction,
 }: {
   blocks: CommandBlock[];
   rowHeight: number;
   scrollTop: number;
   containerHeight: number;
   onToggle: (id: string) => void;
+  onAction: (action: BlockAction, blockId: string) => void;
 }) {
   return (
     <div className="cmd-blocks-overlay" style={{ pointerEvents: "none" }}>
@@ -69,6 +72,9 @@ export function CommandBlocks({
             >
               <Icon name={tabIcon} size={12} />
             </button>
+            {b.state !== "prompting" && !b.collapsed && (
+              <BlockActions block={b} onAction={onAction} />
+            )}
           </div>
         );
       })}
