@@ -14,6 +14,29 @@ mod workspace;
 
 const PREVIEW_PICKER_SCRIPT: &str = include_str!("preview/picker_script.js");
 
+#[cfg(target_os = "linux")]
+fn enable_media_capture(window: &tauri::WebviewWindow) {
+    use webkit2gtk::{
+        glib::ObjectExt, PermissionRequestExt, SettingsExt, UserMediaPermissionRequest,
+        WebViewExt,
+    };
+    let _ = window.with_webview(|webview| {
+        let wv = webview.inner();
+        if let Some(settings) = WebViewExt::settings(&wv) {
+            settings.set_enable_media_stream(true);
+            settings.set_enable_mediasource(true);
+        }
+        wv.connect_permission_request(|_, request| {
+            if request.is::<UserMediaPermissionRequest>() {
+                request.allow();
+                true
+            } else {
+                false
+            }
+        });
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -60,11 +83,11 @@ pub fn run() {
             workspace::commands::workspace_load,
         ])
         .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
             #[cfg(debug_assertions)]
-            {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
-            }
+            window.open_devtools();
+            #[cfg(target_os = "linux")]
+            enable_media_capture(&window);
             Ok(())
         })
         .run(tauri::generate_context!())
