@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { usePaneDragStore } from "../../stores/paneDragStore";
 import type { Pane as PaneType, PaneKind } from "../../lib/types";
 import { Terminal } from "../terminal/Terminal";
 import { Editor } from "../editor/Editor";
@@ -8,70 +8,22 @@ import { FileBrowser } from "../sidebar/FileBrowser";
 import { PaneHeader } from "./PaneHeader";
 import { Icon, type IconName } from "../ui/Icon";
 
-type DropZone = "swap" | "top" | "right" | "bottom" | "left";
-
-function detectDropZone(rect: DOMRect, clientX: number, clientY: number): DropZone {
-  const x = (clientX - rect.left) / rect.width;
-  const y = (clientY - rect.top) / rect.height;
-  const EDGE = 0.25;
-  const dl = x;
-  const dr = 1 - x;
-  const dt = y;
-  const db = 1 - y;
-  const minD = Math.min(dl, dr, dt, db);
-  if (minD > EDGE) return "swap";
-  if (minD === dl) return "left";
-  if (minD === dr) return "right";
-  if (minD === dt) return "top";
-  return "bottom";
-}
-
 export function Pane({ pane, tabId }: { pane: PaneType; tabId: string }) {
   const setActivePane = useWorkspaceStore((s) => s.setActivePane);
-  const swapPanes = useWorkspaceStore((s) => s.swapPanes);
-  const movePaneToEdge = useWorkspaceStore((s) => s.movePaneToEdge);
   const activePaneId = useWorkspaceStore((s) => {
     const t = s.tabs.find((x) => x.id === tabId);
     return t?.activePaneId;
   });
   const isActive = pane.id === activePaneId;
-  const [dropZone, setDropZone] = useState<DropZone | null>(null);
+  const dropZone = usePaneDragStore((s) =>
+    s.targetPaneId === pane.id ? s.zone : null,
+  );
 
   return (
     <div
       className={"pane" + (isActive ? " active" : "")}
+      data-pane-id={pane.id}
       onMouseDown={() => setActivePane(tabId, pane.id)}
-      onDragOver={(e) => {
-        const sourceId = document.body.dataset.dragPaneId;
-        const sourceTab = document.body.dataset.dragTabId;
-        if (!sourceId || sourceTab !== tabId || sourceId === pane.id) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        const zone = detectDropZone(
-          e.currentTarget.getBoundingClientRect(),
-          e.clientX,
-          e.clientY,
-        );
-        setDropZone((prev) => (prev === zone ? prev : zone));
-      }}
-      onDragLeave={(e) => {
-        const next = e.relatedTarget as Node | null;
-        if (next && e.currentTarget.contains(next)) return;
-        setDropZone(null);
-      }}
-      onDrop={(e) => {
-        const sourceId = document.body.dataset.dragPaneId;
-        const sourceTab = document.body.dataset.dragTabId;
-        const zone = dropZone;
-        setDropZone(null);
-        if (!sourceId || sourceTab !== tabId || sourceId === pane.id) return;
-        e.preventDefault();
-        if (!zone || zone === "swap") {
-          swapPanes(tabId, sourceId, pane.id);
-        } else {
-          movePaneToEdge(tabId, sourceId, pane.id, zone);
-        }
-      }}
     >
       <PaneHeader pane={pane} tabId={tabId} />
       <div className="pane-body">
