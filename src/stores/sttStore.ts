@@ -22,7 +22,22 @@ export type SttSettings = {
   model: string;
   language: string; // empty = auto-detect
   presetId: "groq" | "openai" | "custom";
+  // KeyboardEvent.code of the hold-to-talk hotkey. Apple-built keyboards have
+  // no Right Control key, so the default differs by platform; user can rebind
+  // in Settings.
+  hotkey: string;
 };
+
+function isMacPlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const platform = (navigator as { platform?: string }).platform || "";
+  return /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
+}
+
+export function defaultHotkey(): string {
+  return isMacPlatform() ? "AltRight" : "ControlRight";
+}
 
 const DEFAULT_SETTINGS: SttSettings = {
   endpoint: "https://api.groq.com/openai/v1",
@@ -30,6 +45,7 @@ const DEFAULT_SETTINGS: SttSettings = {
   model: "whisper-large-v3-turbo",
   language: "",
   presetId: "groq",
+  hotkey: defaultHotkey(),
 };
 
 const SETTINGS_KEY = "stt";
@@ -54,8 +70,9 @@ type SttState = {
 };
 
 let activeTarget: InjectTarget | null = null;
-let abortCtl: AbortController | null = null;
 let dismissTimer: number | undefined;
+// Bumped on cancel(); after each async hop in startListening / stopAndTranscribe
+// we re-check it to bail out cleanly when a cancel fired mid-flight.
 let startGen = 0;
 
 function snapshotActiveTarget(): InjectTarget {
@@ -188,16 +205,23 @@ export const useSttStore = create<SttState>((set, get) => ({
     }
 
     if (result.durationMs < MIN_RECORDING_MS) {
-      set({ phase: "idle", message: "", analyser: null });
+      set({
+        phase: "error",
+        message: "Hold longer to dictate",
+        analyser: null,
+      });
+      scheduleDismiss(set, 1500);
       return;
     }
 
     set({ phase: "transcribing", message: "Transcribing…", analyser: null });
 
-    abortCtl = new AbortController();
+    const gen = startGen;
     const { settings } = get();
     try {
       const audio = new Uint8Array(await result.blob.arrayBuffer());
+      if (gen !== startGen) return;
+
       const text = await sttTranscribe({
         endpoint: settings.endpoint,
         apiKey: settings.apiKey,
@@ -207,9 +231,12 @@ export const useSttStore = create<SttState>((set, get) => ({
         mime: result.mime,
         filename: filenameFor(result.mime),
       });
+      if (gen !== startGen) return;
 
       const target = activeTarget ?? { kind: "none", label: "no target" };
       const out = await inject(text, target);
+      if (gen !== startGen) return;
+
       if (out.ok) {
         set({ phase: "success", message: out.message, analyser: null });
         scheduleDismiss(set, 1400);
@@ -218,6 +245,7 @@ export const useSttStore = create<SttState>((set, get) => ({
         scheduleDismiss(set, 4000);
       }
     } catch (e) {
+      if (gen !== startGen) return;
       set({
         phase: "error",
         message: e instanceof Error ? e.message : String(e),
@@ -225,21 +253,18 @@ export const useSttStore = create<SttState>((set, get) => ({
       });
       scheduleDismiss(set, 4000);
     } finally {
-      abortCtl = null;
-      activeTarget = null;
+      // Only clear if we still own this generation — otherwise cancel() (or a
+      // fresh startListening) has already managed activeTarget.
+      if (gen === startGen) activeTarget = null;
     }
   },
 
   cancel: () => {
     const phase = get().phase;
-    startGen++; // invalidate any pending startRecording
+    startGen++; // invalidate any pending startRecording / transcribe / inject
     if (phase === "listening") {
       // either recording or in-flight getUserMedia — both safe to cancel
       cancelRecording();
-    }
-    if (phase === "transcribing" && abortCtl) {
-      abortCtl.abort();
-      abortCtl = null;
     }
     activeTarget = null;
     clearDismissTimer();

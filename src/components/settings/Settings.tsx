@@ -291,6 +291,62 @@ const STT_PRESETS: Record<
   custom: { endpoint: "", model: "", label: "Custom" },
 };
 
+const HOTKEY_LABELS: Record<string, string> = {
+  ControlLeft: "Left Ctrl",
+  ControlRight: "Right Ctrl",
+  AltLeft: "Left Alt/Option",
+  AltRight: "Right Alt/Option",
+  MetaLeft: "Left Cmd/Win",
+  MetaRight: "Right Cmd/Win",
+  ShiftLeft: "Left Shift",
+  ShiftRight: "Right Shift",
+  Space: "Space",
+  Backquote: "`",
+};
+
+function formatHotkey(code: string): string {
+  return HOTKEY_LABELS[code] ?? code;
+}
+
+function HotkeyField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+}) {
+  const [capturing, setCapturing] = useState(false);
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code === "Escape") {
+        setCapturing(false);
+        return;
+      }
+      if (!e.code) return;
+      onChange(e.code);
+      setCapturing(false);
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKey, { capture: true });
+  }, [capturing, onChange]);
+
+  return (
+    <button
+      type="button"
+      className={"stt-hotkey-btn" + (capturing ? " capturing" : "")}
+      onClick={() => setCapturing((v) => !v)}
+      aria-label="Set hold-to-talk hotkey"
+    >
+      {capturing ? "Press a key… (Esc to cancel)" : formatHotkey(value)}
+    </button>
+  );
+}
+
 function SttSettingsSection() {
   const settings = useSttStore((s) => s.settings);
   const update = useSttStore((s) => s.updateSettings);
@@ -301,12 +357,20 @@ function SttSettingsSection() {
       <div className="settings-section-head">
         <div className="settings-section-title">Speech to text</div>
         <div className="settings-section-sub">
-          Hold <kbd>Right Ctrl</kbd> to dictate. Transcribed text is pasted into the
-          focused terminal or editor pane.
+          Hold <kbd>{formatHotkey(settings.hotkey)}</kbd> to dictate. Transcribed
+          text is pasted into the focused terminal or editor pane.
         </div>
       </div>
 
       <div className="stt-form">
+        <label className="stt-field">
+          <span className="stt-field-label">Hotkey</span>
+          <HotkeyField
+            value={settings.hotkey}
+            onChange={(code) => void update({ hotkey: code })}
+          />
+        </label>
+
         <label className="stt-field">
           <span className="stt-field-label">Provider</span>
           <select

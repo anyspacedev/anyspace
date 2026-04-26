@@ -1,22 +1,58 @@
-// Right Ctrl hold-to-talk detection, window-scoped.
-// Cancels on any other key, on window blur, and on tab visibility loss.
+// Hold-to-talk hotkey detection, window-scoped.
+// The hotkey is configurable in settings (e.g. ControlRight on Linux/Windows,
+// AltRight on Mac). Cancels on any other key, on window blur, and on tab
+// visibility loss.
 
 import { useEffect, useRef } from "react";
 import { useSttStore } from "../../stores/sttStore";
 
+type ModFlag = "ctrlKey" | "altKey" | "metaKey" | "shiftKey" | null;
+const ALL_MODS: Exclude<ModFlag, null>[] = [
+  "ctrlKey",
+  "altKey",
+  "metaKey",
+  "shiftKey",
+];
+
+function modForCode(code: string): ModFlag {
+  if (code === "ControlLeft" || code === "ControlRight") return "ctrlKey";
+  if (code === "AltLeft" || code === "AltRight") return "altKey";
+  if (code === "MetaLeft" || code === "MetaRight") return "metaKey";
+  if (code === "ShiftLeft" || code === "ShiftRight") return "shiftKey";
+  return null;
+}
+
+function hasForeignModifier(e: KeyboardEvent, allowed: ModFlag): boolean {
+  for (const m of ALL_MODS) {
+    if (m === allowed) continue;
+    if (e[m]) return true;
+  }
+  return false;
+}
+
+// xterm and Monaco both use a focused <textarea>, so allow textarea — we want
+// dictation to work in those panes. Block plain inputs/selects so the hotkey
+// doesn't steal keys while typing in the Settings overlay or other dialogs.
+function isFormInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "SELECT";
+}
+
 export function useSttHotkey() {
   const heldRef = useRef(false);
+  const hotkey = useSttStore((s) => s.settings.hotkey);
 
   useEffect(() => {
+    const expectedMod = modForCode(hotkey);
     const store = useSttStore;
 
     const onDown = (e: KeyboardEvent) => {
-      // ignore key repeats
       if (e.repeat) return;
 
-      if (e.code === "ControlRight") {
-        // require Right Ctrl alone (no other modifiers active)
-        if (e.altKey || e.metaKey || e.shiftKey) return;
+      if (e.code === hotkey) {
+        if (hasForeignModifier(e, expectedMod)) return;
+        if (isFormInput(e.target)) return;
         if (heldRef.current) return;
         heldRef.current = true;
         void store.getState().startListening();
@@ -31,7 +67,7 @@ export function useSttHotkey() {
     };
 
     const onUp = (e: KeyboardEvent) => {
-      if (e.code !== "ControlRight") return;
+      if (e.code !== hotkey) return;
       if (!heldRef.current) return;
       heldRef.current = false;
       void store.getState().stopAndTranscribe();
@@ -60,5 +96,5 @@ export function useSttHotkey() {
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [hotkey]);
 }

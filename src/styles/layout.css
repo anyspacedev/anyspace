@@ -2566,6 +2566,26 @@
   flex: 1;
   font-family: var(--font-mono);
 }
+.stt-hotkey-btn {
+  height: 32px;
+  padding: 0 var(--pad-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.stt-hotkey-btn:hover {
+  background: var(--bg-elev-2);
+}
+.stt-hotkey-btn.capturing {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-elev));
+}
 
 /* ===== Preview element picker ===== */
 

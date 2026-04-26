@@ -88,7 +88,7 @@ The `TEAMSHIP_TASK_FILE` env var is **only** set if you wire it via the agent's 
 
 ### Speech-to-text dispatches by active pane
 
-Hold-to-talk (Right Ctrl, window-scoped) records via `getUserMedia` → `MediaRecorder`, posts the audio to an OpenAI-compatible `/audio/transcriptions` endpoint through the Rust `stt_transcribe` command (uses the existing `reqwest` dep with `multipart` + `json` features), then injects text based on the snapshotted active pane:
+Hold-to-talk (configurable hotkey, window-scoped — default `ControlRight` on Linux/Windows, `AltRight` on Mac since Apple keyboards have no Right Ctrl key; user-rebindable in Settings) records via `getUserMedia` → `MediaRecorder`, posts the audio to an OpenAI-compatible `/audio/transcriptions` endpoint through the Rust `stt_transcribe` command (uses the existing `reqwest` dep with `multipart` + `json` features), then injects text based on the snapshotted active pane:
 
 - `terminal` → `ptyWrite` UTF-8 bytes (no `\n` — never auto-execute)
 - `editor` → `monaco.executeEdits` at the current selection
