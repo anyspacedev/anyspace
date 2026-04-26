@@ -37,6 +37,32 @@ fn enable_media_capture(window: &tauri::WebviewWindow) {
     });
 }
 
+#[cfg(target_os = "macos")]
+fn enable_media_capture(window: &tauri::WebviewWindow) {
+    use objc2_foundation::{ns_string, NSNumber, NSObjectNSKeyValueCoding};
+    use objc2_web_kit::WKWebView;
+
+    let _ = window.with_webview(|webview| {
+        let wv_ptr = webview.inner() as *const WKWebView;
+        if wv_ptr.is_null() {
+            return;
+        }
+        unsafe {
+            let wv = &*wv_ptr;
+            let prefs = wv.configuration().preferences();
+            let yes = NSNumber::numberWithBool(true);
+            let no = NSNumber::numberWithBool(false);
+            // Private WKPreferences SPI — without these `navigator.mediaDevices`
+            // is undefined on Tauri's custom-scheme origin. wry's WKUIDelegate
+            // already grants requestMediaCapturePermissionForOrigin, so flipping
+            // the keys is enough to make hold-to-talk work.
+            prefs.setValue_forKey(Some(&yes), ns_string!("mediaDevicesEnabled"));
+            prefs.setValue_forKey(Some(&no), ns_string!("mediaCaptureRequiresSecureConnection"));
+            prefs.setValue_forKey(Some(&no), ns_string!("getUserMediaRequiresUserGesture"));
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -86,7 +112,7 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             #[cfg(debug_assertions)]
             window.open_devtools();
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
             enable_media_capture(&window);
             Ok(())
         })
