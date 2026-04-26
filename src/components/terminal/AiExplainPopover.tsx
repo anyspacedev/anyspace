@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "../ui/Icon";
 import { aiChat } from "../../lib/tauri";
 import { useAiStore } from "../../stores/aiStore";
+import { useFocusReturn } from "../../lib/useFocusReturn";
 import type { CommandBlock } from "./osc133";
 
 type Phase =
@@ -19,6 +20,8 @@ export function AiExplainPopover({ block, output, onClose }: Props) {
   const settings = useAiStore((s) => s.settings);
   const [phase, setPhase] = useState<Phase>({ state: "loading" });
   const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  useFocusReturn();
 
   // Fire one request on mount. Re-trigger requires unmount + remount via
   // a key change on the parent — explainingBlockId in Terminal.tsx.

@@ -168,7 +168,12 @@ type WorkspaceState = {
   setActivePane: (tabId: string, paneId: string) => void;
   setPaneKind: (tabId: string, paneId: string, kind: PaneKind, payload?: Record<string, unknown>) => void;
   setPanePayload: (tabId: string, paneId: string, payload: Record<string, unknown>) => void;
-  splitPane: (tabId: string, paneId: string, direction: "horizontal" | "vertical") => void;
+  splitPane: (
+    tabId: string,
+    paneId: string,
+    direction: "horizontal" | "vertical",
+    preset?: PanePreset,
+  ) => void;
   closePane: (tabId: string, paneId: string) => void;
 
   setLayoutSizes: (tabId: string, path: number[], sizes: number[]) => void;
@@ -267,7 +272,7 @@ type Snapshot = { tabs: Tab[]; activeTabId: string | null };
 
 // Strip ephemeral session refs from payload before persisting — old session IDs
 // are stale across launches and would confuse the terminal pane.
-const EPHEMERAL_KEYS = new Set(["sessionId", "pendingCommand"]);
+const EPHEMERAL_KEYS = new Set(["sessionId", "pendingCommand", "pickerActive"]);
 function stripEphemeral(payload: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!payload) return {};
   const out: Record<string, unknown> = {};
@@ -378,11 +383,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ),
     })),
 
-  splitPane: (tabId, paneId, direction) => {
+  splitPane: (tabId, paneId, direction, preset) => {
     set((s) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== tabId) return t;
-        const newPane = emptyPane("terminal");
+        const newPane = emptyPane(preset?.kind ?? "terminal");
+        if (preset) {
+          newPane.payload = {
+            pendingCommand: preset.pendingCommand,
+            spawnEnv: preset.spawnEnv,
+            spawnCwd: preset.spawnCwd,
+            title: preset.title,
+          };
+        }
         const newLayout = findAndMutateLayout(
           t.layout,
           (n) => n.type === "leaf" && n.paneId === paneId,

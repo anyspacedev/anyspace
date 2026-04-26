@@ -1,18 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Searcher } from "fast-fuzzy";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { fsListDirRecursive, settingsGet, settingsSet, type FileEntry } from "../../lib/tauri";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { registerShortcut } from "../../lib/shortcuts";
+import { useFocusReturn } from "../../lib/useFocusReturn";
 import { Icon } from "../ui/Icon";
+import { ErrorState } from "../ui/ErrorState";
 import { editorFilesFrom } from "../editor/editorPayload";
 
 export function QuickOpen() {
   const [open, setOpen] = useState(false);
+  useFocusReturn(open);
   const [root, setRoot] = useState<string | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
@@ -32,15 +36,18 @@ export function QuickOpen() {
     });
   }, []);
 
+  const indexFiles = useCallback((path: string) => {
+    setError(null);
+    void fsListDirRecursive(path, 5)
+      .then((list) => setFiles(list.filter((f) => !f.isDir)))
+      .catch((e) => setError(String(e)));
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     inputRef.current?.focus();
-    if (root) {
-      void fsListDirRecursive(root, 5)
-        .then((list) => setFiles(list.filter((f) => !f.isDir)))
-        .catch((e) => console.warn("[quickopen] list failed", e));
-    }
-  }, [open, root]);
+    if (root) indexFiles(root);
+  }, [open, root, indexFiles]);
 
   const searcher = useMemo(() => {
     return new Searcher(files, { keySelector: (f: FileEntry) => f.name + " " + f.path });
@@ -89,10 +96,26 @@ export function QuickOpen() {
     setQuery("");
   };
 
+  // Window-scoped Escape so users can close even if focus has wandered.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   if (!open) return null;
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
-      <div className="modal quickopen" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal quickopen"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Quick Open"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="quickopen-input-row">
           <div className="quickopen-input-wrap">
             <span className="quickopen-input-icon">
@@ -100,11 +123,11 @@ export function QuickOpen() {
             </span>
             <input
               ref={inputRef}
+              aria-label="Search files"
               placeholder={root ? "Search files…" : "Pick a folder first"}
               value={query}
               onChange={(e) => { setQuery(e.target.value); setHighlight(0); }}
               onKeyDown={(e) => {
-                if (e.key === "Escape") setOpen(false);
                 if (e.key === "ArrowDown") { setHighlight((h) => Math.min(h + 1, results.length - 1)); e.preventDefault(); }
                 if (e.key === "ArrowUp") { setHighlight((h) => Math.max(0, h - 1)); e.preventDefault(); }
                 if (e.key === "Enter") { const r = results[highlight]; if (r) openFile(r); }
@@ -122,7 +145,15 @@ export function QuickOpen() {
             <div>Pick a project folder to index its files for fast search.</div>
           </div>
         )}
-        {root && (
+        {root && error && (
+          <ErrorState
+            compact
+            title="Couldn't index this folder"
+            message={error}
+            onRetry={() => indexFiles(root)}
+          />
+        )}
+        {root && !error && (
           <div className="quickopen-list scrollbar">
             {results.map((r, i) => (
               <div
@@ -136,7 +167,10 @@ export function QuickOpen() {
               </div>
             ))}
             {results.length === 0 && query && (
-              <div className="quickopen-empty">No matches for “{query}”</div>
+              <div className="quickopen-empty">
+                <Icon name="search" size={20} />
+                <div>No matches for “{query}”</div>
+              </div>
             )}
           </div>
         )}

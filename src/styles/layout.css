@@ -897,6 +897,26 @@
 .editor-status {
   color: var(--fg-dim);
 }
+.editor-wrap { position: relative; }
+.editor-toast {
+  position: absolute;
+  top: 36px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(420px, calc(100% - 24px));
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: color-mix(in oklab, var(--danger) 14%, var(--bg-elev));
+  border: 1px solid color-mix(in oklab, var(--danger) 50%, var(--border-strong));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  z-index: 30;
+  animation: kanban-toast-in var(--duration-base) var(--ease-spring);
+}
+.editor-toast svg { color: var(--danger); flex-shrink: 0; }
 .editor-host {
   flex: 1;
   min-height: 0;
@@ -1126,9 +1146,26 @@
   opacity: 0.85;
 }
 .fb-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  margin: var(--pad-md);
   padding: var(--pad-lg);
   color: var(--fg-dim);
   text-align: center;
+  font-size: var(--font-size-sm);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+.fb-empty svg { color: var(--fg-dim); opacity: 0.7; }
+.fb-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: var(--pad-md);
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
 }
 
 /* ===== Preview ===== */
@@ -1396,10 +1433,17 @@
   background: var(--border);
 }
 .preview-empty-url {
-  width: 100%;
-  max-width: 360px;
+  flex: 1;
   text-align: center;
 }
+.preview-empty-url-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--pad-sm);
+  width: 100%;
+  max-width: 360px;
+}
+.preview-empty-url-row .btn { padding: 0 10px; }
 
 /* ===== Buttons ===== */
 
@@ -1446,7 +1490,7 @@
 .btn-ghost:hover { background: var(--bg-elev-2); color: var(--fg); border-color: var(--border); }
 .btn-danger {
   background: var(--danger);
-  color: white;
+  color: var(--danger-fg);
   border-color: var(--danger);
 }
 .btn-with-icon {
@@ -1458,6 +1502,22 @@
   filter: grayscale(0.3);
 }
 .btn:disabled:hover { transform: none; }
+
+.btn-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  animation: btn-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner { animation-duration: 2.4s; }
+}
 
 /* ===== Modals ===== */
 
@@ -1480,9 +1540,8 @@
     0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
     var(--shadow);
   padding: var(--pad-lg);
-  min-width: 480px;
-  max-width: 720px;
-  max-height: 80vh;
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -1563,8 +1622,8 @@
 .template-label { font-weight: 600; font-size: var(--font-size-sm); }
 .template-sub { font-size: var(--font-size-xs); color: var(--fg-muted); }
 
-.modal.wide { min-width: 640px; max-width: 880px; }
-.modal.narrow { min-width: 360px; max-width: 460px; }
+.modal.wide   { width: min(880px, calc(100vw - 32px)); }
+.modal.narrow { width: min(460px, calc(100vw - 32px)); }
 .modal-body {
   font-size: var(--font-size-sm);
   color: var(--fg);
@@ -1694,6 +1753,7 @@
 /* ===== Kanban ===== */
 
 .kanban {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1763,12 +1823,17 @@
   gap: var(--pad-sm);
 }
 .kanban-empty {
+  display: grid;
+  place-items: center;
+  gap: 6px;
   text-align: center;
   color: var(--fg-dim);
-  padding: var(--pad-lg);
-  font-style: italic;
+  padding: var(--pad-md);
   font-size: var(--font-size-sm);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
 }
+.kanban-empty svg { color: var(--fg-dim); opacity: 0.7; }
 .kanban-card {
   background: var(--bg-elev-2);
   border: 1px solid var(--border);
@@ -1829,6 +1894,32 @@
   justify-content: flex-end;
 }
 
+.kanban-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: color-mix(in oklab, var(--bg-elev) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  z-index: 50;
+  animation: kanban-toast-in var(--duration-base) var(--ease-spring);
+}
+.kanban-toast svg { color: var(--warning); }
+@keyframes kanban-toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
 /* ===== Forms ===== */
 
 .form-row {
@@ -1865,12 +1956,82 @@
   appearance: none;
   -webkit-appearance: none;
   padding-right: 32px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2398a2b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
+  background-size: 14px 14px;
+  /* Default chevron stroke: --fg-muted on the dark base theme. Per-theme-kind
+     override below keeps the chevron readable on light themes too. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a2b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
 }
+[data-theme-kind="light"] .form-row select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+}
+.form-row select::-ms-expand { display: none; }
 .form-row-inline { display: flex; gap: var(--pad-sm); }
 .form-row-inline > input { flex: 1; }
+.form-row textarea[aria-invalid="true"],
+.form-row input[aria-invalid="true"] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 20%, transparent);
+}
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+/* ===== ErrorState =====
+   Mirrors the empty-state pattern but with a danger-tinted icon and an
+   optional retry action. Used for surface-level failures (FileBrowser,
+   QuickOpen index, etc.). Toast-style transient errors live elsewhere. */
+.error-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--pad-md) var(--pad-lg);
+  margin: var(--pad-md);
+  border: 1px solid color-mix(in oklab, var(--danger) 35%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--danger) 6%, var(--bg-elev));
+  color: var(--fg);
+}
+.error-state-compact {
+  gap: 8px;
+  padding: var(--pad-sm) var(--pad-md);
+  margin: var(--pad-sm);
+}
+.error-state-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--danger) 14%, var(--bg));
+  color: var(--danger);
+}
+.error-state-compact .error-state-icon {
+  width: 24px;
+  height: 24px;
+}
+.error-state-body {
+  flex: 1;
+  min-width: 0;
+}
+.error-state-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+.error-state-msg {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  margin-top: 2px;
+  word-break: break-word;
+}
 
 /* ===== Agent manager ===== */
 
@@ -2376,4 +2537,98 @@
 .stt-field-inline input {
   flex: 1;
   font-family: var(--font-mono);
+}
+
+/* ===== Preview element picker ===== */
+
+.icon-btn-active {
+  background: color-mix(in oklab, var(--accent) 22%, var(--bg-elev-2));
+  color: var(--accent);
+}
+.icon-btn-active:hover {
+  background: color-mix(in oklab, var(--accent) 32%, var(--bg-elev-2));
+  color: var(--accent);
+}
+
+.preview-iframe.picker-active {
+  cursor: crosshair;
+}
+/* Sibling ring inside .preview-iframe-wrap so the indicator can't be clipped
+   by parent overflow. Activated by .picker-active on the iframe. */
+.preview-iframe-wrap:has(.preview-iframe.picker-active)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 2px solid var(--accent);
+  border-radius: inherit;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 25%, transparent) inset;
+  z-index: 2;
+}
+
+.launch-agent-dialog .captured-element {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--pad-sm) var(--pad-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+.launch-agent-dialog .captured-selector,
+.launch-agent-dialog .captured-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+  font-size: var(--font-size-xs);
+}
+.launch-agent-dialog .captured-selector code,
+.launch-agent-dialog .captured-source code {
+  font-family: var(--font-mono);
+  color: var(--fg);
+  background: transparent;
+  padding: 0;
+  word-break: break-all;
+}
+.launch-agent-dialog .captured-html {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: var(--pad-sm);
+  background: var(--bg-elev-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.launch-agent-dialog .captured-html code {
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--fg);
+}
+.launch-agent-dialog .captured-parents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+.launch-agent-dialog .captured-parent {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.modal-toast {
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  animation: backdrop-in var(--duration-base) var(--ease-out);
 }

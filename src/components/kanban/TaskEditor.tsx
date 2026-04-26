@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
+import { useFocusReturn } from "../../lib/useFocusReturn";
 import type { Task } from "../../lib/types";
 import { Icon } from "../ui/Icon";
 
 export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
+  useFocusReturn();
   const create = useKanbanStore((s) => s.createTask);
   const update = useKanbanStore((s) => s.updateTask);
   const remove = useKanbanStore((s) => s.deleteTask);
@@ -14,6 +16,39 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
   const [body, setBody] = useState(task?.body ?? "");
   const [agentId, setAgentId] = useState(task?.agentId ?? "");
   const [projectPath, setProjectPath] = useState(task?.projectPath ?? "");
+
+  const titleId = useId();
+  const titleInputId = useId();
+  const bodyInputId = useId();
+  const agentSelectId = useId();
+  const projectInputId = useId();
+
+  // Dirty if user has typed anything (new task) or changed something (edit).
+  const dirty = task
+    ? title !== (task.title ?? "") ||
+      body !== (task.body ?? "") ||
+      agentId !== (task.agentId ?? "") ||
+      projectPath !== (task.projectPath ?? "")
+    : title.trim().length > 0 || body.trim().length > 0;
+
+  const tryClose = () => {
+    if (dirty) {
+      const ok = window.confirm("Discard changes?");
+      if (!ok) return;
+    }
+    onClose();
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        tryClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dirty]);
 
   const save = async () => {
     if (!title.trim()) return;
@@ -31,29 +66,35 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal task-editor" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">{task ? "Edit task" : "New task"}</div>
+    <div className="modal-backdrop" onClick={tryClose}>
+      <div
+        className="modal task-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div id={titleId} className="modal-title">{task ? "Edit task" : "New task"}</div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={titleInputId}>
             <Icon name="file-edit" size={12} />
             <span>Title</span>
           </label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <input id={titleInputId} value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         </div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={bodyInputId}>
             <Icon name="list-checks" size={12} />
             <span>Body</span>
           </label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} />
+          <textarea id={bodyInputId} value={body} onChange={(e) => setBody(e.target.value)} rows={6} />
         </div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={agentSelectId}>
             <Icon name="sparkles" size={12} />
             <span>Agent</span>
           </label>
-          <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+          <select id={agentSelectId} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
             <option value="">— none —</option>
             {agents.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
@@ -61,12 +102,12 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
           </select>
         </div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={projectInputId}>
             <Icon name="folder" size={12} />
             <span>Project path</span>
           </label>
           <div className="form-row-inline">
-            <input value={projectPath} onChange={(e) => setProjectPath(e.target.value)} placeholder="optional" />
+            <input id={projectInputId} value={projectPath} onChange={(e) => setProjectPath(e.target.value)} placeholder="optional" />
             <button className="btn btn-ghost btn-with-icon" onClick={pickProject}>
               <Icon name="folder" size={14} />
               <span>Pick…</span>
@@ -80,8 +121,8 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
             </button>
           )}
           <div style={{ flex: 1 }} />
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={save}>Save</button>
+          <button className="btn btn-ghost" onClick={tryClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={!title.trim()}>Save</button>
         </div>
       </div>
     </div>

@@ -32,7 +32,8 @@ export type IconName =
   | "file"
   | "circle"
   | "mic"
-  | "clipboard";
+  | "clipboard"
+  | "crosshair";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -209,6 +210,16 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <rect x="8" y="3" width="8" height="4" rx="1" />
       <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+    </>
+  ),
+  crosshair: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3v4" />
+      <path d="M12 17v4" />
+      <path d="M3 12h4" />
+      <path d="M17 12h4" />
+      <circle cx="12" cy="12" r="2" />
     </>
   ),
 };

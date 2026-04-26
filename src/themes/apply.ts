@@ -14,6 +14,7 @@ const KEY_TO_VAR: Record<string, string> = {
   success: "--success",
   warning: "--warning",
   danger: "--danger",
+  dangerFg: "--danger-fg",
   info: "--info",
   shadow: "--shadow",
 };

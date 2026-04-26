@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { open as openExternal } from "@tauri-apps/plugin-shell";
@@ -15,6 +15,8 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { PreviewToolbar, type Device } from "./PreviewToolbar";
 import { DeviceFrame } from "./DeviceFrame";
 import { Icon } from "../ui/Icon";
+import { LaunchAgentDialog } from "./LaunchAgentDialog";
+import type { ElementCapture, PickerMessage } from "../../lib/elementContext";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -49,6 +51,9 @@ export function PreviewPane({ pane, tabId }: Props) {
   const [detecting, setDetecting] = useState(false);
   const [framework, setFramework] = useState<string>("");
   const [load, setLoad] = useState<LoadState>({ kind: "idle" });
+  const [pickerActive, setPickerActive] = useState(false);
+  const [capture, setCapture] = useState<ElementCapture | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Auto-detect dev server when projectPath is set without url. Polls until something answers
   // or the overall window expires — handles the cold-start race where the user picks a folder
@@ -165,6 +170,47 @@ export function PreviewPane({ pane, tabId }: Props) {
 
   const onIframeLoad = () => {
     setLoad((cur) => (cur.kind === "loading" ? { kind: "loaded", at: Date.now() } : cur));
+    if (pickerActive) {
+      // The iframe just (re)loaded — re-send the start message so the freshly
+      // injected picker script wakes up in the new document.
+      iframeRef.current?.contentWindow?.postMessage(
+        { src: "teamship", type: "picker:start" },
+        "*",
+      );
+    }
+  };
+
+  // Bridge picker messages from the iframe. We filter by source window so
+  // multiple preview panes don't cross-talk.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      const msg = e.data as PickerMessage | undefined;
+      if (!msg || msg.src !== "teamship") return;
+      if (msg.type === "picker:selected") {
+        setPickerActive(false);
+        setCapture(msg.payload);
+      } else if (msg.type === "picker:cancelled") {
+        setPickerActive(false);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  // Drive the iframe's picker script via postMessage whenever the toggle changes.
+  useEffect(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      { src: "teamship", type: pickerActive ? "picker:start" : "picker:stop" },
+      "*",
+    );
+  }, [pickerActive]);
+
+  const togglePicker = () => {
+    if (capture) return; // dialog open — ignore
+    setPickerActive((v) => !v);
   };
 
   if (!url) {
@@ -190,15 +236,24 @@ export function PreviewPane({ pane, tabId }: Props) {
           </button>
         </div>
         <div className="preview-empty-divider"><span>or paste a URL</span></div>
-        <input
-          placeholder="http://localhost:5173"
-          className="url-input preview-empty-url"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              setUrl((e.target as HTMLInputElement).value);
-            }
+        <form
+          className="preview-empty-url-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const input = (e.currentTarget.querySelector("input") as HTMLInputElement | null);
+            if (input) setUrl(input.value);
           }}
-        />
+        >
+          <input
+            type="url"
+            aria-label="Preview URL"
+            placeholder="http://localhost:5173"
+            className="url-input preview-empty-url"
+          />
+          <button className="btn btn-ghost btn-with-icon" type="submit" aria-label="Open URL">
+            <Icon name="chevron-right" size={14} />
+          </button>
+        </form>
       </div>
     );
   }
@@ -219,15 +274,18 @@ export function PreviewPane({ pane, tabId }: Props) {
         watching={Boolean(projectPath)}
         loadStatus={load.kind}
         loadedAt={load.kind === "loaded" ? load.at : null}
+        pickerActive={pickerActive}
+        onTogglePicker={togglePicker}
       />
       <div className="preview-stage scrollbar">
         <DeviceFrame device={device} zoom={zoom}>
           <div className="preview-iframe-wrap">
             <iframe
               key={`${url}:${reloadTick}`}
+              ref={iframeRef}
               src={url}
               onLoad={onIframeLoad}
-              className="preview-iframe"
+              className={`preview-iframe${pickerActive ? " picker-active" : ""}`}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
               allow="accelerometer; camera; geolocation; gyroscope; microphone; clipboard-read; clipboard-write"
             />
@@ -240,6 +298,15 @@ export function PreviewPane({ pane, tabId }: Props) {
           </div>
         </DeviceFrame>
       </div>
+      {capture && (
+        <LaunchAgentDialog
+          capture={capture}
+          tabId={tabId}
+          paneId={pane.id}
+          defaultCwd={projectPath}
+          onClose={() => setCapture(null)}
+        />
+      )}
     </div>
   );
 }

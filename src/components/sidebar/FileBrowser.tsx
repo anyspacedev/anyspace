@@ -4,6 +4,7 @@ import { fsListDirRecursive, type FileEntry } from "../../lib/tauri";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { Icon } from "../ui/Icon";
+import { ErrorState } from "../ui/ErrorState";
 import { editorFilesFrom } from "../editor/editorPayload";
 
 type Props = { pane: Pane; tabId: string };
@@ -83,6 +84,7 @@ export function FileBrowser({ pane, tabId }: Props) {
         </button>
         {root && (
           <input
+            aria-label="Filter files"
             placeholder="Filter…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -91,12 +93,27 @@ export function FileBrowser({ pane, tabId }: Props) {
         )}
       </div>
       {!root && (
-        <div className="fb-empty">No folder selected. Pick a project root to start browsing.</div>
+        <div className="fb-empty">
+          <Icon name="folder-tree" size={20} />
+          <div>No folder selected. Pick a project root to start browsing.</div>
+        </div>
       )}
-      {root && (
+      {root && error && (
+        <ErrorState
+          compact
+          title="Couldn't list files"
+          message={error}
+          onRetry={() => load(root)}
+        />
+      )}
+      {root && !error && (
         <div className="fb-list scrollbar">
-          {loading && <div className="fb-row muted">Loading…</div>}
-          {error && <div className="fb-row danger">Error: {error}</div>}
+          {loading && (
+            <div className="fb-loading" role="status" aria-live="polite">
+              <span className="ai-explain-spinner" aria-hidden />
+              <span>Loading…</span>
+            </div>
+          )}
           {!loading && filtered.map((e) => (
             <div
               key={e.path}

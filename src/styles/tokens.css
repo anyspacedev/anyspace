@@ -5,7 +5,7 @@
   --bg-elev-2: #1c2030;
   --fg: #e6e8ef;
   --fg-muted: #98a2b3;
-  --fg-dim: #5b6478;
+  --fg-dim: #6b748a;
   --border: #232838;
   --border-strong: #2e3447;
   --accent: #7c5cff;
@@ -13,6 +13,7 @@
   --success: #2ee29a;
   --warning: #f7b955;
   --danger: #ef4f6f;
+  --danger-fg: #ffffff;
   --info: #5cc8ff;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 

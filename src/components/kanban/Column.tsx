@@ -1,6 +1,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import type { Agent, Task } from "../../lib/types";
 import { Card } from "./Card";
+import { Icon } from "../ui/Icon";
 
 const COLUMN_TONE: Record<Task["column"], string> = {
   todo: "var(--info)",
@@ -60,7 +61,10 @@ export function Column({
           );
         })}
         {tasks.length === 0 && (
-          <div className="kanban-empty">{COLUMN_HINT[id]}</div>
+          <div className="kanban-empty">
+            <Icon name={id === "todo" ? "plus" : "list-checks"} size={16} />
+            <span>{COLUMN_HINT[id]}</span>
+          </div>
         )}
       </div>
     </div>

@@ -39,6 +39,7 @@ export function Settings() {
             <Icon name="search" size={14} />
           </span>
           <input
+            aria-label="Filter themes"
             placeholder="Filter themes…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}

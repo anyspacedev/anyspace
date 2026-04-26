@@ -26,6 +26,8 @@ export function PreviewToolbar({
   watching,
   loadStatus,
   loadedAt,
+  pickerActive,
+  onTogglePicker,
 }: {
   url: string;
   device: Device;
@@ -40,6 +42,8 @@ export function PreviewToolbar({
   watching: boolean;
   loadStatus: LoadStatus;
   loadedAt: number | null;
+  pickerActive: boolean;
+  onTogglePicker: () => void;
 }) {
   const [draft, setDraft] = useState(url);
   useEffect(() => setDraft(url), [url]);
@@ -49,10 +53,21 @@ export function PreviewToolbar({
       <button className="icon-btn" title="Refresh" aria-label="Refresh" onClick={onRefresh}>
         <Icon name="refresh" size={14} />
       </button>
+      <button
+        className={`icon-btn${pickerActive ? " icon-btn-active" : ""}`}
+        title={pickerActive ? "Cancel element picker (Esc)" : "Pick element to describe a change"}
+        aria-label="Pick element"
+        aria-pressed={pickerActive}
+        onClick={onTogglePicker}
+      >
+        <Icon name="crosshair" size={14} />
+      </button>
       <div className={`url-input-wrap status-${loadStatus}`}>
         <span className="url-status-dot" aria-hidden />
         <input
           className="url-input"
+          type="url"
+          aria-label="Preview URL"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

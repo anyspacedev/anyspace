@@ -12,6 +12,8 @@ mod shell_integration;
 mod stt;
 mod workspace;
 
+const PREVIEW_PICKER_SCRIPT: &str = include_str!("preview/picker_script.js");
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -22,6 +24,11 @@ pub fn run() {
             .add_migrations("sqlite:teamship.db", kanban::db::migrations())
             .build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry>::new("teamship-preview-picker")
+                .js_init_script_on_all_frames(PREVIEW_PICKER_SCRIPT)
+                .build(),
+        )
         .manage(pty::PtyManager::new())
         .manage(preview::PreviewManager::new())
         .invoke_handler(tauri::generate_handler![

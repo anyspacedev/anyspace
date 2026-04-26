@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
@@ -17,6 +17,7 @@ import { registerEditor, unregisterEditor } from "../stt/editorRegistry";
 import { editorFilesFrom, basename, parentDir } from "./editorPayload";
 import { EditorTabs } from "./EditorTabs";
 import { gitStatus, type GitStatusLetter } from "../../lib/tauri";
+import { useFocusReturn } from "../../lib/useFocusReturn";
 
 // Monaco needs a real Worker per language. Without this, JSON/TS modes
 // fall through to the AMD loader path and crash on `moduleIdToUrl.toUrl`.
@@ -65,6 +66,13 @@ export function Editor({ pane, tabId }: Props) {
   const [tick, setTick] = useState(0);
   const [confirmClose, setConfirmClose] = useState<{ path: string } | null>(null);
   const [gitMap, setGitMap] = useState<Record<string, GitStatusLetter>>({});
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!saveToast) return;
+    const id = window.setTimeout(() => setSaveToast(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [saveToast]);
 
   const { files, activePath } = editorFilesFrom(pane.payload);
   const filesKey = files.join("\0");
@@ -247,7 +255,10 @@ export function Editor({ pane, tabId }: Props) {
           setTick((t) => t + 1);
           void refreshGit();
         })
-        .catch((err) => console.warn("[editor] save failed", err));
+        .catch((err) => {
+          console.warn("[editor] save failed", err);
+          setSaveToast(`Save failed — ${String(err)}`);
+        });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -295,6 +306,7 @@ export function Editor({ pane, tabId }: Props) {
         savedVersions.set(path, model.getAlternativeVersionId());
       } catch (e) {
         console.warn("[editor] save failed", e);
+        setSaveToast(`Save failed — ${String(e)}`);
         return; // leave the tab + dialog up so the user notices
       }
     }
@@ -377,6 +389,12 @@ export function Editor({ pane, tabId }: Props) {
           onSave={() => void saveAndClose(confirmClose.path)}
         />
       )}
+      {saveToast && (
+        <div className="editor-toast" role="status" aria-live="polite">
+          <Icon name="alert-circle" size={14} />
+          <span>{saveToast}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -392,6 +410,8 @@ function UnsavedConfirm({
   onDiscard: () => void;
   onSave: () => void;
 }) {
+  const titleId = useId();
+  useFocusReturn();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCancel();
@@ -406,9 +426,10 @@ function UnsavedConfirm({
         className="modal narrow"
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-title">Unsaved changes</div>
+        <div id={titleId} className="modal-title">Unsaved changes</div>
         <div className="modal-body">
           <code>{basename(path)}</code> has unsaved changes. Save them before
           closing?

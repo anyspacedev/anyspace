@@ -72,12 +72,19 @@ Forgetting any one leaves dead branches; TS catches the union but not the icon/l
 
 ### Run Task flow
 
-`KanbanBoard.runTask` →
+`launchAgent` in `src/lib/agentLauncher.ts` is the single entry point for spawning an agent. It is used by `KanbanBoard.runTask` and by the preview element picker's "Run now" / "Add to Kanban & run" actions. Two modes:
+
+- `mode: "new-tab"` — creates a fresh workspace tab with one terminal pane (the original Kanban-style flow).
+- `mode: "current-tab"` — calls `splitPane(tabId, paneId, direction, preset)` to add a sibling terminal pane to an existing layout. `splitPane`'s optional `preset: PanePreset` is what lets the new pane carry `pendingCommand`/`spawnEnv`/`spawnCwd`/`title` from the start.
+
+Internal sequence in either mode:
 1. `agent_launch` (Rust) writes task body + system prompt to `/tmp/teamship-tasks/task-<uuid>.md`, substitutes `{task_file}` in the agent's command template, returns `{ command, taskFile, env }`.
-2. Frontend creates a new workspace tab with one terminal pane and stashes `{ pendingCommand, ... }` in pane payload.
+2. Frontend stashes `{ pendingCommand, spawnEnv, spawnCwd, title }` in the new terminal pane's payload (via `newTab` presets or `splitPane`'s preset).
 3. `Terminal.tsx`'s `useEffect` sees `pendingCommand`, waits 600ms for the shell prompt to settle, then writes the command + `\n` to the PTY and clears `pendingCommand`.
 
-The `TEAMSHIP_TASK_FILE` env var is **only** set if you wire it via the agent's stored `envJson` field — `agent_launch` returns it in `env` but the current spawn path doesn't merge that into `pty_spawn`'s env. Either substitute via `{task_file}` in the command, or extend `runTask` to pass env through.
+The `TEAMSHIP_TASK_FILE` env var is **only** set if you wire it via the agent's stored `envJson` field — `agent_launch` returns it in `env` but the current spawn path doesn't merge that into `pty_spawn`'s env. Either substitute via `{task_file}` in the command, or extend the spawn path to pass env through.
+
+`EPHEMERAL_KEYS` in `workspaceStore.ts` strips per-session/UI keys (`sessionId`, `pendingCommand`, `pickerActive`) from the persisted snapshot. Add to that set for any new payload key that should not survive a restart.
 
 ### Speech-to-text dispatches by active pane
 
@@ -106,6 +113,17 @@ Adding a theme = one entry in `definitions.ts`. The 5 shipping themes (Void, Dra
 ### Live preview
 
 `src/components/preview/PreviewPane.tsx` uses an `<iframe>` (not a Tauri child WebView yet). It works for localhost dev servers because they don't set `X-Frame-Options`. `preview_detect` reads `package.json` to identify the framework, then probes conventional ports — see `src-tauri/src/preview/detector.rs` for the priority lists. `preview_watch_start` spawns a `notify-debouncer-mini` (150ms) that emits `preview:reload:<paneId>` events, consumed by `useEffect` in `PreviewPane`.
+
+### Preview element picker (cross-origin iframe injection)
+
+The parent (Tauri scheme) and the preview iframe (`http://localhost:<port>`) are cross-origin, so `iframe.contentDocument` is unreachable. The picker bridges them with two halves:
+
+1. **Iframe-side script** at `src-tauri/src/preview/picker_script.js` — injected into *every* frame at `document_start` via `tauri::plugin::Builder::js_init_script_on_all_frames(...)` registered as an inline plugin in `src-tauri/src/lib.rs`. This is the only iframe-script-injection mechanism in the repo; reuse the same plugin (or add another) before reaching for srcdoc/proxy hacks.
+2. **Parent controller** in `PreviewPane.tsx` — toggles `pickerActive`, sends `postMessage` commands to `iframe.contentWindow`, and listens for replies filtered by `e.source === iframeRef.current?.contentWindow` to avoid cross-pane bleed.
+
+The message envelope is `{ src: "teamship", type: "picker:start" | "picker:stop" | "picker:selected" | "picker:cancelled", payload? }` (typed in `src/lib/elementContext.ts`). Keep `src: "teamship"` on any new commands you add through this channel — the iframe script and parent listener both filter on it.
+
+The script also re-runs on every iframe `load`, so `PreviewPane.onIframeLoad` re-sends `picker:start` when the toggle is still on after a hard reload. Element capture walks the React fiber for `_debugSource` to attach a source-file location when available.
 
 ### Frontend state
 

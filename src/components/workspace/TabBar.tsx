@@ -38,6 +38,7 @@ export function TabBar() {
             {editingId === tab.id ? (
               <input
                 autoFocus
+                aria-label="Rename tab"
                 className="tab-name-input"
                 defaultValue={tab.name}
                 onBlur={(e) => {

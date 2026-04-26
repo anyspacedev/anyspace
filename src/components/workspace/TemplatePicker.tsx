@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { TEMPLATES, useWorkspaceStore, type PanePreset } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { agentLaunch } from "../../lib/tauri";
+import { useFocusReturn } from "../../lib/useFocusReturn";
 import { Icon } from "../ui/Icon";
 
 type Step = "template" | "agents";
@@ -17,6 +18,11 @@ export function TemplatePickerTrigger() {
   const newTab = useWorkspaceStore((s) => s.newTab);
   const agents = useKanbanStore((s) => s.agents);
 
+  const titleId = useId();
+  const projectInputId = useId();
+
+  useFocusReturn(open);
+
   const reset = () => {
     setOpen(false);
     setStep("template");
@@ -24,6 +30,15 @@ export function TemplatePickerTrigger() {
     setProjectPath("");
     setPaneAssign({});
   };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") reset();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const launch = async () => {
     if (!chosen) return;
@@ -111,10 +126,16 @@ export function TemplatePickerTrigger() {
       </button>
       {open && (
         <div className="modal-backdrop" onClick={reset}>
-          <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            onClick={(e) => e.stopPropagation()}
+          >
             {step === "template" && (
               <>
-                <div className="modal-title">New workspace</div>
+                <div id={titleId} className="modal-title">New workspace</div>
                 <div className="modal-sub">
                   Pick a layout. Next you can assign an AI agent to each pane —
                   all panes spawn and fire their agent in parallel.
@@ -148,16 +169,17 @@ export function TemplatePickerTrigger() {
 
             {step === "agents" && chosen && (
               <>
-                <div className="modal-title">Agents — {chosen.label}</div>
+                <div id={titleId} className="modal-title">Agents — {chosen.label}</div>
                 <div className="modal-sub">
                   Pick an agent for each pane (or leave as <em>Plain shell</em>).
                   Optionally point the workspace at a project folder.
                 </div>
 
                 <div className="form-row">
-                  <label>Project folder (optional)</label>
+                  <label htmlFor={projectInputId}>Project folder (optional)</label>
                   <div className="form-row-inline">
                     <input
+                      id={projectInputId}
                       value={projectPath}
                       onChange={(e) => setProjectPath(e.target.value)}
                       placeholder="defaults to current shell cwd"

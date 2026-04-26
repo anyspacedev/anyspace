@@ -404,6 +404,7 @@ export function Terminal({ pane, tabId }: Props) {
           </span>
           <input
             autoFocus
+            aria-label="Search terminal"
             placeholder="Search…"
             value={searchQuery}
             onChange={(e) => {

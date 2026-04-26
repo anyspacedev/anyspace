@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -10,21 +10,24 @@ import { useKanbanStore } from "../../stores/kanbanStore";
 import { COLUMNS, COLUMN_LABEL, type Task } from "../../lib/types";
 import { Column } from "./Column";
 import { TaskEditor } from "./TaskEditor";
-import { agentLaunch } from "../../lib/tauri";
-import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { launchAgent } from "../../lib/agentLauncher";
 import { Icon } from "../ui/Icon";
 
 export function KanbanBoard() {
   const tasks = useKanbanStore((s) => s.tasks);
   const agents = useKanbanStore((s) => s.agents);
   const moveTask = useKanbanStore((s) => s.moveTask);
-  const newTab = useWorkspaceStore((s) => s.newTab);
-  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
-  const setView = useWorkspaceStore((s) => s.setView);
 
   const [editing, setEditing] = useState<Task | null>(null);
   const [creating, setCreating] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   const onDragEnd = (e: DragEndEvent) => {
     const id = String(e.active.id);
@@ -38,29 +41,18 @@ export function KanbanBoard() {
   };
 
   const runTask = async (task: Task) => {
-    const agent = agents.find((a) => a.id === task.agentId);
-    if (!agent) {
-      alert("Pick an agent for this task first.");
+    if (!task.agentId) {
+      setToast("Pick an agent for this task first.");
       return;
     }
-    const plan = await agentLaunch({
-      agentCommand: agent.command,
+    const tabId = await launchAgent({
+      mode: "new-tab",
+      agentId: task.agentId,
       taskTitle: task.title,
       taskBody: task.body,
-      systemPrompt: agent.systemPrompt,
+      cwd: task.projectPath,
     });
-    // Spawn a new workspace tab with a single terminal preconfigured to fire the agent.
-    const tabId = newTab(1, task.title, [
-      {
-        kind: "terminal",
-        pendingCommand: plan.command,
-        spawnEnv: plan.env,
-        spawnCwd: task.projectPath,
-        title: task.title,
-      },
-    ]);
-    setActiveTab(tabId);
-    setView("workspace");
+    if (!tabId) setToast("That agent is no longer available — pick another.");
   };
 
   return (
@@ -88,6 +80,12 @@ export function KanbanBoard() {
       </DndContext>
       {creating && <TaskEditor onClose={() => setCreating(false)} />}
       {editing && <TaskEditor task={editing} onClose={() => setEditing(null)} />}
+      {toast && (
+        <div className="kanban-toast" role="status" aria-live="polite">
+          <Icon name="alert-circle" size={14} />
+          <span>{toast}</span>
+        </div>
+      )}
     </div>
   );
 }

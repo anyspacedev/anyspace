@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import type { Agent } from "../../lib/types";
 import { Icon } from "../ui/Icon";
@@ -19,6 +19,10 @@ export function AgentManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Omit<Agent, "id">>(BLANK);
   const [dirty, setDirty] = useState(false);
+
+  const nameId = useId();
+  const commandId = useId();
+  const systemPromptId = useId();
 
   // When the user picks a different agent in the list, populate the form from it.
   useEffect(() => {
@@ -94,21 +98,23 @@ export function AgentManager() {
       <div className="agent-form">
         <div className="section-title">{editingId ? "Edit agent" : "New agent"}</div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={nameId}>
             <Icon name="file-edit" size={12} />
             <span>Name</span>
           </label>
           <input
+            id={nameId}
             value={draft.name}
             onChange={(e) => update({ name: e.target.value })}
           />
         </div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={commandId}>
             <Icon name="terminal" size={12} />
             <span>Command</span>
           </label>
           <input
+            id={commandId}
             value={draft.command}
             placeholder="e.g. claude --resume {task_file}"
             onChange={(e) => update({ command: e.target.value })}
@@ -118,11 +124,12 @@ export function AgentManager() {
           </div>
         </div>
         <div className="form-row">
-          <label className="label-with-icon">
+          <label className="label-with-icon" htmlFor={systemPromptId}>
             <Icon name="sparkles" size={12} />
             <span>System prompt</span>
           </label>
           <textarea
+            id={systemPromptId}
             value={draft.systemPrompt}
             rows={4}
             onChange={(e) => update({ systemPrompt: e.target.value })}
