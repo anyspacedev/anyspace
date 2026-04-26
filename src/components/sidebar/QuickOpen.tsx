@@ -5,6 +5,7 @@ import { fsListDirRecursive, settingsGet, settingsSet, type FileEntry } from "..
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { Icon } from "../ui/Icon";
+import { editorFilesFrom } from "../editor/editorPayload";
 
 export function QuickOpen() {
   const [open, setOpen] = useState(false);
@@ -60,13 +61,29 @@ export function QuickOpen() {
   const openFile = (entry: FileEntry) => {
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab) return;
-    let editorPane = Object.values(tab.panes).find((p) => p.kind === "editor");
+    const active = tab.activePaneId ? tab.panes[tab.activePaneId] : null;
+    const editorPane =
+      active && active.kind === "editor"
+        ? active
+        : Object.values(tab.panes).find((p) => p.kind === "editor");
     if (!editorPane) {
       const target = tab.activePaneId ?? Object.keys(tab.panes)[0];
       if (!target) return;
-      setPaneKind(tab.id, target, "editor", { path: entry.path });
+      setPaneKind(tab.id, target, "editor", {
+        files: [entry.path],
+        activePath: entry.path,
+      });
     } else {
-      setPanePayload(tab.id, editorPane.id, { path: entry.path });
+      const { files } = editorFilesFrom(editorPane.payload);
+      const nextFiles = files.includes(entry.path)
+        ? files
+        : [...files, entry.path];
+      setPanePayload(tab.id, editorPane.id, {
+        ...editorPane.payload,
+        files: nextFiles,
+        activePath: entry.path,
+        path: undefined,
+      });
     }
     setOpen(false);
     setQuery("");

@@ -4,6 +4,7 @@ import { fsListDirRecursive, type FileEntry } from "../../lib/tauri";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { Icon } from "../ui/Icon";
+import { editorFilesFrom } from "../editor/editorPayload";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -48,13 +49,29 @@ export function FileBrowser({ pane, tabId }: Props) {
   const openInEditor = (entry: FileEntry) => {
     if (entry.isDir) return;
     if (!tab) return;
-    // Find an editor pane already open, otherwise convert this pane's "neighbor" into one.
-    const editorPane = Object.values(tab.panes).find((p) => p.kind === "editor");
+    // Prefer the focused pane if it's an editor; otherwise the first editor pane.
+    const active = tab.activePaneId ? tab.panes[tab.activePaneId] : null;
+    const editorPane =
+      active && active.kind === "editor"
+        ? active
+        : Object.values(tab.panes).find((p) => p.kind === "editor");
     if (editorPane) {
-      setPanePayload(tabId, editorPane.id, { path: entry.path });
+      const { files } = editorFilesFrom(editorPane.payload);
+      const nextFiles = files.includes(entry.path)
+        ? files
+        : [...files, entry.path];
+      setPanePayload(tabId, editorPane.id, {
+        ...editorPane.payload,
+        files: nextFiles,
+        activePath: entry.path,
+        path: undefined,
+      });
     } else {
-      // Fallback: convert the file-browser pane itself.
-      setPaneKind(tabId, pane.id, "editor", { path: entry.path });
+      // No editor pane in this tab — convert the file-browser pane.
+      setPaneKind(tabId, pane.id, "editor", {
+        files: [entry.path],
+        activePath: entry.path,
+      });
     }
   };
 
