@@ -750,6 +750,92 @@
   cursor: not-allowed;
 }
 
+.ai-explain-popover {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: min(420px, calc(100% - 16px));
+  max-height: min(60%, 480px);
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in oklab, var(--bg-elev) 96%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  z-index: 25;
+  overflow: hidden;
+}
+.ai-explain-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--accent) 4%, transparent);
+}
+.ai-explain-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg);
+  flex: 1;
+  min-width: 0;
+}
+.ai-explain-title > span:first-of-type {
+  font-weight: 600;
+}
+.ai-explain-cmd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ai-explain-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+}
+.ai-explain-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-explain-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.ai-explain-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--fg) 20%, transparent);
+  border-top-color: var(--accent);
+  animation: ai-explain-spin 0.7s linear infinite;
+}
+@keyframes ai-explain-spin {
+  to { transform: rotate(360deg); }
+}
+.ai-explain-error {
+  color: var(--danger);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-explain-spinner { animation: none; }
+}
+
 .terminal-search {
   position: absolute;
   top: 8px;

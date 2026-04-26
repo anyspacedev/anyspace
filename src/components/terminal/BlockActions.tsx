@@ -55,6 +55,19 @@ export function BlockActions({ block, onAction }: Props) {
           <Icon name="refresh" size={12} />
         </button>
       )}
+      {isFinished && (
+        <button
+          className="cmd-block-action-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAction("explain", block.id);
+          }}
+          title="Explain with AI"
+          aria-label="Explain with AI"
+        >
+          <Icon name="sparkles" size={12} />
+        </button>
+      )}
       <div className="cmd-block-action-menu" ref={menuRef}>
         <button
           className="cmd-block-action-btn"

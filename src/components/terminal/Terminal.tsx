@@ -15,6 +15,7 @@ import { applyEvent, parseOsc133Payload, type CommandBlock } from "./osc133";
 import { extractCommand, extractOutput } from "./blockBuffer";
 import { CommandBlocks } from "./CommandBlocks";
 import type { BlockAction } from "./BlockActions";
+import { AiExplainPopover } from "./AiExplainPopover";
 import { registerShortcut } from "../../lib/shortcuts";
 import { Icon } from "../ui/Icon";
 
@@ -51,6 +52,7 @@ export function Terminal({ pane, tabId }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const focusedBlockIdRef = useRef<string | null>(null);
+  const [explain, setExplain] = useState<{ block: CommandBlock; output: string } | null>(null);
   const theme = useThemeStore((s) => s.current);
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
 
@@ -368,9 +370,11 @@ export function Terminal({ pane, tabId }: Props) {
         void navigator.clipboard.writeText(formatBlockMarkdown(block, out));
         break;
       }
-      case "explain":
-        // Wired in a follow-up commit.
+      case "explain": {
+        const out = extractOutput(term, block) ?? "(scrolled out of buffer)";
+        setExplain({ block, output: out });
         break;
+      }
     }
   };
 
@@ -385,6 +389,14 @@ export function Terminal({ pane, tabId }: Props) {
         onAction={handleAction}
         focusedBlockId={focusedBlockId}
       />
+      {explain && (
+        <AiExplainPopover
+          key={explain.block.id}
+          block={explain.block}
+          output={explain.output}
+          onClose={() => setExplain(null)}
+        />
+      )}
       {searchOpen && (
         <div className="terminal-search">
           <span className="terminal-search-prefix" aria-hidden="true">
