@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import MonacoEditor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import JsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
@@ -15,6 +14,8 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { languageFor } from "./languages";
 import { Icon } from "../ui/Icon";
 import { registerEditor, unregisterEditor } from "../stt/editorRegistry";
+import { editorFilesFrom } from "./editorPayload";
+import { EditorTabs } from "./EditorTabs";
 
 // Monaco needs a real Worker per language. Without this, JSON/TS modes
 // fall through to the AMD loader path and crash on `moduleIdToUrl.toUrl`.
@@ -40,21 +41,61 @@ import { registerEditor, unregisterEditor } from "../stt/editorRegistry";
   },
 };
 
-// Wire monaco loader to use the bundled instance (offline-capable).
-loader.config({ monaco });
+// Module-scope: models are global to monaco, so dirty baselines are too.
+// A file open in two panes shows the same dirty state in both — correct.
+const savedVersions = new Map<string, number>();
+
+function isModelDirty(path: string): boolean {
+  const model = monaco.editor.getModel(monaco.Uri.file(path));
+  if (!model) return false;
+  return model.getAlternativeVersionId() !== (savedVersions.get(path) ?? 0);
+}
 
 type Props = { pane: Pane; tabId: string };
 
 export function Editor({ pane, tabId }: Props) {
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
   const theme = useThemeStore((s) => s.current);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const [content, setContent] = useState<string>("");
-  const [dirty, setDirty] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const path = pane.payload?.path as string | undefined;
+  const viewStatesRef = useRef(
+    new Map<string, monaco.editor.ICodeEditorViewState | null>(),
+  );
+  const [tick, setTick] = useState(0);
 
-  // Define + apply a Monaco theme for this Teamship theme.
+  const { files, activePath } = editorFilesFrom(pane.payload);
+
+  // Mount the editor once per pane.
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const editor = monaco.editor.create(node, {
+      automaticLayout: true,
+      fontSize: 13,
+      fontFamily:
+        'ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace',
+      minimap: { enabled: false },
+      scrollbar: { vertical: "auto", horizontal: "auto" },
+      renderWhitespace: "selection",
+      tabSize: 2,
+      wordWrap: "on",
+    });
+    editorRef.current = editor;
+    registerEditor(pane.id, editor);
+    const id = pane.id;
+    return () => {
+      // Stash view state for the active model so re-mount restores it.
+      const m = editor.getModel();
+      if (m) viewStatesRef.current.set(m.uri.fsPath, editor.saveViewState());
+      editor.dispose();
+      editorRef.current = null;
+      unregisterEditor(id);
+      // Don't dispose models — they're shared globally and may be in use
+      // by other Editor panes pointing at the same file.
+    };
+  }, [pane.id]);
+
+  // Apply the Teamship-derived Monaco theme on every theme change.
   useEffect(() => {
     const def = monacoThemeFor(theme);
     monaco.editor.defineTheme(def.name, {
@@ -66,49 +107,152 @@ export function Editor({ pane, tabId }: Props) {
     monaco.editor.setTheme(def.name);
   }, [theme]);
 
-  // Load file when path changes
+  // Swap models when activePath changes.
   useEffect(() => {
-    if (!path) {
-      setContent("");
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    // Save the outgoing model's view state.
+    const prev = editor.getModel();
+    if (prev) viewStatesRef.current.set(prev.uri.fsPath, editor.saveViewState());
+
+    if (!activePath) {
+      editor.setModel(null);
       return;
     }
-    void readTextFile(path)
+
+    const uri = monaco.Uri.file(activePath);
+    const cached = monaco.editor.getModel(uri);
+    if (cached) {
+      editor.setModel(cached);
+      const vs = viewStatesRef.current.get(activePath);
+      if (vs) editor.restoreViewState(vs);
+      editor.focus();
+      return;
+    }
+
+    let cancelled = false;
+    void readTextFile(activePath)
       .then((text) => {
-        setContent(text);
-        setDirty(false);
+        if (cancelled) return;
+        const created = monaco.editor.createModel(
+          text,
+          languageFor(activePath),
+          uri,
+        );
+        savedVersions.set(activePath, created.getAlternativeVersionId());
+        editor.setModel(created);
+        const vs = viewStatesRef.current.get(activePath);
+        if (vs) editor.restoreViewState(vs);
+        editor.focus();
+        setTick((t) => t + 1);
       })
       .catch((e) => {
-        setContent(`// failed to read ${path}\n// ${e}`);
+        if (cancelled) return;
+        const created = monaco.editor.createModel(
+          `// failed to read ${activePath}\n// ${e}`,
+          "plaintext",
+          uri,
+        );
+        editor.setModel(created);
       });
-  }, [path]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activePath]);
 
-  // Unregister this pane's editor from the STT registry on unmount.
+  // Subscribe to whichever model the editor currently has — re-subscribe
+  // whenever setModel runs (including the async path after a file read).
   useEffect(() => {
-    const id = pane.id;
-    return () => unregisterEditor(id);
-  }, [pane.id]);
+    const editor = editorRef.current;
+    if (!editor) return;
+    let contentSub: monaco.IDisposable | null = null;
+    const subscribeToCurrent = () => {
+      contentSub?.dispose();
+      const model = editor.getModel();
+      contentSub = model
+        ? model.onDidChangeContent(() => setTick((t) => t + 1))
+        : null;
+    };
+    subscribeToCurrent();
+    const modelSub = editor.onDidChangeModel(subscribeToCurrent);
+    return () => {
+      contentSub?.dispose();
+      modelSub.dispose();
+    };
+  }, []);
 
-  // Cmd/Ctrl+S to save.
+  // Cmd/Ctrl+S to save the active file.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && (e.key === "s" || e.key === "S")) {
-        e.preventDefault();
-        if (!path) return;
-        const value = editorRef.current?.getValue() ?? content;
-        void writeTextFile(path, value)
-          .then(() => {
-            setDirty(false);
-            setSavedAt(Date.now());
-          })
-          .catch((err) => console.warn("[editor] save failed", err));
-      }
+      if (!mod || (e.key !== "s" && e.key !== "S")) return;
+      if (!activePath) return;
+      const editor = editorRef.current;
+      const model = editor?.getModel();
+      if (!model) return;
+      // Only consume the keystroke when this pane has focus, so other
+      // panes (or document-level handlers) can still respond when focus
+      // is elsewhere.
+      const node = containerRef.current;
+      const active = document.activeElement;
+      if (!node || !(node.contains(active) || node === active)) return;
+      e.preventDefault();
+      const value = model.getValue();
+      void writeTextFile(activePath, value)
+        .then(() => {
+          savedVersions.set(activePath, model.getAlternativeVersionId());
+          setTick((t) => t + 1);
+        })
+        .catch((err) => console.warn("[editor] save failed", err));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [path, content]);
+  }, [activePath]);
 
-  if (!path) {
+  const setPayload = (next: { files: string[]; activePath: string | null }) => {
+    // Strip the legacy `path` key so it doesn't shadow the new shape.
+    setPanePayload(tabId, pane.id, {
+      ...pane.payload,
+      files: next.files,
+      activePath: next.activePath,
+      path: undefined,
+    });
+  };
+
+  const switchTab = (path: string) => {
+    if (path === activePath) return;
+    setPayload({ files, activePath: path });
+  };
+
+  const closeTab = (path: string) => {
+    const remaining = files.filter((p) => p !== path);
+    let nextActive: string | null = activePath;
+    if (activePath === path) {
+      const idx = files.indexOf(path);
+      nextActive = remaining[idx] ?? remaining[idx - 1] ?? null;
+    }
+    setPayload({ files: remaining, activePath: nextActive });
+    viewStatesRef.current.delete(path);
+  };
+
+  const addTab = async () => {
+    const selected = await openDialog({ multiple: false });
+    if (typeof selected !== "string") return;
+    if (files.includes(selected)) {
+      switchTab(selected);
+      return;
+    }
+    setPayload({ files: [...files, selected], activePath: selected });
+  };
+
+  // Recompute dirty map on every render (tick changes via content listener).
+  const dirtyMap: Record<string, boolean> = {};
+  for (const f of files) dirtyMap[f] = isModelDirty(f);
+  // Suppress unused-tick warning — read indirectly via the dirty recalc.
+  void tick;
+
+  if (files.length === 0) {
     return (
       <div className="editor-empty">
         <div className="editor-empty-icon">
@@ -121,12 +265,7 @@ export function Editor({ pane, tabId }: Props) {
         <div className="editor-empty-actions">
           <button
             className="btn btn-primary btn-with-icon"
-            onClick={async () => {
-              const selected = await openDialog({ multiple: false });
-              if (typeof selected === "string") {
-                setPanePayload(tabId, pane.id, { path: selected });
-              }
-            }}
+            onClick={addTab}
           >
             <Icon name="file" size={14} />
             <span>Open file…</span>
@@ -138,43 +277,15 @@ export function Editor({ pane, tabId }: Props) {
 
   return (
     <div className="editor-wrap">
-      <div className="editor-bar">
-        <span className="editor-path">{path}</span>
-        <span className="editor-status">
-          {dirty && (
-            <>
-              <span className="editor-dirty-dot" />
-              <span>Modified</span>
-            </>
-          )}
-          {!dirty && savedAt && <span className="editor-status-ok">Saved</span>}
-        </span>
-      </div>
-      <div className="editor-host">
-        <MonacoEditor
-          theme={`teamship-${theme.id}`}
-          language={languageFor(path)}
-          value={content}
-          onChange={(v) => {
-            setContent(v ?? "");
-            setDirty(true);
-          }}
-          onMount={(editor) => {
-            editorRef.current = editor;
-            registerEditor(pane.id, editor);
-          }}
-          options={{
-            fontSize: 13,
-            fontFamily: 'ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace',
-            minimap: { enabled: false },
-            scrollbar: { vertical: "auto", horizontal: "auto" },
-            renderWhitespace: "selection",
-            tabSize: 2,
-            automaticLayout: true,
-            wordWrap: "on",
-          }}
-        />
-      </div>
+      <EditorTabs
+        files={files}
+        activePath={activePath}
+        dirtyMap={dirtyMap}
+        onSwitch={switchTab}
+        onClose={closeTab}
+        onAdd={addTab}
+      />
+      <div className="editor-host" ref={containerRef} />
     </div>
   );
 }
