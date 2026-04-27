@@ -223,7 +223,47 @@
     color var(--duration-fast) var(--ease-out);
 }
 .tab-close:hover { background: var(--bg-elev-2); color: var(--fg); }
-.tabbar-actions { display: flex; gap: 4px; align-items: center; }
+.tabbar-actions { display: flex; gap: 6px; align-items: center; }
+
+.workspace-folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  max-width: 220px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev-2);
+  border: 1px solid transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs, 11px);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.workspace-folder-pill:hover {
+  border-color: var(--border);
+  color: var(--fg);
+}
+.workspace-folder-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.workspace-folder-pill:not(.is-set) {
+  border-style: dashed;
+  border-color: var(--border);
+  font-style: italic;
+}
+.workspace-folder-pill.is-set { color: var(--fg); }
+.workspace-folder-pill-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
 
 /* ===== Status bar ===== */
 

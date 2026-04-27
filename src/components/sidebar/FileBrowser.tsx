@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { fsListDirRecursive, type FileEntry } from "../../lib/tauri";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
@@ -12,8 +13,19 @@ export function FileBrowser({ pane, tabId }: Props) {
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const setPaneKind = useWorkspaceStore((s) => s.setPaneKind);
+  const setTabProjectPath = useWorkspaceStore((s) => s.setTabProjectPath);
   const tab = tabs.find((t) => t.id === tabId);
   const root = tab?.projectPath;
+
+  const pickWorkspaceFolder = async () => {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      defaultPath: root,
+      title: "Choose workspace folder",
+    });
+    if (typeof selected === "string") setTabProjectPath(tabId, selected);
+  };
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [filter, setFilter] = useState("");
@@ -90,8 +102,16 @@ export function FileBrowser({ pane, tabId }: Props) {
         <div className="fb-empty">
           <Icon name="folder-tree" size={20} />
           <div>This workspace has no project folder set.</div>
+          <button
+            type="button"
+            className="btn btn-primary btn-with-icon"
+            onClick={pickWorkspaceFolder}
+          >
+            <Icon name="folder-tree" size={13} />
+            <span>Choose project folder…</span>
+          </button>
           <div className="fb-empty-hint">
-            Create a new workspace and choose a project folder to browse files.
+            The Files pane and new terminals will use this folder.
           </div>
         </div>
       )}

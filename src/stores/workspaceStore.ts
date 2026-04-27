@@ -167,6 +167,7 @@ type WorkspaceState = {
   switchToTabIndex: (i: number) => void;
   renameTab: (id: string, name: string) => void;
 
+  setTabProjectPath: (tabId: string, path: string | undefined) => void;
   setActivePane: (tabId: string, paneId: string) => void;
   togglePaneSelection: (tabId: string, paneId: string) => void;
   clearPaneSelection: (tabId: string) => void;
@@ -415,6 +416,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   renameTab: (id, name) =>
     set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, name } : t)) })),
+
+  setTabProjectPath: (tabId, path) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, projectPath: path || undefined } : t)),
+    })),
 
   setActivePane: (tabId, paneId) =>
     set((s) => ({

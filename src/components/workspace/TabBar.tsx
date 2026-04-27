@@ -1,16 +1,36 @@
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useState } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { TemplatePickerTrigger } from "./TemplatePicker";
 import { Icon } from "../ui/Icon";
+
+function pathBasename(p: string): string {
+  const trimmed = p.replace(/[/\\]+$/, "");
+  const last = trimmed.split(/[/\\]/).pop() ?? trimmed;
+  return last || trimmed;
+}
 
 export function TabBar() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
+  const activeTab = tabs.find((t) => t.id === activeTabId);
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
   const closeTab = useWorkspaceStore((s) => s.closeTab);
   const view = useWorkspaceStore((s) => s.selectedView);
   const renameTab = useWorkspaceStore((s) => s.renameTab);
+  const setTabProjectPath = useWorkspaceStore((s) => s.setTabProjectPath);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const pickWorkspaceFolder = async () => {
+    if (!activeTab) return;
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      defaultPath: activeTab.projectPath,
+      title: "Choose workspace folder",
+    });
+    if (typeof selected === "string") setTabProjectPath(activeTab.id, selected);
+  };
 
   if (view !== "workspace") {
     return (
@@ -70,6 +90,28 @@ export function TabBar() {
         ))}
       </div>
       <div className="tabbar-actions">
+        {activeTab && (
+          <button
+            type="button"
+            className={"workspace-folder-pill" + (activeTab.projectPath ? " is-set" : "")}
+            onClick={pickWorkspaceFolder}
+            title={
+              activeTab.projectPath
+                ? `Workspace folder: ${activeTab.projectPath}\nClick to change`
+                : "Click to choose this workspace's project folder"
+            }
+            aria-label={
+              activeTab.projectPath
+                ? `Change workspace folder (current: ${activeTab.projectPath})`
+                : "Set workspace folder"
+            }
+          >
+            <Icon name="folder-tree" size={13} />
+            <span className="workspace-folder-pill-text">
+              {activeTab.projectPath ? pathBasename(activeTab.projectPath) : "Set folder…"}
+            </span>
+          </button>
+        )}
         <TemplatePickerTrigger />
       </div>
     </div>
