@@ -28,14 +28,16 @@ fn format_reqwest_err(err: &reqwest::Error) -> String {
     parts.join(" → ")
 }
 
-/// Update which key the macOS NSEvent monitor intercepts. No-op on other
-/// platforms — non-Mac targets drive the hotkey purely through the JS
-/// keydown listener, which doesn't trigger the IMK log spam this monitor was
-/// added to suppress.
+/// Update which key the OS-level hotkey monitor intercepts. macOS uses an
+/// NSEvent local monitor (suppresses IMK log spam); Linux uses an X11
+/// keyboard poll (works around WebKitGTK dropping modifier keyup events).
+/// Other platforms drive the hotkey purely through the JS keydown listener.
 #[tauri::command]
 pub fn stt_hotkey_set(code: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     crate::stt::hotkey_monitor::set_hotkey(&code);
+    #[cfg(target_os = "linux")]
+    crate::stt::hotkey_monitor_linux::set_hotkey(&code);
     let _ = code;
     Ok(())
 }

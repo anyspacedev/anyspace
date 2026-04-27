@@ -48,8 +48,14 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # WebKitGTK isn't shown navigator.mediaDevices unless we toggle enable-media-stream
 # on the WebView at startup and answer the permission-request signal — needed by
 # the hold-to-talk recorder.
+#
+# device_query is the keyboard-poll backend for the Linux hold-to-talk monitor
+# (stt/hotkey_monitor_linux.rs). WebKitGTK on Linux silently drops or stalls
+# keyup events for modifier-only hotkeys, so we poll the X server directly
+# instead of trusting the JS keydown/keyup path.
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", features = ["v2_38"] }
+device_query = "2"
 
 # macOS WKWebView hides navigator.mediaDevices on non-https origins by default.
 # We poke the private WKPreferences keys at startup so the API is exposed; wry's

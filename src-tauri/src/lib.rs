@@ -135,6 +135,8 @@ pub fn run() {
             enable_media_capture(&window);
             #[cfg(target_os = "macos")]
             stt::hotkey_monitor::install(app.handle().clone());
+            #[cfg(target_os = "linux")]
+            stt::hotkey_monitor_linux::install(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())
