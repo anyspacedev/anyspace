@@ -6,6 +6,7 @@ import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { SearchAddon } from "@xterm/addon-search";
 import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ptySpawn, ptyWrite, ptyResize, ptyKill } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
@@ -57,6 +58,7 @@ export function Terminal({ pane, tabId }: Props) {
   const [explain, setExplain] = useState<{ block: CommandBlock; output: string } | null>(null);
   const theme = useThemeStore((s) => s.current);
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
+  const closePane = useWorkspaceStore((s) => s.closePane);
 
   // Mount xterm
   useEffect(() => {
@@ -180,6 +182,7 @@ export function Terminal({ pane, tabId }: Props) {
     const cols = term.cols;
     const rows = term.rows;
     let disposed = false;
+    let exitUnlisten: (() => void) | null = null;
     const spawnEnv = (pane.payload?.spawnEnv as Record<string, string> | undefined) ?? {};
     const spawnCwd = pane.payload?.spawnCwd as string | undefined;
     void ptySpawn({ cols, rows, env: spawnEnv, cwd: spawnCwd }, channel)
@@ -190,6 +193,15 @@ export function Terminal({ pane, tabId }: Props) {
         }
         sessionIdRef.current = sid;
         setPanePayload(tabId, pane.id, { sessionId: sid });
+        // Shell exited (typed `exit`, Ctrl+D, kill, …) → close the pane
+        // immediately rather than leave a dead terminal sitting around.
+        void listen(`pty:exit:${sid}`, () => {
+          if (disposed) return;
+          closePane(tabId, pane.id);
+        }).then((u) => {
+          if (disposed) u();
+          else exitUnlisten = u;
+        });
       })
       .catch((e) => {
         term.writeln(`\x1b[31m[teamship] failed to spawn pty: ${e}\x1b[0m`);
@@ -257,6 +269,7 @@ export function Terminal({ pane, tabId }: Props) {
       ro.disconnect();
       dragCancelled = true;
       dragUnlisten?.();
+      exitUnlisten?.();
       unregisterTerminal(pane.id);
       const sid = sessionIdRef.current;
       if (sid) ptyKill(sid).catch(() => {});

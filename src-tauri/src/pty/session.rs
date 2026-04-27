@@ -6,6 +6,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::ipc::Channel;
+use tauri::{AppHandle, Emitter};
 
 pub type SessionId = String;
 
@@ -17,6 +18,7 @@ pub struct PtySession {
 
 impl PtySession {
     pub fn spawn(
+        app: AppHandle,
         id: &SessionId,
         cwd: Option<String>,
         env: HashMap<String, String>,
@@ -92,7 +94,10 @@ impl PtySession {
         let writer = pair.master.take_writer().context("take writer")?;
         let master: Box<dyn MasterPty + Send> = pair.master;
 
-        // Reader pump → channel
+        // Reader pump → channel. EOF (Ok(0)) means the child shell exited
+        // (the slave fd closed) — emit `pty:exit:<id>` so the frontend can
+        // close the pane synchronously instead of leaving it stuck on a
+        // dead shell.
         let id_for_thread = id.to_string();
         thread::spawn(move || {
             let mut buf = [0u8; 4096];
@@ -110,6 +115,7 @@ impl PtySession {
                     }
                 }
             }
+            let _ = app.emit(&format!("pty:exit:{id_for_thread}"), ());
         });
 
         Ok(Self {

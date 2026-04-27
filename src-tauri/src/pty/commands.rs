@@ -2,7 +2,7 @@ use super::session::{PtySession, SessionId};
 use super::PtyManager;
 use serde::Deserialize;
 use std::collections::HashMap;
-use tauri::{ipc::Channel, State};
+use tauri::{ipc::Channel, AppHandle, State};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -17,12 +17,13 @@ pub struct SpawnArgs {
 
 #[tauri::command]
 pub async fn pty_spawn(
+    app: AppHandle,
     args: SpawnArgs,
     on_data: Channel<Vec<u8>>,
     manager: State<'_, PtyManager>,
 ) -> Result<SessionId, String> {
     let id = Uuid::new_v4().to_string();
-    let session = PtySession::spawn(&id, args.cwd, args.env, args.cols, args.rows, on_data)
+    let session = PtySession::spawn(app, &id, args.cwd, args.env, args.cols, args.rows, on_data)
         .map_err(|e| format!("{e:#}"))?;
     manager.sessions.insert(id.clone(), session);
     Ok(id)
