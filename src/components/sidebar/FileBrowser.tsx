@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { fsListDirRecursive, type FileEntry } from "../../lib/tauri";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
@@ -10,11 +9,11 @@ import { editorFilesFrom } from "../editor/editorPayload";
 type Props = { pane: Pane; tabId: string };
 
 export function FileBrowser({ pane, tabId }: Props) {
-  const root = pane.payload?.root as string | undefined;
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const setPaneKind = useWorkspaceStore((s) => s.setPaneKind);
   const tab = tabs.find((t) => t.id === tabId);
+  const root = tab?.projectPath;
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [filter, setFilter] = useState("");
@@ -32,6 +31,7 @@ export function FileBrowser({ pane, tabId }: Props) {
 
   useEffect(() => {
     if (root) load(root);
+    else setEntries([]);
   }, [root, load]);
 
   const filtered = useMemo(() => {
@@ -39,13 +39,6 @@ export function FileBrowser({ pane, tabId }: Props) {
     const f = filter.toLowerCase();
     return entries.filter((e) => e.name.toLowerCase().includes(f) || e.path.toLowerCase().includes(f)).slice(0, 1000);
   }, [entries, filter]);
-
-  const pickRoot = async () => {
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (typeof selected === "string") {
-      setPanePayload(tabId, pane.id, { root: selected });
-    }
-  };
 
   const openInEditor = (entry: FileEntry) => {
     if (entry.isDir) return;
@@ -78,11 +71,12 @@ export function FileBrowser({ pane, tabId }: Props) {
 
   return (
     <div className="filebrowser">
-      <div className="fb-bar">
-        <button className="btn btn-ghost" onClick={pickRoot}>
-          {root ? "Change root" : "Pick folder"}
-        </button>
-        {root && (
+      {root && (
+        <div className="fb-bar">
+          <span className="fb-root" title={root}>
+            <Icon name="folder-tree" size={13} />
+            <span className="fb-root-path">{root}</span>
+          </span>
           <input
             aria-label="Filter files"
             placeholder="Filter…"
@@ -90,12 +84,15 @@ export function FileBrowser({ pane, tabId }: Props) {
             onChange={(e) => setFilter(e.target.value)}
             className="fb-filter"
           />
-        )}
-      </div>
+        </div>
+      )}
       {!root && (
         <div className="fb-empty">
           <Icon name="folder-tree" size={20} />
-          <div>No folder selected. Pick a project root to start browsing.</div>
+          <div>This workspace has no project folder set.</div>
+          <div className="fb-empty-hint">
+            Create a new workspace and choose a project folder to browse files.
+          </div>
         </div>
       )}
       {root && error && (

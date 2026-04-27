@@ -184,7 +184,10 @@ export function Terminal({ pane, tabId }: Props) {
     let disposed = false;
     let exitUnlisten: (() => void) | null = null;
     const spawnEnv = (pane.payload?.spawnEnv as Record<string, string> | undefined) ?? {};
-    const spawnCwd = pane.payload?.spawnCwd as string | undefined;
+    // Fall back to the workspace's project folder so a freshly-opened terminal
+    // lands in the same directory as the rest of the workspace by default.
+    const tabProjectPath = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId)?.projectPath;
+    const spawnCwd = (pane.payload?.spawnCwd as string | undefined) ?? tabProjectPath;
     void ptySpawn({ cols, rows, env: spawnEnv, cwd: spawnCwd }, channel)
       .then((sid) => {
         if (disposed) {

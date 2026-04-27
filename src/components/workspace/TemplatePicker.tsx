@@ -84,25 +84,22 @@ export function TemplatePickerTrigger() {
       });
     }
 
-    // Preview panes need projectPath in payload.root for FileBrowser /
-    // payload.projectPath for Preview. Stamp it now.
     const finalPresets = presets.map((p) =>
       p.kind === "preview" && projectPath
         ? { ...p, spawnCwd: undefined } // preview pane doesn't spawn a shell
         : p,
     );
 
-    const tabId = newTab(chosen.panes, chosen.label, finalPresets);
+    const tabId = newTab(chosen.panes, chosen.label, finalPresets, projectPath);
 
-    // Post-create: write extra payload for non-terminal kinds (root for files,
-    // projectPath for preview) since PanePreset only carries spawn fields.
+    // Preview panes still need projectPath in their own payload for the dev-server
+    // detector / watcher. The Files pane reads from tab.projectPath directly.
     if (projectPath) {
       const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
       if (tab) {
         const setPanePayload = useWorkspaceStore.getState().setPanePayload;
         Object.values(tab.panes).forEach((p) => {
           if (p.kind === "preview") setPanePayload(tab.id, p.id, { projectPath });
-          if (p.kind === "filebrowser") setPanePayload(tab.id, p.id, { root: projectPath });
         });
       }
     }
@@ -226,9 +223,14 @@ export function TemplatePickerTrigger() {
                     className="btn btn-ghost"
                     onClick={() => {
                       // skip agents
-                      newTab(chosen.panes, chosen.label, projectPath
-                        ? Array.from({ length: chosen.panes }, () => ({ spawnCwd: projectPath }))
-                        : undefined);
+                      newTab(
+                        chosen.panes,
+                        chosen.label,
+                        projectPath
+                          ? Array.from({ length: chosen.panes }, () => ({ spawnCwd: projectPath }))
+                          : undefined,
+                        projectPath || undefined,
+                      );
                       reset();
                     }}
                   >

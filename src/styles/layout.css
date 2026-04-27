@@ -1178,10 +1178,35 @@
 }
 .fb-bar {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
+}
+.fb-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 60%;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev-2);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs, 11px);
+}
+.fb-root-path {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+.fb-empty-hint {
+  color: var(--fg-dim);
+  opacity: 0.85;
+  font-size: var(--font-size-xs, 11px);
 }
 .fb-filter {
   flex: 1;
@@ -2511,6 +2536,10 @@
 
 /* Always-visible idle affordance — slightly dimmer until hovered. */
 .stt-bubble--idle {
+  min-width: 0;
+  width: 48px;
+  padding: 0;
+  justify-content: center;
   opacity: 0.85;
   transition: opacity var(--duration-fast) var(--ease-out);
 }

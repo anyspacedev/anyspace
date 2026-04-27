@@ -25,6 +25,9 @@ export type Tab = {
   layout: LayoutNode;
   panes: Record<string, Pane>;
   activePaneId?: string;
+  // Workspace-wide project folder set at creation. The Files pane is locked to
+  // this path; users cannot pick a different folder from inside a Files pane.
+  projectPath?: string;
   // Cmd/Ctrl-clicked panes that participate in input broadcast.
   // Insertion-ordered; the active pane is implicitly added on first toggle.
   // Ephemeral — cleared on launch and on Esc.

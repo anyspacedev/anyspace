@@ -161,7 +161,7 @@ type WorkspaceState = {
   setView: (view: WorkspaceState["selectedView"]) => void;
   hydrate: () => Promise<void>;
 
-  newTab: (template: number, name?: string, presets?: PanePreset[]) => string;
+  newTab: (template: number, name?: string, presets?: PanePreset[], projectPath?: string) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   switchToTabIndex: (i: number) => void;
@@ -275,7 +275,12 @@ function setSizesAtPath(layout: LayoutNode, path: number[], sizes: number[]): La
   };
 }
 
-function makeTab(name: string, template: number, presets: PanePreset[] = []): Tab {
+function makeTab(
+  name: string,
+  template: number,
+  presets: PanePreset[] = [],
+  projectPath?: string,
+): Tab {
   const count = template;
   const ids = Array.from({ length: count }, () => newId());
   const panes = ids.reduce<Record<string, Pane>>((acc, id, i) => {
@@ -303,6 +308,7 @@ function makeTab(name: string, template: number, presets: PanePreset[] = []): Ta
     panes,
     activePaneId: ids[0],
     selectedPaneIds: [],
+    projectPath: projectPath || undefined,
   };
 }
 
@@ -354,7 +360,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const snap = await settingsGet<Snapshot>(PERSIST_KEY);
       if (snap && snap.tabs && snap.tabs.length > 0) {
-        const tabs = snap.tabs.map((t) => ({ ...t, selectedPaneIds: [] }));
+        const tabs = snap.tabs.map((t) => {
+          // Migrate snapshots from before Tab.projectPath existed: the project
+          // folder used to live on each filebrowser pane's payload.root.
+          let projectPath = t.projectPath;
+          if (!projectPath) {
+            for (const p of Object.values(t.panes)) {
+              if (p.kind === "filebrowser") {
+                const r = (p.payload as Record<string, unknown> | undefined)?.root;
+                if (typeof r === "string" && r) {
+                  projectPath = r;
+                  break;
+                }
+              }
+            }
+          }
+          return { ...t, selectedPaneIds: [], projectPath };
+        });
         set({ tabs, activeTabId: snap.activeTabId ?? tabs[0].id, hydrated: true });
         return;
       }
@@ -363,9 +385,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     set({ hydrated: true });
   },
-  newTab: (template, name, presets) => {
+  newTab: (template, name, presets, projectPath) => {
     const idx = get().tabs.length + 1;
-    const tab = makeTab(name ?? `workspace ${idx}`, template, presets);
+    const tab = makeTab(name ?? `workspace ${idx}`, template, presets, projectPath);
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, selectedView: "workspace" }));
     return tab.id;
   },
