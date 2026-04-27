@@ -22,7 +22,25 @@ import { useSttStore } from "../../stores/sttStore";
 // matching hotkey keydown arrives inside this window, the keyup is autorepeat
 // and we drop it. A real release has no following keydown, so the deferred
 // handler fires normally.
-const AUTOREPEAT_DEBOUNCE_MS = 50;
+//
+// The window is generous enough to absorb autorepeat intervals even on slow
+// machines or under Wayland/XWayland, where the keyup→keydown gap can stretch
+// past 50ms. End-of-dictation latency increases by this amount; that's an
+// acceptable trade for not silently dropping every recording.
+const AUTOREPEAT_DEBOUNCE_MS = 200;
+
+// Maps a hotkey `KeyboardEvent.code` to the modifier-state name accepted by
+// `KeyboardEvent.getModifierState` ("Control" / "Alt" / etc). On a real keyup
+// the modifier is reported as released; on a synthetic autorepeat keyup most
+// engines still report it as held. Used as a corroborating signal alongside
+// the debounce.
+function modifierStateName(code: string): string | null {
+  if (code === "ControlLeft" || code === "ControlRight") return "Control";
+  if (code === "AltLeft" || code === "AltRight") return "Alt";
+  if (code === "MetaLeft" || code === "MetaRight") return "Meta";
+  if (code === "ShiftLeft" || code === "ShiftRight") return "Shift";
+  return null;
+}
 
 type ModFlag = "ctrlKey" | "altKey" | "metaKey" | "shiftKey" | null;
 const ALL_MODS: Exclude<ModFlag, null>[] = [
@@ -81,11 +99,21 @@ export function useSttHotkey() {
         // while we're still debouncing the release means the key is actually
         // held. Cancel the pending release and stay in the listening state.
         if (pendingReleaseRef.current !== null) {
+          console.debug(
+            "[stt-hotkey] keydown cancels pending release (autorepeat) repeat=%s ts=%d",
+            e.repeat,
+            Math.round(performance.now()),
+          );
           clearPendingRelease();
           return;
         }
         if (e.repeat) return;
         if (heldRef.current) return;
+        console.debug(
+          "[stt-hotkey] keydown — start listening code=%s ts=%d",
+          e.code,
+          Math.round(performance.now()),
+        );
         heldRef.current = true;
         void store.getState().startListening();
         return;
@@ -104,10 +132,31 @@ export function useSttHotkey() {
     const onUp = (e: KeyboardEvent) => {
       if (e.code !== hotkey) return;
       if (!heldRef.current) return;
+      // If the modifier state still reports the key as held, it's an
+      // autorepeat keyup — ignore it without even arming the debounce timer.
+      const modName = modifierStateName(hotkey);
+      if (modName && e.getModifierState(modName)) {
+        console.debug(
+          "[stt-hotkey] keyup ignored — %s still held (autorepeat) ts=%d",
+          modName,
+          Math.round(performance.now()),
+        );
+        return;
+      }
+      console.debug(
+        "[stt-hotkey] keyup — arming %dms release debounce code=%s ts=%d",
+        AUTOREPEAT_DEBOUNCE_MS,
+        e.code,
+        Math.round(performance.now()),
+      );
       clearPendingRelease();
       pendingReleaseRef.current = window.setTimeout(() => {
         pendingReleaseRef.current = null;
         if (!heldRef.current) return;
+        console.debug(
+          "[stt-hotkey] release confirmed after debounce — stopAndTranscribe ts=%d",
+          Math.round(performance.now()),
+        );
         heldRef.current = false;
         void store.getState().stopAndTranscribe();
       }, AUTOREPEAT_DEBOUNCE_MS);
