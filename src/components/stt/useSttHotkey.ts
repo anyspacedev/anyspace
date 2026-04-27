@@ -14,6 +14,16 @@ import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useSttStore } from "../../stores/sttStore";
 
+// WebKitGTK on Linux X11 emits synthetic `keyup` → `keydown` pairs while a key
+// is held (autorepeat) — and `e.repeat` isn't reliably set on the synthetic
+// keydown. Without this debounce the first synthetic keyup tears the
+// recording down a few ms after `startRecording` resolves, so the user holds
+// for seconds but `stopRecording` reports duration=2ms. We defer keyup; if a
+// matching hotkey keydown arrives inside this window, the keyup is autorepeat
+// and we drop it. A real release has no following keydown, so the deferred
+// handler fires normally.
+const AUTOREPEAT_DEBOUNCE_MS = 50;
+
 type ModFlag = "ctrlKey" | "altKey" | "metaKey" | "shiftKey" | null;
 const ALL_MODS: Exclude<ModFlag, null>[] = [
   "ctrlKey",
@@ -49,26 +59,43 @@ function isFormInput(target: EventTarget | null): boolean {
 
 export function useSttHotkey() {
   const heldRef = useRef(false);
+  const pendingReleaseRef = useRef<number | null>(null);
   const hotkey = useSttStore((s) => s.settings.hotkey);
 
   useEffect(() => {
     const expectedMod = modForCode(hotkey);
     const store = useSttStore;
 
-    const onDown = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+    const clearPendingRelease = () => {
+      if (pendingReleaseRef.current !== null) {
+        window.clearTimeout(pendingReleaseRef.current);
+        pendingReleaseRef.current = null;
+      }
+    };
 
+    const onDown = (e: KeyboardEvent) => {
       if (e.code === hotkey) {
         if (hasForeignModifier(e, expectedMod)) return;
         if (isFormInput(e.target)) return;
+        // X11 autorepeat: a synthetic keydown for the same hotkey arriving
+        // while we're still debouncing the release means the key is actually
+        // held. Cancel the pending release and stay in the listening state.
+        if (pendingReleaseRef.current !== null) {
+          clearPendingRelease();
+          return;
+        }
+        if (e.repeat) return;
         if (heldRef.current) return;
         heldRef.current = true;
         void store.getState().startListening();
         return;
       }
 
+      if (e.repeat) return;
+
       // Any other key while listening cancels (treat as a real shortcut).
       if (heldRef.current) {
+        clearPendingRelease();
         heldRef.current = false;
         store.getState().cancel();
       }
@@ -77,11 +104,17 @@ export function useSttHotkey() {
     const onUp = (e: KeyboardEvent) => {
       if (e.code !== hotkey) return;
       if (!heldRef.current) return;
-      heldRef.current = false;
-      void store.getState().stopAndTranscribe();
+      clearPendingRelease();
+      pendingReleaseRef.current = window.setTimeout(() => {
+        pendingReleaseRef.current = null;
+        if (!heldRef.current) return;
+        heldRef.current = false;
+        void store.getState().stopAndTranscribe();
+      }, AUTOREPEAT_DEBOUNCE_MS);
     };
 
     const onBlur = () => {
+      clearPendingRelease();
       if (!heldRef.current) return;
       heldRef.current = false;
       store.getState().cancel();
@@ -89,6 +122,7 @@ export function useSttHotkey() {
 
     const onVisibility = () => {
       if (document.visibilityState === "hidden" && heldRef.current) {
+        clearPendingRelease();
         heldRef.current = false;
         store.getState().cancel();
       }
@@ -100,6 +134,10 @@ export function useSttHotkey() {
     const unlisten: Array<() => void> = [];
     void listen<null>("stt://hotkey-down", () => {
       if (cancelled) return;
+      if (pendingReleaseRef.current !== null) {
+        clearPendingRelease();
+        return;
+      }
       if (heldRef.current) return;
       heldRef.current = true;
       void store.getState().startListening();
@@ -110,8 +148,17 @@ export function useSttHotkey() {
     void listen<null>("stt://hotkey-up", () => {
       if (cancelled) return;
       if (!heldRef.current) return;
-      heldRef.current = false;
-      void store.getState().stopAndTranscribe();
+      // The macOS NSEvent monitor delivers clean down/up edges, so debouncing
+      // isn't strictly needed here, but mirroring the JS path keeps the state
+      // machine consistent (e.g. if a future change starts emitting these on
+      // Linux too).
+      clearPendingRelease();
+      pendingReleaseRef.current = window.setTimeout(() => {
+        pendingReleaseRef.current = null;
+        if (!heldRef.current) return;
+        heldRef.current = false;
+        void store.getState().stopAndTranscribe();
+      }, AUTOREPEAT_DEBOUNCE_MS);
     }).then((u) => {
       if (cancelled) u();
       else unlisten.push(u);
@@ -123,6 +170,7 @@ export function useSttHotkey() {
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
+      clearPendingRelease();
       for (const u of unlisten) u();
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
