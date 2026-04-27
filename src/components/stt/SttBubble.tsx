@@ -229,16 +229,12 @@ export function SttBubble() {
         <>
           <span className="stt-mic-dot" aria-hidden="true" />
           <Waveform analyser={analyser} />
-          {showCountdown ? (
+          {showCountdown && (
             <span
               className="stt-countdown"
               aria-label={`${countdownDigit} seconds remaining`}
             >
               {countdownDigit}
-            </span>
-          ) : (
-            <span className="stt-hint">
-              Hold <kbd className="stt-kbd">{displayHotkey(hotkey)}</kbd> · release to paste
             </span>
           )}
         </>
