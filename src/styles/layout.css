@@ -685,14 +685,19 @@
   left: 0;
   right: 0;
   border-left: 3px solid transparent;
-  pointer-events: auto;
+  /* Block body passes pointer events through so clicks/drags reach the xterm
+     canvas underneath (otherwise a tall finished block hides the textarea
+     and the terminal can't be focused or text-selected). The interactive
+     children below opt back in with pointer-events: auto. */
+  pointer-events: none;
   transition:
     background var(--duration-base) var(--ease-out),
     box-shadow var(--duration-base) var(--ease-out),
     opacity var(--duration-base) var(--ease-out),
     filter var(--duration-fast) var(--ease-out);
 }
-.cmd-block:hover {
+.cmd-block:has(.cmd-block-tab:hover),
+.cmd-block:has(.cmd-block-actions:hover) {
   background: color-mix(in oklab, var(--fg) 4%, transparent);
   filter: brightness(1.02);
 }
@@ -718,6 +723,7 @@
   border: none;
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
   color: var(--fg-dim);
+  pointer-events: auto;
   transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
 .cmd-block.ok      > .cmd-block-tab { color: var(--success); }
@@ -742,7 +748,8 @@
   transition: opacity var(--duration-fast) var(--ease-out);
   pointer-events: auto;
 }
-.cmd-block:hover .cmd-block-actions,
+.cmd-block:has(.cmd-block-tab:hover) .cmd-block-actions,
+.cmd-block:has(.cmd-block-actions:hover) .cmd-block-actions,
 .cmd-block.focused .cmd-block-actions,
 .cmd-block-actions.menu-open {
   opacity: 1;

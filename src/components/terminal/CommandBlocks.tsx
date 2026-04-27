@@ -64,7 +64,6 @@ export function CommandBlocks({
             style={{
               transform: `translateY(${Math.max(0, top)}px)`,
               height: `${height}px`,
-              pointerEvents: "auto",
             }}
           >
             <button
