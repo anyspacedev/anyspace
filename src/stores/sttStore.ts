@@ -194,10 +194,14 @@ export const useSttStore = create<SttState>((set, get) => ({
   },
 
   startListening: async () => {
-    if (get().phase !== "idle") return;
+    if (get().phase !== "idle") {
+      console.debug("[stt] startListening ignored — phase=", get().phase);
+      return;
+    }
     clearDismissTimer();
 
     if (!get().settings.apiKey) {
+      console.warn("[stt] startListening blocked — no API key configured");
       set({
         phase: "error",
         message: "No API key — open Settings → Speech to text",
@@ -209,6 +213,11 @@ export const useSttStore = create<SttState>((set, get) => ({
 
     activeTarget = snapshotActiveTarget();
     const gen = ++startGen;
+    console.log(
+      "[stt] startListening preset=%s target=%s",
+      get().settings.presetId,
+      activeTarget.kind + (activeTarget.label ? ` (${activeTarget.label})` : ""),
+    );
     // Pre-mark phase so a synchronous cancel() during the async await
     // sees a non-idle state and tears down properly.
     set({ phase: "listening", message: "", analyser: null });
@@ -221,6 +230,7 @@ export const useSttStore = create<SttState>((set, get) => ({
         return;
       }
       recordingStartedAt = performance.now();
+      console.debug("[stt] recording started — max=%dms", MAX_RECORDING_MS);
       set({ analyser, elapsedMs: 0, remainingMs: MAX_RECORDING_MS });
       tickTimer = window.setInterval(() => {
         const elapsed = performance.now() - recordingStartedAt;
@@ -242,6 +252,7 @@ export const useSttStore = create<SttState>((set, get) => ({
         e instanceof Error && e.name === "NotAllowedError"
           ? "Microphone permission denied"
           : `Mic error: ${e instanceof Error ? e.message : String(e)}`;
+      console.error("[stt] startRecording failed:", e);
       set({ phase: "error", message: msg, analyser: null });
       scheduleDismiss(set, 4000);
     }
@@ -268,6 +279,7 @@ export const useSttStore = create<SttState>((set, get) => ({
     try {
       result = await stopRecording();
     } catch (e) {
+      console.error("[stt] stopRecording failed:", e);
       set({
         phase: "error",
         message: `Recorder error: ${e instanceof Error ? e.message : String(e)}`,
@@ -277,7 +289,19 @@ export const useSttStore = create<SttState>((set, get) => ({
       return;
     }
 
+    console.debug(
+      "[stt] recorded duration=%dms mime=%s bytes=%d",
+      Math.round(result.durationMs),
+      result.mime,
+      result.blob.size,
+    );
+
     if (result.durationMs < MIN_RECORDING_MS) {
+      console.debug(
+        "[stt] discarded — duration %dms below MIN_RECORDING_MS=%d",
+        Math.round(result.durationMs),
+        MIN_RECORDING_MS,
+      );
       set({
         phase: "error",
         message: "Hold longer to dictate",
@@ -291,10 +315,24 @@ export const useSttStore = create<SttState>((set, get) => ({
 
     const gen = startGen;
     const { settings } = get();
+    const provider: "openai" | "elevenlabs" =
+      settings.presetId === "elevenlabs" ? "elevenlabs" : "openai";
     try {
       const audio = new Uint8Array(await result.blob.arrayBuffer());
-      if (gen !== startGen) return;
+      if (gen !== startGen) {
+        console.debug("[stt] aborted before transcribe — gen mismatch");
+        return;
+      }
 
+      console.log(
+        "[stt] sttTranscribe → provider=%s endpoint=%s model=%s lang=%s bytes=%d",
+        provider,
+        settings.endpoint,
+        settings.model,
+        settings.language || "(auto)",
+        audio.byteLength,
+      );
+      const t0 = performance.now();
       const text = await sttTranscribe({
         endpoint: settings.endpoint,
         apiKey: settings.apiKey,
@@ -303,13 +341,33 @@ export const useSttStore = create<SttState>((set, get) => ({
         audio,
         mime: result.mime,
         filename: filenameFor(result.mime),
-        provider: settings.presetId === "elevenlabs" ? "elevenlabs" : "openai",
+        provider,
       });
-      if (gen !== startGen) return;
+      const elapsedMs = Math.round(performance.now() - t0);
+      if (gen !== startGen) {
+        console.debug("[stt] aborted after transcribe — gen mismatch");
+        return;
+      }
+      console.log(
+        '[stt] transcribed %dms chars=%d preview="%s"',
+        elapsedMs,
+        text.length,
+        text.slice(0, 60).replace(/\n/g, " "),
+      );
 
       const target = activeTarget ?? { kind: "none", label: "no target" };
       const out = await inject(text, target);
-      if (gen !== startGen) return;
+      if (gen !== startGen) {
+        console.debug("[stt] aborted after inject — gen mismatch");
+        return;
+      }
+      console.log(
+        "[stt] inject → ok=%s fallback=%s target=%s msg=%s",
+        out.ok,
+        out.fallback ?? "none",
+        target.kind,
+        out.message,
+      );
 
       if (out.ok) {
         set({ phase: "success", message: out.message, analyser: null });
@@ -319,7 +377,11 @@ export const useSttStore = create<SttState>((set, get) => ({
         scheduleDismiss(set, 4000);
       }
     } catch (e) {
-      if (gen !== startGen) return;
+      if (gen !== startGen) {
+        console.debug("[stt] error after gen mismatch (suppressed):", e);
+        return;
+      }
+      console.error("[stt] transcribe/inject failed provider=%s:", provider, e);
       set({
         phase: "error",
         message: e instanceof Error ? e.message : String(e),
@@ -335,6 +397,9 @@ export const useSttStore = create<SttState>((set, get) => ({
 
   cancel: () => {
     const phase = get().phase;
+    if (phase !== "idle") {
+      console.debug("[stt] cancel from phase=%s", phase);
+    }
     startGen++; // invalidate any pending startRecording / transcribe / inject
     if (phase === "listening") {
       // either recording or in-flight getUserMedia — both safe to cancel
