@@ -5,3 +5,5 @@ UPDATE agents SET command = 'claude "$(cat {task_file})"'
   WHERE id = 'agent-claude' AND command = 'claude';
 UPDATE agents SET command = 'codex "$(cat {task_file})"'
   WHERE id = 'agent-codex' AND command = 'codex';
+UPDATE agents SET command = 'bash -c ''cat "{task_file}"'''
+  WHERE id = 'agent-shell' AND command = 'bash -c "cat $TEAMSHIP_TASK_FILE"';
