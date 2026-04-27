@@ -421,5 +421,6 @@ export const useSttStore = create<SttState>((set, get) => ({
 function filenameFor(mime: string): string {
   if (mime.includes("ogg")) return "audio.ogg";
   if (mime.includes("mp4")) return "audio.mp4";
+  if (mime.includes("wav")) return "audio.wav";
   return "audio.webm";
 }
