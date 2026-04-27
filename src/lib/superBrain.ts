@@ -127,7 +127,10 @@ export async function runSuperBrain(tabId: string): Promise<void> {
         await ptyWrite(ctx.sessionId, new TextEncoder().encode(safe));
         return "ok";
       } catch (e) {
-        console.warn("[superBrain] failed for pane", paneId, e);
+        // Tauri rejects with a plain string from the Rust command; ensure it's
+        // visible (some loggers stringify Error wrappers as "[object Object]").
+        const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
+        console.error("[superBrain] failed for pane", paneId, "→", msg, "(raw)", e);
         return "error";
       }
     }),
