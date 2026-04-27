@@ -114,8 +114,7 @@ export function SttBubble() {
     const startY = e.clientY;
     let latestPos: BubblePos | null = null;
 
-    modeRef.current = "pending";
-    intentTimerRef.current = window.setTimeout(() => {
+    const fireHoldIntent = () => {
       intentTimerRef.current = null;
       if (modeRef.current !== "pending") return;
       // Only escalate to recording from a true idle bubble. If a keyboard hold
@@ -124,7 +123,10 @@ export function SttBubble() {
       if (useSttStore.getState().phase !== "idle") return;
       modeRef.current = "recording";
       void useSttStore.getState().startListening();
-    }, HOLD_INTENT_MS);
+    };
+
+    modeRef.current = "pending";
+    intentTimerRef.current = window.setTimeout(fireHoldIntent, HOLD_INTENT_MS);
 
     const teardown = () => {
       elem.removeEventListener("pointermove", onMove);
@@ -163,6 +165,13 @@ export function SttBubble() {
         modeRef.current = "dragging";
         setDragging(true);
         document.body.style.userSelect = "none";
+      } else if (modeRef.current === "pending" && intentTimerRef.current !== null) {
+        // Sub-threshold movement: the user is mid-gesture, not holding still.
+        // Push the hold-intent deadline back so recording only kicks in once
+        // the bubble has actually been stationary for HOLD_INTENT_MS — this
+        // avoids a recording flash when a slow drag never quite stops moving.
+        window.clearTimeout(intentTimerRef.current);
+        intentTimerRef.current = window.setTimeout(fireHoldIntent, HOLD_INTENT_MS);
       }
       if (modeRef.current === "dragging") {
         const next = clampToViewport(
