@@ -58,7 +58,12 @@ export default function App() {
       registerShortcut("themeNext", () => cycleTheme()),
       registerShortcut("runSuperBrain", () => {
         const id = useWorkspaceStore.getState().activeTabId;
-        if (id) void runSuperBrain(id);
+        console.log("[shortcut] runSuperBrain dispatched", { activeTabId: id });
+        if (!id) {
+          console.warn("[shortcut] runSuperBrain: no active tab");
+          return;
+        }
+        void runSuperBrain(id);
       }),
     ];
     // Esc clears multi-pane selection. Use capture so we beat any per-component

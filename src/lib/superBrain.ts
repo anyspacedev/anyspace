@@ -44,25 +44,67 @@ function guardDraft(cmd: string): string {
 }
 
 export async function runSuperBrain(tabId: string): Promise<void> {
+  console.log("[superBrain] invoked", { tabId });
   const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
-  if (!tab) return;
+  if (!tab) {
+    console.warn("[superBrain] no tab found for id", tabId);
+    return;
+  }
   const sel = tab.selectedPaneIds ?? [];
   const targets = sel.length > 0 ? sel : (tab.activePaneId ? [tab.activePaneId] : []);
-  if (targets.length === 0) return;
-
-  const ai = useAiStore.getState().settings;
-  if (!ai.endpoint || !ai.apiKey || !ai.model) {
-    console.warn("[superBrain] AI not configured — skipping");
+  console.log("[superBrain] targets resolved", {
+    selectedPaneIds: sel,
+    activePaneId: tab.activePaneId,
+    targets,
+  });
+  if (targets.length === 0) {
+    console.warn("[superBrain] no target panes — select a pane or focus a terminal first");
     return;
   }
 
-  await Promise.all(
+  const ai = useAiStore.getState().settings;
+  console.log("[superBrain] ai settings", {
+    endpoint: ai.endpoint,
+    model: ai.model,
+    hasApiKey: !!ai.apiKey,
+  });
+  if (!ai.endpoint || !ai.apiKey || !ai.model) {
+    console.warn("[superBrain] AI not configured — skipping", {
+      hasEndpoint: !!ai.endpoint,
+      hasApiKey: !!ai.apiKey,
+      hasModel: !!ai.model,
+    });
+    return;
+  }
+
+  const results = await Promise.all(
     targets.map(async (paneId) => {
       const pane = tab.panes[paneId];
-      if (!pane || pane.kind !== "terminal") return;
+      if (!pane) {
+        console.warn("[superBrain] pane missing in tab", { paneId });
+        return "missing-pane";
+      }
+      if (pane.kind !== "terminal") {
+        console.warn("[superBrain] skipping non-terminal pane", { paneId, kind: pane.kind });
+        return "non-terminal";
+      }
       const ctx = getTerminalContext(paneId);
-      if (!ctx) return;
+      if (!ctx) {
+        console.warn(
+          "[superBrain] no completed command block for pane — run a command and wait for it to finish first",
+          { paneId },
+        );
+        return "no-context";
+      }
+      console.log("[superBrain] context captured", {
+        paneId,
+        sessionId: ctx.sessionId,
+        command: ctx.command,
+        exitCode: ctx.exitCode,
+        outputLength: ctx.output.length,
+      });
       try {
+        console.log("[superBrain] calling aiChat", { paneId, endpoint: ai.endpoint, model: ai.model });
         const reply = await aiChat({
           endpoint: ai.endpoint,
           apiKey: ai.apiKey,
@@ -70,14 +112,25 @@ export async function runSuperBrain(tabId: string): Promise<void> {
           systemPrompt: SUPER_BRAIN_SYSTEM_PROMPT,
           userMessage: buildUserMessage(ctx),
         });
+        console.log("[superBrain] aiChat reply", { paneId, replyLength: reply.length, replyPreview: reply.slice(0, 200) });
         const cmd = sanitize(reply);
-        if (!cmd) return;
+        if (!cmd) {
+          console.warn("[superBrain] sanitize produced empty draft — model returned no usable command", { paneId, reply });
+          return "empty-draft";
+        }
         const safe = guardDraft(cmd);
+        if (safe !== cmd) {
+          console.log("[superBrain] draft guarded with comment prefix (destructive heuristic)", { paneId, cmd, safe });
+        }
+        console.log("[superBrain] writing draft to PTY (no newline)", { paneId, sessionId: ctx.sessionId, draft: safe });
         // Raw bytes, no newline — the user reviews before pressing Enter.
         await ptyWrite(ctx.sessionId, new TextEncoder().encode(safe));
+        return "ok";
       } catch (e) {
         console.warn("[superBrain] failed for pane", paneId, e);
+        return "error";
       }
     }),
   );
+  console.log("[superBrain] done", { results });
 }
