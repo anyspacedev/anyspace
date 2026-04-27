@@ -16,6 +16,8 @@ export type SttPhase =
   | "success"
   | "error";
 
+export type BubblePos = { x: number; y: number };
+
 export type SttSettings = {
   endpoint: string;
   apiKey: string;
@@ -26,6 +28,9 @@ export type SttSettings = {
   // no Right Control key, so the default differs by platform; user can rebind
   // in Settings.
   hotkey: string;
+  // Persisted screen position of the floating bubble. null = default
+  // (bottom-center, driven by CSS).
+  bubblePos: BubblePos | null;
 };
 
 function isMacPlatform(): boolean {
@@ -46,12 +51,19 @@ const DEFAULT_SETTINGS: SttSettings = {
   language: "",
   presetId: "groq",
   hotkey: defaultHotkey(),
+  bubblePos: null,
 };
 
 const SETTINGS_KEY = "stt";
 
 // Recordings shorter than this are treated as accidental key-taps.
 const MIN_RECORDING_MS = 350;
+// Hard cap on a single recording. We auto-stop and transcribe whatever we
+// captured up to this point, so a stuck modifier never records indefinitely.
+export const MAX_RECORDING_MS = 60_000;
+// When `remainingMs` drops below this, the bubble shows a countdown digit.
+export const COUNTDOWN_MS = 5_000;
+const TICK_MS = 100;
 
 type SttState = {
   phase: SttPhase;
@@ -59,9 +71,15 @@ type SttState = {
   analyser: AnalyserNode | null;
   settings: SttSettings;
   loaded: boolean;
+  // While listening, ticked every TICK_MS so the bubble can render a countdown
+  // in the last few seconds. Reset to 0 / MAX_RECORDING_MS once recording ends.
+  elapsedMs: number;
+  remainingMs: number;
 
   load: () => Promise<void>;
   updateSettings: (partial: Partial<SttSettings>) => Promise<void>;
+  // Persists bubble position without going through the hotkey-rebind path.
+  setBubblePos: (pos: BubblePos) => void;
 
   startListening: () => Promise<void>;
   stopAndTranscribe: () => Promise<void>;
@@ -74,6 +92,10 @@ let dismissTimer: number | undefined;
 // Bumped on cancel(); after each async hop in startListening / stopAndTranscribe
 // we re-check it to bail out cleanly when a cancel fired mid-flight.
 let startGen = 0;
+// Recording-window timers. Cleared on every exit path out of `listening`.
+let tickTimer: number | undefined;
+let maxDurationTimer: number | undefined;
+let recordingStartedAt = 0;
 
 function snapshotActiveTarget(): InjectTarget {
   const ws = useWorkspaceStore.getState();
@@ -101,6 +123,18 @@ function clearDismissTimer() {
   }
 }
 
+function clearRecordingTimers(set: (s: Partial<SttState>) => void) {
+  if (tickTimer !== undefined) {
+    window.clearInterval(tickTimer);
+    tickTimer = undefined;
+  }
+  if (maxDurationTimer !== undefined) {
+    window.clearTimeout(maxDurationTimer);
+    maxDurationTimer = undefined;
+  }
+  set({ elapsedMs: 0, remainingMs: MAX_RECORDING_MS });
+}
+
 function scheduleDismiss(set: (s: Partial<SttState>) => void, delayMs: number) {
   clearDismissTimer();
   dismissTimer = window.setTimeout(() => {
@@ -115,6 +149,8 @@ export const useSttStore = create<SttState>((set, get) => ({
   analyser: null,
   settings: DEFAULT_SETTINGS,
   loaded: false,
+  elapsedMs: 0,
+  remainingMs: MAX_RECORDING_MS,
 
   load: async () => {
     try {
@@ -148,6 +184,15 @@ export const useSttStore = create<SttState>((set, get) => ({
     }
   },
 
+  setBubblePos: (pos) => {
+    const prev = get().settings;
+    const next = { ...prev, bubblePos: pos };
+    set({ settings: next });
+    void settingsSet(SETTINGS_KEY, next).catch(() => {
+      /* ignore — bubble position persistence is best-effort */
+    });
+  },
+
   startListening: async () => {
     if (get().phase !== "idle") return;
     clearDismissTimer();
@@ -175,7 +220,22 @@ export const useSttStore = create<SttState>((set, get) => ({
         cancelRecording();
         return;
       }
-      set({ analyser });
+      recordingStartedAt = performance.now();
+      set({ analyser, elapsedMs: 0, remainingMs: MAX_RECORDING_MS });
+      tickTimer = window.setInterval(() => {
+        const elapsed = performance.now() - recordingStartedAt;
+        set({
+          elapsedMs: elapsed,
+          remainingMs: Math.max(0, MAX_RECORDING_MS - elapsed),
+        });
+      }, TICK_MS);
+      // Hard cap: same teardown path as a normal release. If a cancel fires
+      // before this triggers, clearRecordingTimers cancels the timeout.
+      maxDurationTimer = window.setTimeout(() => {
+        if (gen !== startGen) return;
+        if (useSttStore.getState().phase !== "listening") return;
+        void useSttStore.getState().stopAndTranscribe();
+      }, MAX_RECORDING_MS);
     } catch (e) {
       if (gen !== startGen) return;
       const msg =
@@ -199,6 +259,10 @@ export const useSttStore = create<SttState>((set, get) => ({
       get().cancel();
       return;
     }
+
+    // From here on the recording is ending one way or another — kill the cap
+    // timer so it can't fire again, and freeze the countdown UI.
+    clearRecordingTimers(set);
 
     let result: Awaited<ReturnType<typeof stopRecording>>;
     try {
@@ -277,11 +341,13 @@ export const useSttStore = create<SttState>((set, get) => ({
     }
     activeTarget = null;
     clearDismissTimer();
+    clearRecordingTimers(set);
     set({ phase: "idle", message: "", analyser: null });
   },
 
   dismiss: () => {
     clearDismissTimer();
+    clearRecordingTimers(set);
     set({ phase: "idle", message: "", analyser: null });
   },
 }));
