@@ -1,5 +1,6 @@
 // Audio capture: getUserMedia → MediaRecorder → Blob, with a live AnalyserNode
 // exposed for the waveform UI. Single instance — only one recording at a time.
+import { playStartCue, playStopCue } from "./feedbackSounds";
 
 type RecorderState = "idle" | "recording";
 
@@ -46,6 +47,7 @@ export async function startRecording(): Promise<StartResult> {
     if (e.data && e.data.size > 0) chunks.push(e.data);
   };
   recorder.start(100); // collect chunks every 100ms so a fast stop still has data
+  playStartCue();
   state = "recording";
   startedAt = performance.now();
   return { analyser, mime: mimeType };
@@ -64,6 +66,7 @@ export function stopRecording(): Promise<StopResult> {
       reject(new Error("recorder error: " + String(e)));
     };
     rec.onstop = () => {
+      playStopCue();
       const durationMs = performance.now() - startedAt;
       const blob = new Blob(chunks, { type: mimeType });
       cleanup();
