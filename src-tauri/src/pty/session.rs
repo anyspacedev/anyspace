@@ -30,8 +30,34 @@ impl PtySession {
             .context("openpty failed")?;
 
         let shell = pick_shell();
+
+        // Compute final args + integration env up front so we can mutate args
+        // for bash (--rcfile) before handing them to CommandBuilder.
+        let integration = crate::shell_integration::scripts::write_integration_script()?;
+        let mut shell_args: Vec<String> = shell.args.clone();
+
+        // Per-shell wiring. BASH_ENV alone never worked for *interactive* bash
+        // or any zsh — see shell_integration/scripts.rs for the full story.
+        let mut zsh_wrapper: Option<String> = None;
+        let mut zsh_user_zdotdir: Option<String> = None;
+        if shell.kind == ShellKind::Zsh {
+            zsh_wrapper = Some(crate::shell_integration::scripts::write_zsh_wrapper_dir()?);
+            zsh_user_zdotdir = Some(
+                std::env::var("ZDOTDIR")
+                    .ok()
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| std::env::var("HOME").ok())
+                    .unwrap_or_default(),
+            );
+        } else if shell.kind == ShellKind::Bash {
+            // bash --rcfile is ignored for login shells, so we drop -l and
+            // replay the login init chain inside the wrapper rc file.
+            let wrapper = crate::shell_integration::scripts::write_bash_wrapper_rc()?;
+            shell_args = vec!["-i".into(), "--rcfile".into(), wrapper];
+        }
+
         let mut cmd = CommandBuilder::new(shell.program);
-        for arg in shell.args {
+        for arg in &shell_args {
             cmd.arg(arg);
         }
         if let Some(cwd) = cwd.as_deref() {
@@ -46,12 +72,16 @@ impl PtySession {
         for (k, v) in env {
             cmd.env(k, v);
         }
-        // Tell the shell to source our integration script.
-        let integration = crate::shell_integration::scripts::write_integration_script()?;
+        // Path to the OSC 133 hook script — sourced by every wrapper rc.
         cmd.env("TEAMSHIP_SHELL_INTEGRATION", &integration);
-        // Bash-specific: BASH_ENV is sourced for non-interactive bash; we use it as a hook then
-        // PROMPT_COMMAND-style emission inside the script handles interactive sessions.
+        // BASH_ENV still helps non-interactive bash subshells emit blocks too.
         cmd.env("BASH_ENV", &integration);
+        if let Some(w) = zsh_wrapper {
+            cmd.env("ZDOTDIR", w);
+        }
+        if let Some(u) = zsh_user_zdotdir {
+            cmd.env("TEAMSHIP_USER_ZDOTDIR", u);
+        }
 
         let child = pair
             .slave
@@ -119,20 +149,41 @@ impl Drop for PtySession {
 struct ShellChoice {
     program: String,
     args: Vec<String>,
+    kind: ShellKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ShellKind {
+    Zsh,
+    Bash,
+    Other,
 }
 
 #[cfg(unix)]
 fn pick_shell() -> ShellChoice {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
-    // Force interactive + login so PROMPT_COMMAND etc. fire.
-    ShellChoice { program: shell, args: vec!["-il".into()] }
+    let kind = match Path::new(&shell)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
+        "zsh" => ShellKind::Zsh,
+        "bash" => ShellKind::Bash,
+        _ => ShellKind::Other,
+    };
+    // Force interactive + login so PROMPT_COMMAND etc. fire. Bash gets
+    // overridden later (the spawn path swaps -il for -i --rcfile so the
+    // integration wrapper actually loads).
+    ShellChoice { program: shell, args: vec!["-il".into()], kind }
 }
 
 #[cfg(windows)]
 fn pick_shell() -> ShellChoice {
     // Prefer ComSpec; fall back to pwsh/powershell/cmd by env hint.
     if let Ok(comspec) = std::env::var("COMSPEC") {
-        return ShellChoice { program: comspec, args: vec![] };
+        return ShellChoice { program: comspec, args: vec![], kind: ShellKind::Other };
     }
-    ShellChoice { program: "cmd.exe".into(), args: vec![] }
+    ShellChoice { program: "cmd.exe".into(), args: vec![], kind: ShellKind::Other }
 }
