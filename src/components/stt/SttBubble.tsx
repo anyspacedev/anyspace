@@ -221,7 +221,7 @@ export function SttBubble() {
           className="stt-mic-idle"
           aria-label={`Hold ${displayHotkey(hotkey)} to talk`}
         >
-          <Icon name="mic" size={14} />
+          <Icon name="mic" size={24} />
         </span>
       )}
 
