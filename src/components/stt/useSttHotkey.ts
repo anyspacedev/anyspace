@@ -14,20 +14,20 @@ import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useSttStore } from "../../stores/sttStore";
 
-// WebKitGTK on Linux X11 emits synthetic `keyup` → `keydown` pairs while a key
-// is held (autorepeat) — and `e.repeat` isn't reliably set on the synthetic
-// keydown. Without this debounce the first synthetic keyup tears the
-// recording down a few ms after `startRecording` resolves, so the user holds
-// for seconds but `stopRecording` reports duration=2ms. We defer keyup; if a
-// matching hotkey keydown arrives inside this window, the keyup is autorepeat
-// and we drop it. A real release has no following keydown, so the deferred
-// handler fires normally.
+// WebKitGTK on Linux fires *spurious* keyup events for modifier keys at 2–7 s
+// intervals while the key is still held — and on real release, the keyup
+// either never arrives or arrives with `getModifierState` still reporting the
+// modifier as held. Two corroborating signals work around that:
 //
-// The window is generous enough to absorb autorepeat intervals even on slow
-// machines or under Wayland/XWayland, where the keyup→keydown gap can stretch
-// past 50ms. End-of-dictation latency increases by this amount; that's an
-// acceptable trade for not silently dropping every recording.
+//   1. `getModifierState`: when a keyup says the modifier is still held, it's
+//      a spurious event and we ignore it (and reset the watchdog).
+//   2. Watchdog: while heldRef is true, if no hotkey-related event fires for
+//      `WATCHDOG_MS`, assume the user released. Pointer events with the
+//      modifier reported released also short-circuit this — most users
+//      reach for the mouse soon after release, which fires the cleanup
+//      well before the watchdog timeout.
 const AUTOREPEAT_DEBOUNCE_MS = 200;
+const WATCHDOG_MS = 8000;
 
 // Maps a hotkey `KeyboardEvent.code` to the modifier-state name accepted by
 // `KeyboardEvent.getModifierState` ("Control" / "Alt" / etc). On a real keyup
@@ -78,10 +78,12 @@ function isFormInput(target: EventTarget | null): boolean {
 export function useSttHotkey() {
   const heldRef = useRef(false);
   const pendingReleaseRef = useRef<number | null>(null);
+  const watchdogRef = useRef<number | null>(null);
   const hotkey = useSttStore((s) => s.settings.hotkey);
 
   useEffect(() => {
     const expectedMod = modForCode(hotkey);
+    const modName = modifierStateName(hotkey);
     const store = useSttStore;
 
     const clearPendingRelease = () => {
@@ -91,13 +93,48 @@ export function useSttHotkey() {
       }
     };
 
+    const clearWatchdog = () => {
+      if (watchdogRef.current !== null) {
+        window.clearTimeout(watchdogRef.current);
+        watchdogRef.current = null;
+      }
+    };
+
+    const armWatchdog = () => {
+      clearWatchdog();
+      watchdogRef.current = window.setTimeout(() => {
+        watchdogRef.current = null;
+        if (!heldRef.current) return;
+        console.debug(
+          "[stt-hotkey] watchdog — no hotkey activity for %dms, assuming release ts=%d",
+          WATCHDOG_MS,
+          Math.round(performance.now()),
+        );
+        clearPendingRelease();
+        heldRef.current = false;
+        void store.getState().stopAndTranscribe();
+      }, WATCHDOG_MS);
+    };
+
+    const finishRelease = (reason: string) => {
+      clearWatchdog();
+      clearPendingRelease();
+      console.debug(
+        "[stt-hotkey] release confirmed (%s) — stopAndTranscribe ts=%d",
+        reason,
+        Math.round(performance.now()),
+      );
+      heldRef.current = false;
+      void store.getState().stopAndTranscribe();
+    };
+
     const onDown = (e: KeyboardEvent) => {
       if (e.code === hotkey) {
         if (hasForeignModifier(e, expectedMod)) return;
         if (isFormInput(e.target)) return;
-        // X11 autorepeat: a synthetic keydown for the same hotkey arriving
-        // while we're still debouncing the release means the key is actually
-        // held. Cancel the pending release and stay in the listening state.
+        // Autorepeat: a hotkey keydown arriving while a release is being
+        // debounced means the key is actually held. Cancel the pending
+        // release and stay in the listening state.
         if (pendingReleaseRef.current !== null) {
           console.debug(
             "[stt-hotkey] keydown cancels pending release (autorepeat) repeat=%s ts=%d",
@@ -105,16 +142,24 @@ export function useSttHotkey() {
             Math.round(performance.now()),
           );
           clearPendingRelease();
+          armWatchdog();
           return;
         }
-        if (e.repeat) return;
-        if (heldRef.current) return;
+        if (e.repeat) {
+          armWatchdog();
+          return;
+        }
+        if (heldRef.current) {
+          armWatchdog();
+          return;
+        }
         console.debug(
           "[stt-hotkey] keydown — start listening code=%s ts=%d",
           e.code,
           Math.round(performance.now()),
         );
         heldRef.current = true;
+        armWatchdog();
         void store.getState().startListening();
         return;
       }
@@ -123,6 +168,7 @@ export function useSttHotkey() {
 
       // Any other key while listening cancels (treat as a real shortcut).
       if (heldRef.current) {
+        clearWatchdog();
         clearPendingRelease();
         heldRef.current = false;
         store.getState().cancel();
@@ -132,15 +178,15 @@ export function useSttHotkey() {
     const onUp = (e: KeyboardEvent) => {
       if (e.code !== hotkey) return;
       if (!heldRef.current) return;
-      // If the modifier state still reports the key as held, it's an
-      // autorepeat keyup — ignore it without even arming the debounce timer.
-      const modName = modifierStateName(hotkey);
+      // If the modifier state still reports the key as held, it's a spurious
+      // WebKitGTK keyup. Reset the watchdog and otherwise ignore.
       if (modName && e.getModifierState(modName)) {
         console.debug(
-          "[stt-hotkey] keyup ignored — %s still held (autorepeat) ts=%d",
+          "[stt-hotkey] keyup ignored — %s still held (spurious) ts=%d",
           modName,
           Math.round(performance.now()),
         );
+        armWatchdog();
         return;
       }
       console.debug(
@@ -153,16 +199,22 @@ export function useSttHotkey() {
       pendingReleaseRef.current = window.setTimeout(() => {
         pendingReleaseRef.current = null;
         if (!heldRef.current) return;
-        console.debug(
-          "[stt-hotkey] release confirmed after debounce — stopAndTranscribe ts=%d",
-          Math.round(performance.now()),
-        );
-        heldRef.current = false;
-        void store.getState().stopAndTranscribe();
+        finishRelease("keyup state=false");
       }, AUTOREPEAT_DEBOUNCE_MS);
     };
 
+    // Pointer events also carry getModifierState. While we're holding, if the
+    // user moves/clicks the mouse, we can confirm the release without waiting
+    // for the watchdog. Most users do this within ~1 s of releasing.
+    const onPointerActivity = (e: MouseEvent) => {
+      if (!heldRef.current) return;
+      if (!modName) return;
+      if (e.getModifierState(modName)) return;
+      finishRelease("pointer event state=false");
+    };
+
     const onBlur = () => {
+      clearWatchdog();
       clearPendingRelease();
       if (!heldRef.current) return;
       heldRef.current = false;
@@ -171,6 +223,7 @@ export function useSttHotkey() {
 
     const onVisibility = () => {
       if (document.visibilityState === "hidden" && heldRef.current) {
+        clearWatchdog();
         clearPendingRelease();
         heldRef.current = false;
         store.getState().cancel();
@@ -185,10 +238,15 @@ export function useSttHotkey() {
       if (cancelled) return;
       if (pendingReleaseRef.current !== null) {
         clearPendingRelease();
+        armWatchdog();
         return;
       }
-      if (heldRef.current) return;
+      if (heldRef.current) {
+        armWatchdog();
+        return;
+      }
       heldRef.current = true;
+      armWatchdog();
       void store.getState().startListening();
     }).then((u) => {
       if (cancelled) u();
@@ -199,14 +257,12 @@ export function useSttHotkey() {
       if (!heldRef.current) return;
       // The macOS NSEvent monitor delivers clean down/up edges, so debouncing
       // isn't strictly needed here, but mirroring the JS path keeps the state
-      // machine consistent (e.g. if a future change starts emitting these on
-      // Linux too).
+      // machine consistent.
       clearPendingRelease();
       pendingReleaseRef.current = window.setTimeout(() => {
         pendingReleaseRef.current = null;
         if (!heldRef.current) return;
-        heldRef.current = false;
-        void store.getState().stopAndTranscribe();
+        finishRelease("tauri hotkey-up");
       }, AUTOREPEAT_DEBOUNCE_MS);
     }).then((u) => {
       if (cancelled) u();
@@ -215,14 +271,19 @@ export function useSttHotkey() {
 
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
+    window.addEventListener("mousemove", onPointerActivity);
+    window.addEventListener("mousedown", onPointerActivity);
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
       clearPendingRelease();
+      clearWatchdog();
       for (const u of unlisten) u();
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
+      window.removeEventListener("mousemove", onPointerActivity);
+      window.removeEventListener("mousedown", onPointerActivity);
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisibility);
     };
