@@ -12,6 +12,7 @@ type TerminalEntry = {
   term: XTerm;
   getBlocks: () => CommandBlock[];
   getSessionId: () => string | null;
+  handleDrop: (paths: string[]) => void;
 };
 
 const entries = new Map<string, TerminalEntry>();
@@ -22,6 +23,13 @@ export function registerTerminal(paneId: string, entry: TerminalEntry): void {
 
 export function unregisterTerminal(paneId: string): void {
   entries.delete(paneId);
+}
+
+export function dispatchDropToPane(paneId: string, paths: string[]): boolean {
+  const e = entries.get(paneId);
+  if (!e) return false;
+  e.handleDrop(paths);
+  return true;
 }
 
 export type TerminalContext = {

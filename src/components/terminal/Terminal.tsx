@@ -7,7 +7,6 @@ import { SearchAddon } from "@xterm/addon-search";
 import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ptySpawn, ptyWrite, ptyResize, ptyKill } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
 import type { Pane } from "../../lib/types";
@@ -113,13 +112,28 @@ export function Terminal({ pane, tabId }: Props) {
     fitRef.current = fit;
     searchRef.current = search;
 
-    // Expose to non-React callers (Super Brain) for output capture and PTY
-    // session lookup. Closures keep readers pointed at the live refs without
-    // forcing this component to re-render.
+    // Expose to non-React callers (Super Brain, global drag-drop dispatcher)
+    // for output capture, PTY session lookup, and OS file drops. Closures keep
+    // readers pointed at the live refs without forcing this component to
+    // re-render.
     registerTerminal(pane.id, {
       term,
       getBlocks: () => blocksRef.current,
       getSessionId: () => sessionIdRef.current,
+      handleDrop: (paths) => {
+        const sid = sessionIdRef.current;
+        if (!sid || paths.length === 0) return;
+        let text = paths.map(quoteShellPath).join(" ");
+        // When the running program enabled bracketed paste mode (most modern
+        // shells, REPLs, and TUI apps including Claude Code), wrap the drop
+        // with \e[200~…\e[201~. Claude Code only inspects bracketed-paste
+        // chunks for image paths to convert into [Image #N] placeholders —
+        // unwrapped paths show up verbatim.
+        if (term.modes.bracketedPasteMode) {
+          text = `\x1b[200~${text}\x1b[201~`;
+        }
+        void ptyWrite(sid, new TextEncoder().encode(text)).catch(() => {});
+      },
     });
 
     // Defer the first fit: calling fit.fit() synchronously after open()
@@ -237,32 +251,10 @@ export function Terminal({ pane, tabId }: Props) {
     });
     ro.observe(containerRef.current);
 
-    // OS drag-drop: Tauri intercepts at the window level (HTML5 drop never fires, and dataTransfer would lack absolute paths anyway), so subscribe to the native event and hit-test against this pane's rect.
-    let dragUnlisten: (() => void) | null = null;
-    let dragCancelled = false;
-    getCurrentWebview()
-      .onDragDropEvent((event) => {
-        if (event.payload.type !== "drop") return;
-        const node = containerRef.current;
-        const sid = sessionIdRef.current;
-        if (!node || !sid) return;
-        // Workspace view is kept laid out (opacity:0) when the user is on
-        // Tasks/Agents/Settings — skip drops so they don't land on a hidden
-        // terminal under the active view.
-        if (useWorkspaceStore.getState().selectedView !== "workspace") return;
-        const rect = node.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const x = event.payload.position.x / dpr;
-        const y = event.payload.position.y / dpr;
-        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
-        const text = event.payload.paths.map(quoteShellPath).join(" ");
-        void ptyWrite(sid, new TextEncoder().encode(text));
-      })
-      .then((fn) => {
-        if (dragCancelled) fn();
-        else dragUnlisten = fn;
-      })
-      .catch(() => {/* noop */});
+    // OS drag-drop is handled by the global dispatcher in App.tsx, which
+    // hit-tests via document.elementFromPoint and routes to this pane's
+    // registered handleDrop. Per-pane subscriptions are unreliable in
+    // multi-pane layouts on some platforms, so we centralise instead.
 
     return () => {
       disposed = true;
@@ -270,8 +262,6 @@ export function Terminal({ pane, tabId }: Props) {
       cancelAnimationFrame(resizeRaf);
       dataDisp.dispose();
       ro.disconnect();
-      dragCancelled = true;
-      dragUnlisten?.();
       exitUnlisten?.();
       unregisterTerminal(pane.id);
       const sid = sessionIdRef.current;

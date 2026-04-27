@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useThemeStore } from "./stores/themeStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useKanbanStore } from "./stores/kanbanStore";
@@ -7,6 +8,7 @@ import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
+import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
@@ -40,6 +42,38 @@ export default function App() {
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
   }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy]);
+
+  // Global OS drag-drop dispatcher. Tauri delivers drops at the webview level
+  // with PhysicalPosition coordinates; converting to CSS pixels and using
+  // document.elementFromPoint to find the [data-pane-id] under the cursor is
+  // more reliable than per-pane bounding-rect checks (which silently failed
+  // for the right-hand pane in split layouts).
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        if (useWorkspaceStore.getState().selectedView !== "workspace") return;
+        const dpr = window.devicePixelRatio || 1;
+        const x = event.payload.position.x / dpr;
+        const y = event.payload.position.y / dpr;
+        const el = document.elementFromPoint(x, y);
+        const paneEl = el?.closest("[data-pane-id]") as HTMLElement | null;
+        const paneId = paneEl?.dataset.paneId;
+        if (!paneId) return;
+        dispatchDropToPane(paneId, event.payload.paths);
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {/* noop */});
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     const detach = attachGlobalShortcuts();
