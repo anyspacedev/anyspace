@@ -186,86 +186,36 @@ export function Terminal({ pane, tabId }: Props) {
 
     // WebKitGTK occasionally drops the mouseup that follows a click inside
     // xterm. When that happens, xterm's SelectionService keeps its
-    // _dragScrollIntervalTimer running and every subsequent mousemove —
-    // even with no button pressed — keeps extending the selection (the
+    // _dragScrollIntervalTimer running and every later mousemove — even
+    // with no button pressed — keeps extending the selection (the
     // "click → move → wheel scrolls but selects text" bug). Recover by
-    // synthesising a mouseup on the document the moment we see a mousemove
-    // with buttons === 0 while xterm still thinks the primary button is
-    // held. The synthetic event drives xterm's own _handleMouseUp, which
-    // tears down its document listeners and clears the interval.
-    const tag = `[term-debug ${pane.id.slice(0, 6)}]`;
-    type SelDebug = {
-      _core?: {
-        _selectionService?: {
-          _dragScrollIntervalTimer?: number;
-          _model?: { selectionStart?: unknown; selectionEnd?: unknown };
-        };
-      };
+    // dispatching a synthetic mouseup the moment we see a mousemove with
+    // buttons === 0 while xterm still thinks the primary button is held.
+    // It's fired on the terminal-wrap (a real Element) and bubbles up to
+    // xterm's document listener — dispatching straight on `document`
+    // makes event.target the Document, which trips Tauri's drag-region
+    // user-script when it reads target.getAttribute.
+    type SelInternals = {
+      _core?: { _selectionService?: { _dragScrollIntervalTimer?: number } };
     };
-    const selState = () => {
-      const s = (term as unknown as SelDebug)._core?._selectionService;
-      return {
-        timer: s?._dragScrollIntervalTimer,
-        start: s?._model?.selectionStart,
-        end: s?._model?.selectionEnd,
-      };
-    };
-    const describe = (e: MouseEvent | WheelEvent) => {
-      const t = e.target as Element | null;
-      return {
-        tag: t?.tagName,
-        cls: t instanceof HTMLElement ? t.className : undefined,
-        x: e.clientX,
-        y: e.clientY,
-        button: (e as MouseEvent).button,
-        buttons: e.buttons,
-      };
-    };
-    const onDebugDown = (e: MouseEvent) => {
-      console.log(`${tag} mousedown buttons=${e.buttons}`, describe(e), selState());
-    };
-    const onDebugUp = (e: MouseEvent) => {
-      console.log(`${tag} mouseup buttons=${e.buttons}`, describe(e), selState());
-    };
-    let lastMoveLog = 0;
     const onDocMouseMove = (e: MouseEvent) => {
-      const state = selState();
-      // Recovery: stuck selection + no button pressed → fake a mouseup so
-      // xterm releases its document listeners. Only the pane that owns the
-      // stuck timer should dispatch (otherwise every mounted Terminal would
-      // race to fire one).
-      if (state.timer !== undefined && e.buttons === 0) {
-        console.warn(`${tag} stuck selection — synthesising mouseup`, describe(e), state);
-        // Dispatch on the terminal-wrap (a real Element) and let the event
-        // bubble up to xterm's document-level mouseup listener. Dispatching
-        // straight on `document` makes event.target a Document, which trips
-        // Tauri's drag-region user-script (it reads target.getAttribute).
-        pasteHost.dispatchEvent(
-          new MouseEvent("mouseup", {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            button: 0,
-            buttons: 0,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            screenX: e.screenX,
-            screenY: e.screenY,
-          }),
-        );
-        return;
-      }
-      const now = performance.now();
-      if (now - lastMoveLog < 80) return;
-      lastMoveLog = now;
-      console.log(`${tag} mousemove buttons=${e.buttons}`, describe(e), state);
+      if (e.buttons !== 0) return;
+      const sel = (term as unknown as SelInternals)._core?._selectionService;
+      if (sel?._dragScrollIntervalTimer === undefined) return;
+      pasteHost.dispatchEvent(
+        new MouseEvent("mouseup", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          button: 0,
+          buttons: 0,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+        }),
+      );
     };
-    const onDebugWheel = (e: WheelEvent) => {
-      console.log(`${tag} wheel buttons=${e.buttons}`, { ...describe(e), dy: e.deltaY }, selState());
-    };
-    pasteHost.addEventListener("mousedown", onDebugDown, true);
-    pasteHost.addEventListener("wheel", onDebugWheel, true);
-    document.addEventListener("mouseup", onDebugUp, true);
     document.addEventListener("mousemove", onDocMouseMove, true);
 
     // Defer the first fit: calling fit.fit() synchronously after open()
@@ -395,9 +345,6 @@ export function Terminal({ pane, tabId }: Props) {
       dataDisp.dispose();
       ro.disconnect();
       pasteHost.removeEventListener("paste", onPaste, true);
-      pasteHost.removeEventListener("mousedown", onDebugDown, true);
-      pasteHost.removeEventListener("wheel", onDebugWheel, true);
-      document.removeEventListener("mouseup", onDebugUp, true);
       document.removeEventListener("mousemove", onDocMouseMove, true);
       exitUnlisten?.();
       unregisterTerminal(pane.id);
