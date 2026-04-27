@@ -144,16 +144,25 @@ export function SttBubble() {
       if (ev.pointerId !== pointerId) return;
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
-      if (modeRef.current === "pending") {
-        if (Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
-          if (intentTimerRef.current !== null) {
-            window.clearTimeout(intentTimerRef.current);
-            intentTimerRef.current = null;
-          }
-          modeRef.current = "dragging";
-          setDragging(true);
-          document.body.style.userSelect = "none";
+      const movedPastThreshold = Math.hypot(dx, dy) >= DRAG_THRESHOLD;
+      // Movement promotes the gesture to a drag even after the hold-intent
+      // timer already escalated us to "recording": a slow tap-and-drag can
+      // cross 4px only after 120ms, and without this branch the bubble would
+      // silently capture audio while the user is just repositioning it.
+      if (
+        movedPastThreshold &&
+        (modeRef.current === "pending" || modeRef.current === "recording")
+      ) {
+        if (intentTimerRef.current !== null) {
+          window.clearTimeout(intentTimerRef.current);
+          intentTimerRef.current = null;
         }
+        if (modeRef.current === "recording") {
+          useSttStore.getState().cancel();
+        }
+        modeRef.current = "dragging";
+        setDragging(true);
+        document.body.style.userSelect = "none";
       }
       if (modeRef.current === "dragging") {
         const next = clampToViewport(
