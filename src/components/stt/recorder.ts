@@ -25,12 +25,16 @@ let pcmSampleRate = 0;
 let pcmFrames = 0;
 
 function pickMime(): string | undefined {
+  // Deliberately no audio/mp4: WebKitGTK reports it as supported via the
+  // gstreamer-bad mp4 muxer, but the encoder silently produces zero bytes,
+  // and the resulting blob is rejected as "empty or corrupted" by the STT
+  // server. Real browsers all support webm or ogg, so missing webm+ogg is
+  // the WebKitGTK fingerprint — we let it fall through to the PCM/WAV path.
   const candidates = [
     "audio/webm;codecs=opus",
     "audio/webm",
     "audio/ogg;codecs=opus",
     "audio/ogg",
-    "audio/mp4",
   ];
   if (typeof MediaRecorder === "undefined") return undefined;
   for (const m of candidates) {
@@ -42,8 +46,9 @@ function pickMime(): string | undefined {
 function tryCreateMediaRecorder(s: MediaStream): MediaRecorder | null {
   if (typeof MediaRecorder === "undefined") return null;
   const picked = pickMime();
+  if (!picked) return null;
   try {
-    return picked ? new MediaRecorder(s, { mimeType: picked }) : new MediaRecorder(s);
+    return new MediaRecorder(s, { mimeType: picked });
   } catch (e) {
     console.warn("[stt] MediaRecorder unavailable, will fall back to PCM/WAV:", e);
     return null;
