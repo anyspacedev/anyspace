@@ -13,17 +13,19 @@ let analyser: AnalyserNode | null = null;
 let mimeType = "audio/webm";
 let startedAt = 0;
 
-function pickMime(): string {
+function pickMime(): string | undefined {
   const candidates = [
     "audio/webm;codecs=opus",
     "audio/webm",
     "audio/ogg;codecs=opus",
+    "audio/ogg",
     "audio/mp4",
   ];
+  if (typeof MediaRecorder === "undefined") return undefined;
   for (const m of candidates) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) return m;
+    if (MediaRecorder.isTypeSupported(m)) return m;
   }
-  return "audio/webm";
+  return undefined;
 }
 
 export type StartResult = { analyser: AnalyserNode; mime: string };
@@ -40,9 +42,12 @@ export async function startRecording(): Promise<StartResult> {
   analyser.smoothingTimeConstant = 0.6;
   src.connect(analyser);
 
-  mimeType = pickMime();
+  const picked = pickMime();
   chunks = [];
-  recorder = new MediaRecorder(stream, { mimeType });
+  recorder = picked ? new MediaRecorder(stream, { mimeType: picked }) : new MediaRecorder(stream);
+  // WebKitGTK on Linux often refuses every webm/ogg/mp4 hint we pass; let the
+  // browser pick its default and report it back via recorder.mimeType.
+  mimeType = recorder.mimeType || picked || "audio/webm";
   recorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) chunks.push(e.data);
   };
