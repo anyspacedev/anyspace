@@ -2561,6 +2561,12 @@
   /* Bubble itself never receives focus — focus stays on the target pane. */
 }
 
+/* Listening shows only mic-dot + waveform; drop the label-state min-width
+ * so the pill hugs its content instead of leaving dead space on the right. */
+.stt-bubble--listening {
+  min-width: 0;
+}
+
 /* Once the user drags it, position is driven by inline left/top — drop the
  * centering transform so dragged + centered both work without conflict. */
 .stt-bubble--free {
