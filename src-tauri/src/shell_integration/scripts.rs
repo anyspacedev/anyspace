@@ -49,8 +49,9 @@ pub fn write_zsh_wrapper_dir() -> Result<String> {
 
 /// Writes a bash rcfile wrapper that replays login + interactive init then
 /// sources the integration script. Returns its path — caller invokes bash
-/// with `-i --rcfile <this>` (and drops `-l`, since `--rcfile` is ignored
-/// for login shells).
+/// with `--rcfile <this> -i` (and drops `-l`, since `--rcfile` is ignored
+/// for login shells; the long option must come before `-i` or bash 5.2
+/// rejects it as `--: invalid option`).
 pub fn write_bash_wrapper_rc() -> Result<String> {
     let dir = integration_root()?;
     let path = dir.join("bashrc-wrapper.sh");

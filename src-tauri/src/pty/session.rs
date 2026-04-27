@@ -55,7 +55,9 @@ impl PtySession {
             // bash --rcfile is ignored for login shells, so we drop -l and
             // replay the login init chain inside the wrapper rc file.
             let wrapper = crate::shell_integration::scripts::write_bash_wrapper_rc()?;
-            shell_args = vec!["-i".into(), "--rcfile".into(), wrapper];
+            // Long options must precede short ones — `bash -i --rcfile X`
+            // makes bash 5.2 bail with `--: invalid option`.
+            shell_args = vec!["--rcfile".into(), wrapper, "-i".into()];
         }
 
         let mut cmd = CommandBuilder::new(shell.program);
