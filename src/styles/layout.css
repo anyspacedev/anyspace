@@ -295,6 +295,13 @@
   visibility: visible;
   pointer-events: auto;
 }
+/* When the workspace view is hidden (Tasks/Agents/Settings active) it stays
+   laid out over .app-content so panel sizes survive — but the active tab's
+   pointer-events:auto would otherwise swallow wheel/click events meant for
+   the view below. */
+.view-workspace[aria-hidden="true"] .workspace-tab.active {
+  pointer-events: none;
+}
 
 .pane {
   position: relative;
