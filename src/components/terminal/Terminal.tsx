@@ -184,6 +184,59 @@ export function Terminal({ pane, tabId }: Props) {
     const pasteHost = containerRef.current;
     pasteHost.addEventListener("paste", onPaste, true);
 
+    // Debug: trace mousedown/move/up/wheel to figure out why click+wheel ends
+    // up extending a selection in xterm. Logs the target tag/class, button
+    // state, coords, and xterm's internal SelectionService drag-scroll timer
+    // (truthy = xterm thinks the primary button is still held).
+    const tag = `[term-debug ${pane.id.slice(0, 6)}]`;
+    type SelDebug = {
+      _core?: {
+        _selectionService?: {
+          _dragScrollIntervalTimer?: number;
+          _model?: { selectionStart?: unknown; selectionEnd?: unknown };
+        };
+      };
+    };
+    const selStuck = () => {
+      const s = (term as unknown as SelDebug)._core?._selectionService;
+      return {
+        timer: s?._dragScrollIntervalTimer,
+        start: s?._model?.selectionStart,
+        end: s?._model?.selectionEnd,
+      };
+    };
+    const describe = (e: MouseEvent | WheelEvent) => {
+      const t = e.target as Element | null;
+      return {
+        tag: t?.tagName,
+        cls: t instanceof HTMLElement ? t.className : undefined,
+        x: e.clientX,
+        y: e.clientY,
+        button: (e as MouseEvent).button,
+        buttons: e.buttons,
+      };
+    };
+    const onDebugDown = (e: MouseEvent) => {
+      console.log(`${tag} mousedown`, describe(e), selStuck());
+    };
+    const onDebugUp = (e: MouseEvent) => {
+      console.log(`${tag} mouseup`, describe(e), selStuck());
+    };
+    let lastMoveLog = 0;
+    const onDebugMove = (e: MouseEvent) => {
+      const now = performance.now();
+      if (now - lastMoveLog < 80) return;
+      lastMoveLog = now;
+      console.log(`${tag} mousemove`, describe(e), selStuck());
+    };
+    const onDebugWheel = (e: WheelEvent) => {
+      console.log(`${tag} wheel`, { ...describe(e), dy: e.deltaY }, selStuck());
+    };
+    pasteHost.addEventListener("mousedown", onDebugDown, true);
+    pasteHost.addEventListener("wheel", onDebugWheel, true);
+    document.addEventListener("mouseup", onDebugUp, true);
+    document.addEventListener("mousemove", onDebugMove, true);
+
     // Defer the first fit: calling fit.fit() synchronously after open()
     // races the renderer init and crashes on `_renderer.value.dimensions`.
     const safeFit = () => {
@@ -311,6 +364,10 @@ export function Terminal({ pane, tabId }: Props) {
       dataDisp.dispose();
       ro.disconnect();
       pasteHost.removeEventListener("paste", onPaste, true);
+      pasteHost.removeEventListener("mousedown", onDebugDown, true);
+      pasteHost.removeEventListener("wheel", onDebugWheel, true);
+      document.removeEventListener("mouseup", onDebugUp, true);
+      document.removeEventListener("mousemove", onDebugMove, true);
       exitUnlisten?.();
       unregisterTerminal(pane.id);
       const sid = sessionIdRef.current;
