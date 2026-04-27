@@ -72,7 +72,12 @@ export async function startRecording(): Promise<StartResult> {
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunks.push(e.data);
     };
-    recorder.start(100); // collect chunks every 100ms so a fast stop still has data
+    // No timeslice: WebKitGTK's GStreamer MediaRecorder emits a separate init
+    // segment per chunk in timeslice mode, and the concatenated blob comes out
+    // malformed enough that ElevenLabs/Whisper reject it as "empty or
+    // corrupted". Without timeslice the final dataavailable fires on stop with
+    // a single well-formed container.
+    recorder.start();
   } else {
     // PCM fallback. ScriptProcessor only fires when its output reaches the
     // destination, so route through a muted GainNode to avoid echoing the mic
