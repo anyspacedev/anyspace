@@ -184,10 +184,15 @@ export function Terminal({ pane, tabId }: Props) {
     const pasteHost = containerRef.current;
     pasteHost.addEventListener("paste", onPaste, true);
 
-    // Debug: trace mousedown/move/up/wheel to figure out why click+wheel ends
-    // up extending a selection in xterm. Logs the target tag/class, button
-    // state, coords, and xterm's internal SelectionService drag-scroll timer
-    // (truthy = xterm thinks the primary button is still held).
+    // WebKitGTK occasionally drops the mouseup that follows a click inside
+    // xterm. When that happens, xterm's SelectionService keeps its
+    // _dragScrollIntervalTimer running and every subsequent mousemove —
+    // even with no button pressed — keeps extending the selection (the
+    // "click → move → wheel scrolls but selects text" bug). Recover by
+    // synthesising a mouseup on the document the moment we see a mousemove
+    // with buttons === 0 while xterm still thinks the primary button is
+    // held. The synthetic event drives xterm's own _handleMouseUp, which
+    // tears down its document listeners and clears the interval.
     const tag = `[term-debug ${pane.id.slice(0, 6)}]`;
     type SelDebug = {
       _core?: {
@@ -197,7 +202,7 @@ export function Terminal({ pane, tabId }: Props) {
         };
       };
     };
-    const selStuck = () => {
+    const selState = () => {
       const s = (term as unknown as SelDebug)._core?._selectionService;
       return {
         timer: s?._dragScrollIntervalTimer,
@@ -217,25 +222,47 @@ export function Terminal({ pane, tabId }: Props) {
       };
     };
     const onDebugDown = (e: MouseEvent) => {
-      console.log(`${tag} mousedown`, describe(e), selStuck());
+      console.log(`${tag} mousedown buttons=${e.buttons}`, describe(e), selState());
     };
     const onDebugUp = (e: MouseEvent) => {
-      console.log(`${tag} mouseup`, describe(e), selStuck());
+      console.log(`${tag} mouseup buttons=${e.buttons}`, describe(e), selState());
     };
     let lastMoveLog = 0;
-    const onDebugMove = (e: MouseEvent) => {
+    const onDocMouseMove = (e: MouseEvent) => {
+      const state = selState();
+      // Recovery: stuck selection + no button pressed → fake a mouseup so
+      // xterm releases its document listeners. Only the pane that owns the
+      // stuck timer should dispatch (otherwise every mounted Terminal would
+      // race to fire one).
+      if (state.timer !== undefined && e.buttons === 0) {
+        console.warn(`${tag} stuck selection — synthesising mouseup`, describe(e), state);
+        document.dispatchEvent(
+          new MouseEvent("mouseup", {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 0,
+            buttons: 0,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            screenX: e.screenX,
+            screenY: e.screenY,
+          }),
+        );
+        return;
+      }
       const now = performance.now();
       if (now - lastMoveLog < 80) return;
       lastMoveLog = now;
-      console.log(`${tag} mousemove`, describe(e), selStuck());
+      console.log(`${tag} mousemove buttons=${e.buttons}`, describe(e), state);
     };
     const onDebugWheel = (e: WheelEvent) => {
-      console.log(`${tag} wheel`, { ...describe(e), dy: e.deltaY }, selStuck());
+      console.log(`${tag} wheel buttons=${e.buttons}`, { ...describe(e), dy: e.deltaY }, selState());
     };
     pasteHost.addEventListener("mousedown", onDebugDown, true);
     pasteHost.addEventListener("wheel", onDebugWheel, true);
     document.addEventListener("mouseup", onDebugUp, true);
-    document.addEventListener("mousemove", onDebugMove, true);
+    document.addEventListener("mousemove", onDocMouseMove, true);
 
     // Defer the first fit: calling fit.fit() synchronously after open()
     // races the renderer init and crashes on `_renderer.value.dimensions`.
@@ -367,7 +394,7 @@ export function Terminal({ pane, tabId }: Props) {
       pasteHost.removeEventListener("mousedown", onDebugDown, true);
       pasteHost.removeEventListener("wheel", onDebugWheel, true);
       document.removeEventListener("mouseup", onDebugUp, true);
-      document.removeEventListener("mousemove", onDebugMove, true);
+      document.removeEventListener("mousemove", onDocMouseMove, true);
       exitUnlisten?.();
       unregisterTerminal(pane.id);
       const sid = sessionIdRef.current;
