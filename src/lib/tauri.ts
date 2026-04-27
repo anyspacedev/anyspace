@@ -169,4 +169,8 @@ export async function aiChat(args: AiChatArgs): Promise<string> {
   return rawInvoke<string>("ai_chat", { args });
 }
 
+export async function clipboardSaveBlob(bytes: Uint8Array, ext: string): Promise<string> {
+  return rawInvoke<string>("clipboard_save_blob", { bytes: Array.from(bytes), ext });
+}
+
 export { Channel };

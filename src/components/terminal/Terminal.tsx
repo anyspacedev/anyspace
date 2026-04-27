@@ -7,7 +7,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ptySpawn, ptyWrite, ptyResize, ptyKill } from "../../lib/tauri";
+import { ptySpawn, ptyWrite, ptyResize, ptyKill, clipboardSaveBlob } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
@@ -112,6 +112,21 @@ export function Terminal({ pane, tabId }: Props) {
     fitRef.current = fit;
     searchRef.current = search;
 
+    // Quote, optionally wrap with bracketed-paste markers, and stream the
+    // result to the PTY. Shared between the global drop dispatcher and the
+    // local paste interceptor so both paths produce identical bytes —
+    // Claude Code only converts paths to [Image #N] placeholders inside
+    // bracketed-paste chunks, so the gate must match in both flows.
+    const dispatchPaths = (paths: string[]) => {
+      const sid = sessionIdRef.current;
+      if (!sid || paths.length === 0) return;
+      let text = paths.map(quoteShellPath).join(" ");
+      if (term.modes.bracketedPasteMode) {
+        text = `\x1b[200~${text}\x1b[201~`;
+      }
+      void ptyWrite(sid, new TextEncoder().encode(text)).catch(() => {});
+    };
+
     // Expose to non-React callers (Super Brain, global drag-drop dispatcher)
     // for output capture, PTY session lookup, and OS file drops. Closures keep
     // readers pointed at the live refs without forcing this component to
@@ -120,21 +135,54 @@ export function Terminal({ pane, tabId }: Props) {
       term,
       getBlocks: () => blocksRef.current,
       getSessionId: () => sessionIdRef.current,
-      handleDrop: (paths) => {
-        const sid = sessionIdRef.current;
-        if (!sid || paths.length === 0) return;
-        let text = paths.map(quoteShellPath).join(" ");
-        // When the running program enabled bracketed paste mode (most modern
-        // shells, REPLs, and TUI apps including Claude Code), wrap the drop
-        // with \e[200~…\e[201~. Claude Code only inspects bracketed-paste
-        // chunks for image paths to convert into [Image #N] placeholders —
-        // unwrapped paths show up verbatim.
-        if (term.modes.bracketedPasteMode) {
-          text = `\x1b[200~${text}\x1b[201~`;
-        }
-        void ptyWrite(sid, new TextEncoder().encode(text)).catch(() => {});
-      },
+      handleDrop: dispatchPaths,
     });
+
+    // Capture-phase paste interceptor. xterm's ClipboardAddon handles plain
+    // text pastes (and wraps them in bracketed-paste markers automatically),
+    // but the clipboard can also carry file blobs (image bytes from a
+    // screenshot tool) or text/uri-list (file references from a file
+    // manager) — neither of which would surface as text. We snapshot the
+    // clipboard synchronously, fall through silently if it's text-only, and
+    // otherwise resolve to absolute paths and route through the same
+    // dispatchPaths used by drops.
+    const onPaste = (e: ClipboardEvent) => {
+      const data = e.clipboardData;
+      if (!data) return;
+      const blobs: File[] = [];
+      for (const it of data.items) {
+        if (it.kind === "file") {
+          const f = it.getAsFile();
+          if (f) blobs.push(f);
+        }
+      }
+      const uriList = data.getData("text/uri-list");
+      const hasUris = uriList.split(/\r?\n/).some((l) => l.startsWith("file://"));
+      if (blobs.length === 0 && !hasUris) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void (async () => {
+        const paths: string[] = [];
+        for (const f of blobs) {
+          try {
+            const buf = new Uint8Array(await f.arrayBuffer());
+            const ext = (f.type.split("/")[1] ?? "bin").split("+")[0] || "bin";
+            paths.push(await clipboardSaveBlob(buf, ext));
+          } catch {/* skip this blob */}
+        }
+        if (hasUris) {
+          for (const line of uriList.split(/\r?\n/)) {
+            if (!line.startsWith("file://")) continue;
+            try {
+              paths.push(decodeURIComponent(line.replace(/^file:\/\//, "")));
+            } catch {/* skip malformed URI */}
+          }
+        }
+        if (paths.length > 0) dispatchPaths(paths);
+      })();
+    };
+    const pasteHost = containerRef.current;
+    pasteHost.addEventListener("paste", onPaste, true);
 
     // Defer the first fit: calling fit.fit() synchronously after open()
     // races the renderer init and crashes on `_renderer.value.dimensions`.
@@ -262,6 +310,7 @@ export function Terminal({ pane, tabId }: Props) {
       cancelAnimationFrame(resizeRaf);
       dataDisp.dispose();
       ro.disconnect();
+      pasteHost.removeEventListener("paste", onPaste, true);
       exitUnlisten?.();
       unregisterTerminal(pane.id);
       const sid = sessionIdRef.current;

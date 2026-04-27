@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod agent;
 mod ai;
+mod clipboard;
 mod fs_ops;
 mod git;
 mod kanban;
@@ -120,6 +121,8 @@ pub fn run() {
             stt::commands::stt_hotkey_set,
             // AI
             ai::commands::ai_chat,
+            // Clipboard
+            clipboard::commands::clipboard_save_blob,
             // Workspace persistence
             workspace::commands::workspace_save,
             workspace::commands::workspace_load,
