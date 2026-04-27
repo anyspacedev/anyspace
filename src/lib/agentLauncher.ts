@@ -44,15 +44,20 @@ export async function launchAgent(input: LaunchAgentInput): Promise<string | nul
 
   const ws = useWorkspaceStore.getState();
   if (input.mode === "new-tab") {
-    const tabId = ws.newTab(1, input.taskTitle, [
-      {
-        kind: "terminal",
-        pendingCommand: plan.command,
-        spawnEnv: plan.env,
-        spawnCwd: input.cwd,
-        title: input.taskTitle,
-      },
-    ]);
+    const tabId = ws.newTab(
+      1,
+      input.taskTitle,
+      [
+        {
+          kind: "terminal",
+          pendingCommand: plan.command,
+          spawnEnv: plan.env,
+          spawnCwd: input.cwd,
+          title: input.taskTitle,
+        },
+      ],
+      input.cwd,
+    );
     ws.setActiveTab(tabId);
     ws.setView("workspace");
     return tabId;
