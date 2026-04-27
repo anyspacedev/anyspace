@@ -2683,6 +2683,10 @@
   color: var(--fg-muted);
   font-weight: 500;
 }
+.stt-field-hint {
+  font-weight: 400;
+  opacity: 0.7;
+}
 .stt-field input,
 .stt-field select {
   height: 32px;

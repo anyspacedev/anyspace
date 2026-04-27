@@ -141,6 +141,7 @@ export type SttTranscribeArgs = {
   mime?: string;
   filename?: string;
   language?: string;
+  provider?: "openai" | "elevenlabs";
 };
 
 export async function sttTranscribe(args: SttTranscribeArgs): Promise<string> {

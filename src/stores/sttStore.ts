@@ -23,7 +23,7 @@ export type SttSettings = {
   apiKey: string;
   model: string;
   language: string; // empty = auto-detect
-  presetId: "groq" | "openai" | "custom";
+  presetId: "groq" | "openai" | "elevenlabs" | "custom";
   // KeyboardEvent.code of the hold-to-talk hotkey. Apple-built keyboards have
   // no Right Control key, so the default differs by platform; user can rebind
   // in Settings.
@@ -303,6 +303,7 @@ export const useSttStore = create<SttState>((set, get) => ({
         audio,
         mime: result.mime,
         filename: filenameFor(result.mime),
+        provider: settings.presetId === "elevenlabs" ? "elevenlabs" : "openai",
       });
       if (gen !== startGen) return;
 

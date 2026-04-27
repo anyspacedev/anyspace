@@ -22,6 +22,7 @@ pub struct TranscribeArgs {
     pub mime: Option<String>,
     pub filename: Option<String>,
     pub language: Option<String>,
+    pub provider: Option<String>,
 }
 
 #[tauri::command]
@@ -29,10 +30,13 @@ pub async fn stt_transcribe(
     app: tauri::AppHandle,
     args: TranscribeArgs,
 ) -> Result<String, String> {
-    let url = format!(
-        "{}/audio/transcriptions",
-        args.endpoint.trim_end_matches('/')
-    );
+    let is_elevenlabs = args.provider.as_deref() == Some("elevenlabs");
+    let endpoint = args.endpoint.trim_end_matches('/');
+    let url = if is_elevenlabs {
+        format!("{}/speech-to-text", endpoint)
+    } else {
+        format!("{}/audio/transcriptions", endpoint)
+    };
     let mime = args.mime.unwrap_or_else(|| "audio/webm".to_string());
     let filename = args.filename.unwrap_or_else(|| "audio.webm".to_string());
 
@@ -41,19 +45,28 @@ pub async fn stt_transcribe(
         .mime_str(&mime)
         .map_err(|e| format!("invalid mime: {e}"))?;
 
+    let (model_field, language_field) = if is_elevenlabs {
+        ("model_id", "language_code")
+    } else {
+        ("model", "language")
+    };
     let mut form = reqwest::multipart::Form::new()
-        .text("model", args.model)
+        .text(model_field, args.model)
         .part("file", part);
     if let Some(lang) = args.language {
         if !lang.is_empty() {
-            form = form.text("language", lang);
+            form = form.text(language_field, lang);
         }
     }
 
     let client = crate::net::http_client(&app).map_err(|e| format!("client: {e}"))?;
-    let resp = client
-        .post(&url)
-        .bearer_auth(&args.api_key)
+    let mut req = client.post(&url);
+    if is_elevenlabs {
+        req = req.header("xi-api-key", &args.api_key);
+    } else {
+        req = req.bearer_auth(&args.api_key);
+    }
+    let resp = req
         .multipart(form)
         .send()
         .await

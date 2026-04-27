@@ -291,6 +291,11 @@ const STT_PRESETS: Record<
     model: "whisper-1",
     label: "OpenAI",
   },
+  elevenlabs: {
+    endpoint: "https://api.elevenlabs.io/v1",
+    model: "scribe_v1",
+    label: "ElevenLabs",
+  },
   custom: { endpoint: "", model: "", label: "Custom" },
 };
 
@@ -412,12 +417,19 @@ function SttSettingsSection() {
         </label>
 
         <label className="stt-field">
-          <span className="stt-field-label">API key</span>
+          <span className="stt-field-label">
+            API key
+            {settings.presetId === "elevenlabs" && (
+              <span className="stt-field-hint"> — sent as xi-api-key</span>
+            )}
+          </span>
           <div className="stt-field-inline">
             <input
               type={revealKey ? "text" : "password"}
               value={settings.apiKey}
-              placeholder="sk-…"
+              placeholder={
+                settings.presetId === "elevenlabs" ? "xi-…" : "sk-…"
+              }
               onChange={(e) => void update({ apiKey: e.target.value })}
               spellCheck={false}
               autoComplete="off"
