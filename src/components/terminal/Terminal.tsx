@@ -236,7 +236,11 @@ export function Terminal({ pane, tabId }: Props) {
       // race to fire one).
       if (state.timer !== undefined && e.buttons === 0) {
         console.warn(`${tag} stuck selection — synthesising mouseup`, describe(e), state);
-        document.dispatchEvent(
+        // Dispatch on the terminal-wrap (a real Element) and let the event
+        // bubble up to xterm's document-level mouseup listener. Dispatching
+        // straight on `document` makes event.target a Document, which trips
+        // Tauri's drag-region user-script (it reads target.getAttribute).
+        pasteHost.dispatchEvent(
           new MouseEvent("mouseup", {
             bubbles: true,
             cancelable: true,
