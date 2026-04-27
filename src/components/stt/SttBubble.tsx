@@ -13,7 +13,9 @@ const DRAG_THRESHOLD = 4;
 // How long the user must press without moving before we treat it as a
 // hold-to-talk gesture. Below this threshold a release is a stray click;
 // movement past DRAG_THRESHOLD switches the gesture to drag-to-move.
-const HOLD_INTENT_MS = 120;
+// Tuned long enough that a click-and-drag never trips recording mid-pause —
+// the keyboard hotkey is the primary hold-to-talk path.
+const HOLD_INTENT_MS = 500;
 // Keep this many px between the bubble and the viewport edges so it never
 // clips when restored from a saved position on a smaller window.
 const EDGE_MARGIN = 8;
