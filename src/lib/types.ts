@@ -25,6 +25,10 @@ export type Tab = {
   layout: LayoutNode;
   panes: Record<string, Pane>;
   activePaneId?: string;
+  // Cmd/Ctrl-clicked panes that participate in input broadcast.
+  // Insertion-ordered; the active pane is implicitly added on first toggle.
+  // Ephemeral — cleared on launch and on Esc.
+  selectedPaneIds?: string[];
 };
 
 export type Task = {

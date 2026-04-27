@@ -17,6 +17,8 @@ import { CommandBlocks } from "./CommandBlocks";
 import type { BlockAction } from "./BlockActions";
 import { AiExplainPopover } from "./AiExplainPopover";
 import { registerShortcut } from "../../lib/shortcuts";
+import { broadcastBytes } from "../../lib/paneBroadcast";
+import { registerTerminal, unregisterTerminal } from "./terminalRegistry";
 import { Icon } from "../ui/Icon";
 
 type Props = { pane: Pane; tabId: string };
@@ -109,6 +111,15 @@ export function Terminal({ pane, tabId }: Props) {
     fitRef.current = fit;
     searchRef.current = search;
 
+    // Expose to non-React callers (Super Brain) for output capture and PTY
+    // session lookup. Closures keep readers pointed at the live refs without
+    // forcing this component to re-render.
+    registerTerminal(pane.id, {
+      term,
+      getBlocks: () => blocksRef.current,
+      getSessionId: () => sessionIdRef.current,
+    });
+
     // Defer the first fit: calling fit.fit() synchronously after open()
     // races the renderer init and crashes on `_renderer.value.dimensions`.
     const safeFit = () => {
@@ -184,12 +195,15 @@ export function Terminal({ pane, tabId }: Props) {
         term.writeln(`\x1b[31m[teamship] failed to spawn pty: ${e}\x1b[0m`);
       });
 
-    // Forward keystrokes
+    // Forward keystrokes. When this pane is part of a multi-select group,
+    // also fan out to every other selected pane — mirrors every byte (incl.
+    // arrows, Ctrl+C, paste). The broadcast pill in the header is mandatory.
     const dataDisp = term.onData((data) => {
       const sid = sessionIdRef.current;
       if (!sid) return;
       const bytes = new TextEncoder().encode(data);
       void ptyWrite(sid, bytes).catch(() => {});
+      broadcastBytes(pane.id, bytes);
     });
 
     // Forward resize on container resize. Defer to rAF so we don't race
@@ -239,6 +253,7 @@ export function Terminal({ pane, tabId }: Props) {
       ro.disconnect();
       dragCancelled = true;
       dragUnlisten?.();
+      unregisterTerminal(pane.id);
       const sid = sessionIdRef.current;
       if (sid) ptyKill(sid).catch(() => {});
       term.dispose();

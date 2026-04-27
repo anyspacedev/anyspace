@@ -24,7 +24,8 @@ export type ShortcutAction =
   | "themeNext"
   | "togglePreview"
   | "jumpBlockPrev"
-  | "jumpBlockNext";
+  | "jumpBlockNext"
+  | "runSuperBrain";
 
 const handlers = new Map<ShortcutAction, () => void>();
 
@@ -46,6 +47,7 @@ export function attachGlobalShortcuts() {
     if (!mod) return;
     const k = e.key.toLowerCase();
     if (e.shiftKey && k === "d") return dispatch("splitPaneVertical"), e.preventDefault();
+    if (e.shiftKey && k === "b") return dispatch("runSuperBrain"), e.preventDefault();
     switch (k) {
       case "t": dispatch("newTab"); e.preventDefault(); break;
       case "w": dispatch("closeTab"); e.preventDefault(); break;

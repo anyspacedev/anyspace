@@ -3,6 +3,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { usePaneDragStore, type DropZone } from "../../stores/paneDragStore";
 import type { Pane, PaneKind } from "../../lib/types";
 import { Icon, type IconName } from "../ui/Icon";
+import { runSuperBrain } from "../../lib/superBrain";
 
 const KIND_LABELS: Record<PaneKind, string> = {
   terminal: "Terminal",
@@ -38,7 +39,16 @@ function detectDropZone(rect: DOMRect, clientX: number, clientY: number): DropZo
   return "bottom";
 }
 
-export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
+type HeaderProps = {
+  pane: Pane;
+  tabId: string;
+  // 1-based index of this pane in selectedPaneIds, or null when not selected.
+  selectionIndex?: number | null;
+  // Broadcast group size when this pane is the active driver; 0 means hide pill.
+  broadcastSize?: number;
+};
+
+export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: HeaderProps) {
   const setPaneKind = useWorkspaceStore((s) => s.setPaneKind);
   const splitPane = useWorkspaceStore((s) => s.splitPane);
   const closePane = useWorkspaceStore((s) => s.closePane);
@@ -156,7 +166,34 @@ export function PaneHeader({ pane, tabId }: { pane: Pane; tabId: string }) {
             ))}
         </div>
       )}
+      {selectionIndex != null && (
+        <span
+          className="pane-broadcast-badge"
+          title={`Broadcast member #${selectionIndex}`}
+          aria-label={`Broadcast member ${selectionIndex}`}
+        >
+          {selectionIndex}
+        </span>
+      )}
+      {broadcastSize >= 2 && (
+        <span
+          className="pane-broadcast-pill"
+          title="Keystrokes mirror to every selected pane. Press Esc to stop."
+        >
+          → {broadcastSize} panes
+        </span>
+      )}
       <div className="pane-actions">
+        {pane.kind === "terminal" && (
+          <button
+            className="icon-btn"
+            title="Super Brain — AI suggests next command (⌘⇧B)"
+            aria-label="Super Brain"
+            onClick={() => void runSuperBrain(tabId)}
+          >
+            <Icon name="sparkles" size={14} />
+          </button>
+        )}
         <button
           className="icon-btn"
           title="Split horizontal (⌘D)"

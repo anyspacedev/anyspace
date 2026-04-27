@@ -168,6 +168,9 @@ type WorkspaceState = {
   renameTab: (id: string, name: string) => void;
 
   setActivePane: (tabId: string, paneId: string) => void;
+  togglePaneSelection: (tabId: string, paneId: string) => void;
+  clearPaneSelection: (tabId: string) => void;
+  replacePaneSelection: (tabId: string, ids: string[]) => void;
   setPaneKind: (tabId: string, paneId: string, kind: PaneKind, payload?: Record<string, unknown>) => void;
   setPanePayload: (tabId: string, paneId: string, payload: Record<string, unknown>) => void;
   splitPane: (
@@ -299,6 +302,7 @@ function makeTab(name: string, template: number, presets: PanePreset[] = []): Ta
     layout,
     panes,
     activePaneId: ids[0],
+    selectedPaneIds: [],
   };
 }
 
@@ -325,6 +329,8 @@ function snapshot(state: WorkspaceState): Snapshot {
     panes: Object.fromEntries(
       Object.entries(t.panes).map(([id, p]) => [id, { ...p, payload: stripEphemeral(p.payload) }]),
     ),
+    // selection is ephemeral — never persist
+    selectedPaneIds: [],
   }));
   return { tabs, activeTabId: state.activeTabId };
 }
@@ -348,7 +354,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const snap = await settingsGet<Snapshot>(PERSIST_KEY);
       if (snap && snap.tabs && snap.tabs.length > 0) {
-        set({ tabs: snap.tabs, activeTabId: snap.activeTabId ?? snap.tabs[0].id, hydrated: true });
+        const tabs = snap.tabs.map((t) => ({ ...t, selectedPaneIds: [] }));
+        set({ tabs, activeTabId: snap.activeTabId ?? tabs[0].id, hydrated: true });
         return;
       }
     } catch {
@@ -385,6 +392,40 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setActivePane: (tabId, paneId) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, activePaneId: paneId } : t)),
+    })),
+
+  togglePaneSelection: (tabId, paneId) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.id !== tabId) return t;
+        const current = t.selectedPaneIds ?? [];
+        const has = current.includes(paneId);
+        let next: string[];
+        if (has) {
+          next = current.filter((id) => id !== paneId);
+          // A 1-element selection is a ghost: it can't broadcast (needs ≥2)
+          // but still draws a badge. Collapse to empty for clarity.
+          if (next.length < 2) next = [];
+        } else {
+          // Implicitly include the active pane so it remains a broadcast member
+          // once another pane is multi-selected. Both adds are guarded so the
+          // active-equals-clicked case doesn't double-push.
+          next = [...current];
+          if (t.activePaneId && !next.includes(t.activePaneId)) next.push(t.activePaneId);
+          if (!next.includes(paneId)) next.push(paneId);
+        }
+        return { ...t, selectedPaneIds: next, activePaneId: has ? t.activePaneId : paneId };
+      }),
+    })),
+
+  clearPaneSelection: (tabId) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, selectedPaneIds: [] } : t)),
+    })),
+
+  replacePaneSelection: (tabId, ids) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, selectedPaneIds: ids } : t)),
     })),
 
   setPaneKind: (tabId, paneId, kind, payload) =>
@@ -460,6 +501,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (t.id !== tabId) return t;
         const stripped = removeLeaf(t.layout, paneId);
         const { [paneId]: _, ...remaining } = t.panes;
+        const prunedSelection = (t.selectedPaneIds ?? []).filter((id) => id !== paneId);
         if (!stripped) {
           // Last pane closed: create a fresh one to keep the tab alive.
           const p = emptyPane("terminal");
@@ -468,6 +510,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             layout: leaf(p.id),
             panes: { [p.id]: p },
             activePaneId: p.id,
+            selectedPaneIds: [],
           };
         }
         const firstRemaining = Object.keys(remaining)[0];
@@ -476,6 +519,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           layout: stripped,
           panes: remaining,
           activePaneId: t.activePaneId === paneId ? firstRemaining : t.activePaneId,
+          selectedPaneIds: prunedSelection,
         };
       }),
     }));

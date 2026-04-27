@@ -6,6 +6,7 @@ import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
+import { runSuperBrain } from "./lib/superBrain";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
@@ -55,9 +56,27 @@ export default function App() {
       registerShortcut("switchTab8", () => switchToTabIndex(7)),
       registerShortcut("switchTab9", () => switchToTabIndex(8)),
       registerShortcut("themeNext", () => cycleTheme()),
+      registerShortcut("runSuperBrain", () => {
+        const id = useWorkspaceStore.getState().activeTabId;
+        if (id) void runSuperBrain(id);
+      }),
     ];
+    // Esc clears multi-pane selection. Use capture so we beat any per-component
+    // Esc handlers (modal close, picker cancel) — but only consume the event
+    // when a selection actually exists.
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const ws = useWorkspaceStore.getState();
+      const tab = ws.tabs.find((t) => t.id === ws.activeTabId);
+      if (!tab || !tab.selectedPaneIds || tab.selectedPaneIds.length === 0) return;
+      ws.clearPaneSelection(tab.id);
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onEsc, true);
     return () => {
       detach();
+      window.removeEventListener("keydown", onEsc, true);
       unregisters.forEach((u) => u());
     };
   }, [newTab, closeTab, switchToTabIndex, cycleTheme, activeTabId]);

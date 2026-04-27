@@ -7,25 +7,45 @@ import { PreviewPane } from "../preview/PreviewPane";
 import { FileBrowser } from "../sidebar/FileBrowser";
 import { PaneHeader } from "./PaneHeader";
 import { Icon, type IconName } from "../ui/Icon";
+import { modKey } from "../../lib/shortcuts";
 
 export function Pane({ pane, tabId }: { pane: PaneType; tabId: string }) {
   const setActivePane = useWorkspaceStore((s) => s.setActivePane);
-  const activePaneId = useWorkspaceStore((s) => {
-    const t = s.tabs.find((x) => x.id === tabId);
-    return t?.activePaneId;
-  });
+  const togglePaneSelection = useWorkspaceStore((s) => s.togglePaneSelection);
+  const clearPaneSelection = useWorkspaceStore((s) => s.clearPaneSelection);
+  const tab = useWorkspaceStore((s) => s.tabs.find((x) => x.id === tabId));
+  const activePaneId = tab?.activePaneId;
+  const selectedPaneIds = tab?.selectedPaneIds ?? [];
   const isActive = pane.id === activePaneId;
+  const selectionIndex = selectedPaneIds.indexOf(pane.id);
+  const isSelected = selectionIndex >= 0;
+  const broadcastSize = selectedPaneIds.length;
   const dropZone = usePaneDragStore((s) =>
     s.targetPaneId === pane.id ? s.zone : null,
   );
 
   return (
     <div
-      className={"pane" + (isActive ? " active" : "")}
+      className={
+        "pane" + (isActive ? " active" : "") + (isSelected ? " selected" : "")
+      }
       data-pane-id={pane.id}
-      onMouseDown={() => setActivePane(tabId, pane.id)}
+      onMouseDown={(e) => {
+        if (e[modKey]) {
+          e.preventDefault();
+          togglePaneSelection(tabId, pane.id);
+          return;
+        }
+        setActivePane(tabId, pane.id);
+        if (selectedPaneIds.length) clearPaneSelection(tabId);
+      }}
     >
-      <PaneHeader pane={pane} tabId={tabId} />
+      <PaneHeader
+        pane={pane}
+        tabId={tabId}
+        selectionIndex={isSelected ? selectionIndex + 1 : null}
+        broadcastSize={isActive && broadcastSize >= 2 ? broadcastSize : 0}
+      />
       <div className="pane-body">
         <PaneBody kind={pane.kind} pane={pane} tabId={tabId} />
       </div>
