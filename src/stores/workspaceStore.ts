@@ -362,16 +362,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (snap && snap.tabs && snap.tabs.length > 0) {
         const tabs = snap.tabs.map((t) => {
           // Migrate snapshots from before Tab.projectPath existed: the project
-          // folder used to live on each filebrowser pane's payload.root.
+          // folder used to live on individual panes (filebrowser.payload.root,
+          // terminal.payload.spawnCwd, preview.payload.projectPath). Lift the
+          // first match onto the tab so splits and Cmd+T inherit it.
           let projectPath = t.projectPath;
           if (!projectPath) {
             for (const p of Object.values(t.panes)) {
-              if (p.kind === "filebrowser") {
-                const r = (p.payload as Record<string, unknown> | undefined)?.root;
-                if (typeof r === "string" && r) {
-                  projectPath = r;
-                  break;
-                }
+              const payload = p.payload as Record<string, unknown> | undefined;
+              const candidate =
+                p.kind === "filebrowser" ? payload?.root :
+                p.kind === "terminal" ? payload?.spawnCwd :
+                p.kind === "preview" ? payload?.projectPath :
+                undefined;
+              if (typeof candidate === "string" && candidate) {
+                projectPath = candidate;
+                break;
               }
             }
           }
