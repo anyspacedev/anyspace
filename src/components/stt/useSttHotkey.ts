@@ -66,15 +66,6 @@ function hasForeignModifier(e: KeyboardEvent, allowed: ModFlag): boolean {
   return false;
 }
 
-// xterm and Monaco both use a focused <textarea>, so allow textarea — we want
-// dictation to work in those panes. Block plain inputs/selects so the hotkey
-// doesn't steal keys while typing in the Settings overlay or other dialogs.
-function isFormInput(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "SELECT";
-}
-
 export function useSttHotkey() {
   const heldRef = useRef(false);
   const pendingReleaseRef = useRef<number | null>(null);
@@ -131,7 +122,6 @@ export function useSttHotkey() {
     const onDown = (e: KeyboardEvent) => {
       if (e.code === hotkey) {
         if (hasForeignModifier(e, expectedMod)) return;
-        if (isFormInput(e.target)) return;
         // Autorepeat: a hotkey keydown arriving while a release is being
         // debounced means the key is actually held. Cancel the pending
         // release and stay in the listening state.

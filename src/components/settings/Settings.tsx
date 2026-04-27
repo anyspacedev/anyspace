@@ -366,7 +366,7 @@ function SttSettingsSection() {
         <div className="settings-section-title">Speech to text</div>
         <div className="settings-section-sub">
           Hold <kbd>{formatHotkey(settings.hotkey)}</kbd> to dictate. Transcribed
-          text is pasted into the focused terminal or editor pane.
+          text is pasted into the focused input, terminal, or editor.
         </div>
       </div>
 

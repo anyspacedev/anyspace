@@ -97,7 +97,67 @@ let tickTimer: number | undefined;
 let maxDurationTimer: number | undefined;
 let recordingStartedAt = 0;
 
+// xterm and Monaco both focus an internal <textarea>; pane-based dispatch
+// (ptyWrite / executeEdits) is the only correct path for those, so we filter
+// them out before treating a focused element as a generic DOM input.
+function isInsideTerminalOrEditor(el: Element): boolean {
+  return Boolean(
+    el.closest(".xterm") ||
+      el.closest(".xterm-helper-textarea") ||
+      el.closest(".monaco-editor"),
+  );
+}
+
+const NON_TEXT_INPUT_TYPES = new Set([
+  "checkbox",
+  "radio",
+  "button",
+  "submit",
+  "reset",
+  "file",
+  "color",
+  "range",
+  "image",
+  "hidden",
+]);
+
+function isWritableInput(
+  el: Element,
+): el is HTMLInputElement | HTMLTextAreaElement {
+  if (el instanceof HTMLTextAreaElement) {
+    return !el.readOnly && !el.disabled;
+  }
+  if (el instanceof HTMLInputElement) {
+    if (el.readOnly || el.disabled) return false;
+    if (NON_TEXT_INPUT_TYPES.has(el.type)) return false;
+    return true;
+  }
+  return false;
+}
+
+function labelForInput(el: HTMLInputElement | HTMLTextAreaElement): string {
+  const aria = el.getAttribute("aria-label");
+  if (aria && aria.trim()) return aria.trim();
+  if (el.placeholder && el.placeholder.trim()) return el.placeholder.trim();
+  if (el.name && el.name.trim()) return el.name.trim();
+  return el instanceof HTMLTextAreaElement ? "textarea" : "input";
+}
+
 function snapshotActiveTarget(): InjectTarget {
+  // Focused DOM element wins — covers Settings inputs, Kanban editors, etc.
+  // Only fall through to pane-based dispatch if the focus isn't on a writable
+  // text element outside xterm/Monaco's internals.
+  const active =
+    typeof document !== "undefined" ? document.activeElement : null;
+  if (active instanceof HTMLElement && !isInsideTerminalOrEditor(active)) {
+    if (isWritableInput(active)) {
+      return { kind: "dom-input", element: active, label: labelForInput(active) };
+    }
+    if (active.isContentEditable) {
+      return { kind: "dom-contenteditable", element: active, label: "editable" };
+    }
+  }
+
   const ws = useWorkspaceStore.getState();
   const tab = ws.tabs.find((t) => t.id === ws.activeTabId);
   if (!tab) return { kind: "none", label: "no workspace" };

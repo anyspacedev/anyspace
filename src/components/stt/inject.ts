@@ -1,4 +1,4 @@
-// Paste transcribed text into whichever pane was focused at hotkey-down.
+// Paste transcribed text into whichever pane (or focused input) was active at hotkey-down.
 
 import { ptyWrite } from "../../lib/tauri";
 import { getEditor } from "./editorRegistry";
@@ -6,6 +6,8 @@ import { getEditor } from "./editorRegistry";
 export type InjectTarget =
   | { kind: "terminal"; sessionId: string; label: string }
   | { kind: "editor"; paneId: string; label: string }
+  | { kind: "dom-input"; element: HTMLInputElement | HTMLTextAreaElement; label: string }
+  | { kind: "dom-contenteditable"; element: HTMLElement; label: string }
   | { kind: "none"; label: string };
 
 export type InjectResult = {
@@ -51,6 +53,62 @@ export async function inject(text: string, target: InjectTarget): Promise<Inject
     }
     ed.executeEdits("stt", [{ range: sel, text, forceMoveMarkers: true }]);
     return { ok: true, fallback: null, message: `Pasted to ${target.label}` };
+  }
+
+  if (target.kind === "dom-input") {
+    const el = target.element;
+    if (!document.contains(el)) {
+      return clipboardFallback(text, "input no longer attached");
+    }
+    try {
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? el.value.length;
+      el.setRangeText(text, start, end, "end");
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true, fallback: null, message: `Pasted to ${target.label}` };
+    } catch (e) {
+      console.error("[stt:inject] input write failed:", e);
+      return clipboardFallback(text, `input write failed: ${stringifyErr(e)}`);
+    }
+  }
+
+  if (target.kind === "dom-contenteditable") {
+    const el = target.element;
+    if (!document.contains(el)) {
+      return clipboardFallback(text, "editable no longer attached");
+    }
+    try {
+      // Refocus so execCommand / Selection acts on this element.
+      if (document.activeElement !== el) el.focus();
+      let inserted = false;
+      try {
+        inserted = document.execCommand("insertText", false, text);
+      } catch {
+        inserted = false;
+      }
+      if (!inserted) {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) {
+          return clipboardFallback(text, "no selection in editable");
+        }
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const node = document.createTextNode(text);
+        range.insertNode(node);
+        range.setStartAfter(node);
+        range.setEndAfter(node);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        el.dispatchEvent(
+          new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }),
+        );
+      }
+      return { ok: true, fallback: null, message: `Pasted to ${target.label}` };
+    } catch (e) {
+      console.error("[stt:inject] contenteditable write failed:", e);
+      return clipboardFallback(text, `editable write failed: ${stringifyErr(e)}`);
+    }
   }
 
   return clipboardFallback(text, "no text target focused");
