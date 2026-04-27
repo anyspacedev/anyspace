@@ -231,6 +231,10 @@ export function Terminal({ pane, tabId }: Props) {
         const node = containerRef.current;
         const sid = sessionIdRef.current;
         if (!node || !sid) return;
+        // Workspace view is kept laid out (opacity:0) when the user is on
+        // Tasks/Agents/Settings — skip drops so they don't land on a hidden
+        // terminal under the active view.
+        if (useWorkspaceStore.getState().selectedView !== "workspace") return;
         const rect = node.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         const x = event.payload.position.x / dpr;

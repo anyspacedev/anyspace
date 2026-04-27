@@ -89,7 +89,12 @@ export default function App() {
         <div className="app-content">
           <div
             className="view-workspace"
-            style={view === "workspace" ? undefined : { display: "none" }}
+            style={
+              view === "workspace"
+                ? undefined
+                : { opacity: 0, pointerEvents: "none" }
+            }
+            aria-hidden={view !== "workspace"}
           >
             <WorkspaceView />
           </div>
