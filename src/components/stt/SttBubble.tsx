@@ -217,14 +217,12 @@ export function SttBubble() {
       onPointerDown={onPointerDown}
     >
       {phase === "idle" && (
-        <>
-          <span className="stt-mic-idle" aria-hidden="true">
-            <Icon name="mic" size={14} />
-          </span>
-          <span className="stt-hint">
-            Hold <kbd className="stt-kbd">{displayHotkey(hotkey)}</kbd> to talk
-          </span>
-        </>
+        <span
+          className="stt-mic-idle"
+          aria-label={`Hold ${displayHotkey(hotkey)} to talk`}
+        >
+          <Icon name="mic" size={14} />
+        </span>
       )}
 
       {phase === "listening" && (

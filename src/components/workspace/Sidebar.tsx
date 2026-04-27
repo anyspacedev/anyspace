@@ -1,7 +1,22 @@
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useThemeStore } from "../../stores/themeStore";
+import { useSttStore } from "../../stores/sttStore";
 import { Icon, type IconName } from "../ui/Icon";
+
+function displayHotkey(code: string): string {
+  switch (code) {
+    case "ControlRight": return "Right Ctrl";
+    case "ControlLeft": return "Left Ctrl";
+    case "AltRight": return "Right Alt";
+    case "AltLeft": return "Left Alt";
+    case "MetaRight": return "Right ⌘";
+    case "MetaLeft": return "Left ⌘";
+    case "ShiftRight": return "Right Shift";
+    case "ShiftLeft": return "Left Shift";
+    default: return code;
+  }
+}
 
 const NAV_ITEMS: Array<{
   id: "workspace" | "kanban" | "agents" | "settings";
@@ -22,6 +37,7 @@ export function Sidebar() {
     s.tasks.filter((t) => t.column !== "complete").length,
   );
   const theme = useThemeStore((s) => s.current);
+  const sttHotkey = useSttStore((s) => s.settings.hotkey);
 
   return (
     <aside className="sidebar">
@@ -71,6 +87,9 @@ export function Sidebar() {
         </div>
         <div className="hint">
           <kbd>⌘D</kbd> split
+        </div>
+        <div className="hint">
+          Hold <kbd>{displayHotkey(sttHotkey)}</kbd> to talk
         </div>
       </div>
     </aside>
