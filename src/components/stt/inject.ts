@@ -1,10 +1,11 @@
 // Paste transcribed text into whichever pane (or focused input) was active at hotkey-down.
 
 import { ptyWrite } from "../../lib/tauri";
+import { broadcastBytes } from "../../lib/paneBroadcast";
 import { getEditor } from "./editorRegistry";
 
 export type InjectTarget =
-  | { kind: "terminal"; sessionId: string; label: string }
+  | { kind: "terminal"; sessionId: string; paneId: string; label: string }
   | { kind: "editor"; paneId: string; label: string }
   | { kind: "dom-input"; element: HTMLInputElement | HTMLTextAreaElement; label: string }
   | { kind: "dom-contenteditable"; element: HTMLElement; label: string }
@@ -32,7 +33,11 @@ export async function inject(text: string, target: InjectTarget): Promise<Inject
   if (target.kind === "terminal") {
     try {
       // Deliberately omit \n so we never auto-execute the command.
-      await ptyWrite(target.sessionId, new TextEncoder().encode(text));
+      const bytes = new TextEncoder().encode(text);
+      await ptyWrite(target.sessionId, bytes);
+      // Mirror to other selected panes so multi-pane broadcast applies to STT
+      // dictation, matching the keyboard onData fan-out in Terminal.tsx.
+      broadcastBytes(target.paneId, bytes);
       return { ok: true, fallback: null, message: `Pasted to ${target.label}` };
     } catch (e) {
       console.error("[stt:inject] terminal write failed session=%s:", target.sessionId, e);

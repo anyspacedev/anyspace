@@ -168,7 +168,7 @@ function snapshotActiveTarget(): InjectTarget {
   if (pane.kind === "terminal") {
     const sessionId = pane.payload?.sessionId as string | undefined;
     if (!sessionId) return { kind: "none", label: "terminal not ready" };
-    return { kind: "terminal", sessionId, label: "terminal" };
+    return { kind: "terminal", sessionId, paneId: pane.id, label: "terminal" };
   }
   if (pane.kind === "editor") {
     return { kind: "editor", paneId: pane.id, label: "editor" };
