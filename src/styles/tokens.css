@@ -16,6 +16,13 @@
   --danger-fg: #ffffff;
   --info: #5cc8ff;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  /* Elevation scale. --shadow is the mid tier (popovers, menus, toasts). The
+     small tier is for hover lifts on cards/rows; the large tier is for
+     prominent surfaces (preview device chrome, full-screen modals). Both are
+     overridden under [data-theme-kind="light"] in globals.css so light themes
+     don't get heavy dark-mode shadows. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.20), 0 4px 12px -6px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
 
   /* Radius scale */
   --radius-sm: 4px;

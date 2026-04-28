@@ -9,6 +9,7 @@ import {
 } from "../../lib/elementContext";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import { Icon } from "../ui/Icon";
+import { Select } from "../ui/Select";
 
 type Props = {
   capture: ElementCapture;
@@ -228,14 +229,14 @@ export function LaunchAgentDialog({ capture, tabId, paneId, defaultCwd, onClose 
             <Icon name="sparkles" size={12} />
             <span>Agent</span>
           </label>
-          <select id={agentSelectId} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+          <Select id={agentSelectId} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
             {agents.length === 0 && <option value="">— no agents configured —</option>}
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {!defaultCwd && (

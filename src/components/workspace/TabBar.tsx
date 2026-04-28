@@ -51,6 +51,7 @@ export function TabBar() {
           <div
             key={tab.id}
             className={"tab" + (tab.id === activeTabId ? " active" : "")}
+            aria-current={tab.id === activeTabId ? "page" : undefined}
             onClick={() => setActiveTab(tab.id)}
             onDoubleClick={() => setEditingId(tab.id)}
           >

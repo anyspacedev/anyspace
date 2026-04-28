@@ -56,6 +56,7 @@ export function EditorTabs({
             <button
               type="button"
               className="editor-tab-label"
+              aria-current={active ? "true" : undefined}
               onClick={() => onSwitch(f)}
             >
               <span className="editor-tab-name">{name}</span>

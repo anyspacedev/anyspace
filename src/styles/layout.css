@@ -15,6 +15,7 @@
   border-bottom: 1px solid var(--border);
   height: var(--titlebar-h);
   min-height: var(--titlebar-h);
+  user-select: none;
 }
 [data-platform="macos"] .app-titlebar {
   padding-left: 78px;
@@ -298,6 +299,7 @@
   font-size: var(--font-size-xs);
   color: var(--fg-muted);
   height: var(--statusbar-h);
+  user-select: none;
 }
 .status-left, .status-right {
   display: flex;
@@ -1030,6 +1032,7 @@
   background: var(--bg-elev);
   font-size: var(--font-size-xs);
   color: var(--fg-muted);
+  user-select: none;
 }
 .editor-status {
   color: var(--fg-dim);
@@ -1068,6 +1071,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
+  user-select: none;
 }
 .editor-tab {
   display: flex;
@@ -1244,6 +1248,7 @@
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
+  user-select: none;
 }
 .fb-root {
   display: inline-flex;
@@ -1294,6 +1299,7 @@
   cursor: grab;
   color: var(--fg-muted);
   border-radius: 0;
+  user-select: none;
 }
 .fb-row:hover { background: var(--bg-elev-2); color: var(--fg); }
 .fb-row.dir { color: var(--accent); }
@@ -1346,6 +1352,7 @@
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
   font-size: var(--font-size-xs);
+  user-select: none;
 }
 .url-input {
   flex: 1;
@@ -1404,7 +1411,7 @@
 .device {
   background: #000;
   border: 1px solid var(--border-strong);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   position: relative;
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -1643,6 +1650,14 @@
   background: var(--accent);
   border-color: color-mix(in oklab, var(--accent) 70%, white);
   filter: brightness(1.06);
+}
+/* On light themes, mixing accent with white washes the border out below the
+   button surface — flip the mix toward black so the edge stays defined. */
+[data-theme-kind="light"] .btn-primary {
+  border-color: color-mix(in oklab, var(--accent) 80%, black);
+}
+[data-theme-kind="light"] .btn-primary:hover {
+  border-color: color-mix(in oklab, var(--accent) 70%, black);
 }
 .btn-ghost {
   background: transparent;
@@ -1955,6 +1970,7 @@
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   letter-spacing: -0.01em;
+  user-select: none;
 }
 .kanban-col-title {
   display: inline-flex;
@@ -2010,7 +2026,7 @@
 .kanban-card:hover {
   border-color: var(--border-strong);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
 }
 .kanban-card.dragging { opacity: 0.5; cursor: grabbing; transform: none; }
 .kanban-card-title {
@@ -2076,7 +2092,7 @@
   z-index: 50;
   animation: kanban-toast-in var(--duration-base) var(--ease-spring);
 }
-.kanban-toast svg { color: var(--warning); }
+.kanban-toast svg { color: var(--danger); }
 @keyframes kanban-toast-in {
   from { opacity: 0; transform: translate(-50%, 8px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
@@ -2114,21 +2130,31 @@
   border-color: var(--border-strong);
 }
 .form-row textarea { resize: vertical; min-height: 80px; font-family: var(--font-mono); }
-.form-row select {
+.form-row .select-shell { display: block; }
+.form-row .select-shell > select { width: 100%; padding-right: 32px; }
+
+/* <Select> from components/ui/Select.tsx — wraps native <select> with a
+   theme-aware chevron via inline <Icon>. The chevron uses currentColor and
+   inherits --fg-muted regardless of theme; no per-theme SVG override needed. */
+.select-shell {
+  position: relative;
+  display: inline-block;
+}
+.select-shell > select {
   appearance: none;
   -webkit-appearance: none;
-  padding-right: 32px;
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 14px 14px;
-  /* Default chevron stroke: --fg-muted on the dark base theme. Per-theme-kind
-     override below keeps the chevron readable on light themes too. */
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a2b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
 }
-[data-theme-kind="light"] .form-row select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+.select-shell > select::-ms-expand { display: none; }
+.select-chevron {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--fg-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
 }
-.form-row select::-ms-expand { display: none; }
 .form-row-inline { display: flex; gap: var(--pad-sm); }
 .form-row-inline > input { flex: 1; }
 .form-row textarea[aria-invalid="true"],
@@ -2372,7 +2398,7 @@
 .theme-select-trigger.open {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
 }
 .theme-select-label {
   flex: 1;

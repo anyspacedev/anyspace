@@ -4,6 +4,7 @@ import { useKanbanStore } from "../../stores/kanbanStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import type { Task } from "../../lib/types";
 import { Icon } from "../ui/Icon";
+import { Select } from "../ui/Select";
 
 export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
   useFocusReturn();
@@ -94,12 +95,12 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
             <Icon name="sparkles" size={12} />
             <span>Agent</span>
           </label>
-          <select id={agentSelectId} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+          <Select id={agentSelectId} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
             <option value="">— none —</option>
             {agents.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
-          </select>
+          </Select>
         </div>
         <div className="form-row">
           <label className="label-with-icon" htmlFor={projectInputId}>

@@ -62,6 +62,7 @@ export function Sidebar() {
           <button
             key={item.id}
             className={"nav-item" + (view === item.id ? " active" : "")}
+            aria-current={view === item.id ? "page" : undefined}
             onClick={() => setView(item.id)}
           >
             <span className="nav-icon">
