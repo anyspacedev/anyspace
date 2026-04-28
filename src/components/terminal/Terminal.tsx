@@ -20,7 +20,6 @@ import { registerShortcut } from "../../lib/shortcuts";
 import { broadcastBytes } from "../../lib/paneBroadcast";
 import { registerTerminal, unregisterTerminal } from "./terminalRegistry";
 import { Icon } from "../ui/Icon";
-import { getDraggingPath, setDraggingPath } from "../../lib/screenshotDrag";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -185,41 +184,6 @@ export function Terminal({ pane, tabId }: Props) {
     const pasteHost = containerRef.current;
     pasteHost.addEventListener("paste", onPaste, true);
 
-    // In-app HTML5 drop target for ScreenshotStack thumbnails (and any other
-    // dragstart that puts a path in dataTransfer["text/plain"]). The OS-level
-    // drop dispatcher in App.tsx handles native file drags from the desktop;
-    // this path handles renderer-internal drags that never leave the WebView.
-    //
-    // setDraggingPath is the fallback channel — if some future WebView quirk
-    // strips dataTransfer between dragstart and drop, the source still
-    // populates a module-level ref that the receiver can read here.
-    const onDragOver = (e: DragEvent) => {
-      const types = e.dataTransfer?.types;
-      const hasText = types ? Array.from(types).includes("text/plain") : false;
-      if (!getDraggingPath() && !hasText) return;
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-      pasteHost.dataset.screenshotDropover = "true";
-    };
-    const onDragLeave = (e: DragEvent) => {
-      const next = e.relatedTarget as Node | null;
-      if (!next || !pasteHost.contains(next)) {
-        delete pasteHost.dataset.screenshotDropover;
-      }
-    };
-    const onDrop = (e: DragEvent) => {
-      delete pasteHost.dataset.screenshotDropover;
-      const path = getDraggingPath() || e.dataTransfer?.getData("text/plain") || "";
-      if (!path) return;
-      e.preventDefault();
-      e.stopPropagation();
-      dispatchPaths([path]);
-      setDraggingPath(null);
-    };
-    pasteHost.addEventListener("dragover", onDragOver);
-    pasteHost.addEventListener("dragleave", onDragLeave);
-    pasteHost.addEventListener("drop", onDrop);
-
     // WebKitGTK occasionally drops the mouseup that follows a click inside
     // xterm. When that happens, xterm's SelectionService keeps its
     // _dragScrollIntervalTimer running and every later mousemove — even
@@ -381,9 +345,6 @@ export function Terminal({ pane, tabId }: Props) {
       dataDisp.dispose();
       ro.disconnect();
       pasteHost.removeEventListener("paste", onPaste, true);
-      pasteHost.removeEventListener("dragover", onDragOver);
-      pasteHost.removeEventListener("dragleave", onDragLeave);
-      pasteHost.removeEventListener("drop", onDrop);
       document.removeEventListener("mousemove", onDocMouseMove, true);
       exitUnlisten?.();
       unregisterTerminal(pane.id);

@@ -32,6 +32,13 @@ export function dispatchDropToPane(paneId: string, paths: string[]): boolean {
   return true;
 }
 
+// Predicate used by the in-app drag (screenshot stack) to know whether a
+// pane should highlight as a drop target. Mirrors `dispatchDropToPane` but
+// without side effects.
+export function paneAcceptsDrop(paneId: string): boolean {
+  return entries.has(paneId);
+}
+
 export type TerminalContext = {
   command: string;
   output: string;

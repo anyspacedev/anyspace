@@ -3386,9 +3386,39 @@
   box-shadow: 0 0 0 2px var(--accent);
   opacity: 1;
 }
-.terminal-wrap[data-screenshot-dropover="true"] {
+/* Highlight the pane the cursor is over while dragging a screenshot
+ * thumbnail. Applies to any pane root with [data-pane-id]; the JS only
+ * sets the attribute on panes that registered a drop handler. */
+[data-pane-id][data-screenshot-dropover="true"] {
   outline: 2px dashed var(--accent);
   outline-offset: -4px;
+}
+
+/* Drag follower (the thumbnail clone that tracks the cursor while a
+ * pointer-driven drag is in progress). Sits on top of everything,
+ * eats no events. */
+.screenshot-drag-follower {
+  position: fixed;
+  width: 140px;
+  height: auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-strong);
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0.92;
+  transform: translate(-50%, -50%);
+  transition: none;
+}
+
+/* While dragging, neutralise iframes so pointermove keeps reaching the
+ * source thumb (pointer capture handles same-window dispatch but iframes
+ * still consume events on some platforms). */
+body.screenshot-dragging iframe {
+  pointer-events: none;
+}
+body.screenshot-dragging {
+  cursor: grabbing;
 }
 
 @keyframes screenshot-thumb-in {
