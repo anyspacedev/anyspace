@@ -115,11 +115,18 @@ function Notice({
 }
 
 function paneElementAt(x: number, y: number): HTMLElement | null {
-  // Same hit-test pattern App.tsx uses for OS file drops — iterate panes
-  // and check bounding rects directly. elementFromPoint can't be trusted
-  // here because command-block overlays sit on top of terminals (and an
-  // iframe under the cursor would return the iframe element itself).
-  for (const el of document.querySelectorAll<HTMLElement>("[data-pane-id]")) {
+  // Iterate panes and hit-test bounding rects. elementFromPoint can't be
+  // trusted here because command-block overlays sit on top of terminals
+  // (and an iframe under the cursor would return the iframe itself).
+  //
+  // Scope to the active tab — WorkspaceView renders every tab's PaneGrid
+  // simultaneously to preserve PTY/Monaco/iframe state across tab switches,
+  // so [data-pane-id] elements from inactive tabs sit at the same screen
+  // coordinates as the active ones. Without this scope, the first tab's
+  // panes always win.
+  const activeTab = document.querySelector<HTMLElement>(".workspace-tab.active");
+  const root: ParentNode = activeTab ?? document;
+  for (const el of root.querySelectorAll<HTMLElement>("[data-pane-id]")) {
     const r = el.getBoundingClientRect();
     if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return el;
   }
