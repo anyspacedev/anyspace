@@ -149,7 +149,7 @@ pub async fn stt_transcribe(
         eprintln!("[stt_transcribe] parse json failed: {e} (body: {body})");
         format!("parse json: {e} ({body})")
     })?;
-    let text = v
+    let raw_text = v
         .get("text")
         .and_then(|t| t.as_str())
         .map(|s| s.trim().to_string())
@@ -157,9 +157,98 @@ pub async fn stt_transcribe(
             eprintln!("[stt_transcribe] response missing 'text' provider={provider_tag}: {body}");
             format!("response missing 'text': {body}")
         })?;
+    // ElevenLabs Scribe inlines non-speech audio events as bracketed/parenthesized
+    // tags (e.g. `[tapping]`, `(Background noise and people speaking)`) inside the
+    // transcript. They're noise once the text is being injected into a terminal /
+    // editor, so drop them here before returning.
+    let text = if is_elevenlabs {
+        strip_bracketed_annotations(&raw_text)
+    } else {
+        raw_text
+    };
     eprintln!(
         "[stt_transcribe] ok provider={provider_tag} chars={} elapsed={elapsed:?}",
         text.chars().count()
     );
     Ok(text)
+}
+
+fn strip_bracketed_annotations(text: &str) -> String {
+    let mut stripped = String::with_capacity(text.len());
+    let mut bracket_depth: u32 = 0;
+    let mut paren_depth: u32 = 0;
+    for ch in text.chars() {
+        match ch {
+            '[' => bracket_depth += 1,
+            ']' if bracket_depth > 0 => bracket_depth -= 1,
+            '(' => paren_depth += 1,
+            ')' if paren_depth > 0 => paren_depth -= 1,
+            _ if bracket_depth == 0 && paren_depth == 0 => stripped.push(ch),
+            _ => {}
+        }
+    }
+    let mut out = String::with_capacity(stripped.len());
+    let mut prev_space = true;
+    for ch in stripped.chars() {
+        if ch.is_whitespace() {
+            if !prev_space {
+                out.push(' ');
+                prev_space = true;
+            }
+        } else {
+            out.push(ch);
+            prev_space = false;
+        }
+    }
+    while out.ends_with(' ') {
+        out.pop();
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_bracketed_annotations;
+
+    #[test]
+    fn strips_bracketed_audio_events() {
+        assert_eq!(
+            strip_bracketed_annotations("Hello [tapping] world"),
+            "Hello world"
+        );
+    }
+
+    #[test]
+    fn strips_parenthesized_audio_events() {
+        assert_eq!(
+            strip_bracketed_annotations("Hello (Background noise and people speaking) world"),
+            "Hello world"
+        );
+    }
+
+    #[test]
+    fn strips_mixed_and_collapses_whitespace() {
+        assert_eq!(
+            strip_bracketed_annotations("[music]  Let's begin (laughter), shall we?  [end]"),
+            "Let's begin , shall we?"
+        );
+    }
+
+    #[test]
+    fn leaves_plain_text_untouched() {
+        assert_eq!(
+            strip_bracketed_annotations("Just a normal sentence."),
+            "Just a normal sentence."
+        );
+    }
+
+    #[test]
+    fn handles_unmatched_brackets_gracefully() {
+        // Unmatched openers swallow the rest of the string — that's fine for
+        // ASR output, where stray openers are themselves noise.
+        assert_eq!(
+            strip_bracketed_annotations("Hello [unclosed annotation"),
+            "Hello"
+        );
+    }
 }
