@@ -151,30 +151,28 @@ export default function App() {
 
   return (
     <div className="app-root">
+      <Sidebar />
       <header className="app-titlebar" data-tauri-drag-region="deep">
         <TabBar />
       </header>
-      <div className="app-body">
-        <Sidebar />
-        <div className="app-main">
-          <div className="app-content">
-            <div
-              className="view-workspace"
-              style={
-                view === "workspace"
-                  ? undefined
-                  : { opacity: 0, pointerEvents: "none" }
-              }
-              aria-hidden={view !== "workspace"}
-            >
-              <WorkspaceView />
-            </div>
-            {view === "kanban" && <KanbanBoard />}
-            {view === "agents" && <AgentManager />}
-            {view === "settings" && <Settings />}
+      <div className="app-main">
+        <div className="app-content">
+          <div
+            className="view-workspace"
+            style={
+              view === "workspace"
+                ? undefined
+                : { opacity: 0, pointerEvents: "none" }
+            }
+            aria-hidden={view !== "workspace"}
+          >
+            <WorkspaceView />
           </div>
-          <StatusBar />
+          {view === "kanban" && <KanbanBoard />}
+          {view === "agents" && <AgentManager />}
+          {view === "settings" && <Settings />}
         </div>
+        <StatusBar />
       </div>
       <TemplatePicker />
       <QuickOpen />

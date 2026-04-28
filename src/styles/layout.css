@@ -2,34 +2,31 @@
 
 .app-root {
   display: grid;
-  grid-template-rows: var(--titlebar-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "sidebar titlebar"
+    "sidebar main";
   height: 100vh;
   background: var(--bg);
   color: var(--fg);
 }
 
 .app-titlebar {
+  grid-area: titlebar;
   display: flex;
   align-items: stretch;
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
-  height: var(--titlebar-h);
   min-height: var(--titlebar-h);
   user-select: none;
 }
 [data-platform="macos"] .app-titlebar {
-  padding-left: 78px;
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--fg) 4%, transparent);
 }
 
-.app-body {
-  display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
-  min-width: 0;
-  min-height: 0;
-}
-
 .app-main {
+  grid-area: main;
   display: grid;
   grid-template-rows: 1fr var(--statusbar-h);
   min-width: 0;
@@ -45,11 +42,13 @@
 /* ===== Sidebar ===== */
 
 .sidebar {
+  grid-area: sidebar;
   background: var(--bg-elev);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   user-select: none;
+  min-height: 0;
 }
 
 .sidebar-brand {
@@ -58,6 +57,9 @@
   gap: var(--pad-md);
   padding: var(--pad-md);
   border-bottom: 1px solid var(--border);
+}
+[data-platform="macos"] .sidebar-brand {
+  padding-top: calc(var(--pad-md) + 18px);
 }
 .brand-mark {
   width: 30px;
