@@ -27,6 +27,16 @@ use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
 use tokio::time::{sleep, timeout};
 
+/// Grace period to let `adb shell` close its stdio pipe naturally after the
+/// device-side server exits. We avoid killing the host adb client up-front
+/// because that races with the pipe flush — past attempts showed empty
+/// captures despite scrcpy actually printing a stack trace.
+const FAILURE_GRACE: Duration = Duration::from_millis(800);
+
+/// Hard ceiling on output collection. If the host adb client is somehow stuck,
+/// we kill it and take whatever's already buffered.
+const FAILURE_LOG_TIMEOUT: Duration = Duration::from_secs(3);
+
 const SERVER_REMOTE_PATH: &str = "/data/local/tmp/scrcpy-server.jar";
 
 /// Common locations the scrcpy package installs its server JAR. Order is
@@ -90,9 +100,14 @@ async fn detect_version() -> Result<String> {
 }
 
 fn generate_scid() -> String {
-    // 8 hex chars / 32 bits — scrcpy parses this as a hex integer to namespace
-    // the abstract socket so multiple sessions don't collide.
-    let n: u32 = rand::random();
+    // 8 hex chars / 31 bits. The server parses scid via Java's
+    // `Integer.parseInt(value, 16)`, which only accepts values in the *signed*
+    // int range — anything with the high bit set (>= 0x80000000) throws
+    // NumberFormatException, the server exits before disableSystemStreams(),
+    // and the socket closes with the dummy byte never written. Result: roughly
+    // half of all connections would fail with "early eof". Masking the top bit
+    // matches scrcpy's own client (random 31-bit non-negative).
+    let n: u32 = rand::random::<u32>() & 0x7FFF_FFFF;
     format!("{n:08x}")
 }
 
@@ -111,6 +126,77 @@ async fn run_adb(adb: &Path, serial: &str, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+/// Collects whatever the scrcpy server printed before dying. We give the
+/// adb-shell tunnel a grace period to close on its own (the device-side
+/// process has typically already exited by the time we get here) so the pipe
+/// drains; only kill if it's still alive past the grace. As a last-resort
+/// fallback, also dump the last few logcat lines tagged `scrcpy:*` — the
+/// server's `Ln.*` writes to both stdout/stderr *and* logcat.
+async fn capture_failure_logs(adb: &Path, serial: &str, mut child: Child) -> String {
+    sleep(FAILURE_GRACE).await;
+    if matches!(child.try_wait(), Ok(None)) {
+        let _ = child.start_kill();
+    }
+    let output = match timeout(FAILURE_LOG_TIMEOUT, child.wait_with_output()).await {
+        Ok(Ok(out)) => Some(out),
+        _ => None,
+    };
+    let mut sections: Vec<String> = Vec::new();
+    if let Some(out) = output {
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !stderr.is_empty() {
+            sections.push(format!("scrcpy server stderr:\n{stderr}"));
+        }
+        if !stdout.is_empty() {
+            sections.push(format!("scrcpy server stdout:\n{stdout}"));
+        }
+    }
+    if let Some(lc) = recent_scrcpy_logcat(adb, serial).await {
+        sections.push(format!("device logcat (scrcpy + AndroidRuntime):\n{lc}"));
+    }
+    if sections.is_empty() {
+        "(no output captured from scrcpy server or logcat)".into()
+    } else {
+        sections.join("\n\n")
+    }
+}
+
+/// Pulls the tail of `adb logcat` filtered to scrcpy's tag plus AndroidRuntime
+/// errors (which catch unhandled exceptions from `app_process`). `-d` makes
+/// logcat dump-and-exit; `-t 80` limits to the last ~80 lines. Returns None
+/// when logcat fails or contains nothing useful.
+async fn recent_scrcpy_logcat(adb: &Path, serial: &str) -> Option<String> {
+    let res = timeout(
+        Duration::from_secs(2),
+        Command::new(adb)
+            .args([
+                "-s",
+                serial,
+                "logcat",
+                "-d",
+                "-t",
+                "80",
+                "scrcpy:V",
+                "AndroidRuntime:E",
+                "*:S",
+            ])
+            .output(),
+    )
+    .await
+    .ok()?
+    .ok()?;
+    if !res.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&res.stdout).trim().to_string();
+    if text.is_empty() || text.contains("--------- beginning of") && text.lines().count() <= 2 {
+        None
+    } else {
+        Some(text)
+    }
+}
+
 async fn connect_with_retry(port: u16, deadline: Duration) -> Result<TcpStream> {
     let start = std::time::Instant::now();
     let mut last_err: Option<std::io::Error> = None;
@@ -127,6 +213,44 @@ async fn connect_with_retry(port: u16, deadline: Duration) -> Result<TcpStream> 
         "scrcpy server didn't accept on local port {port} within {deadline:?}: {:?}",
         last_err
     ))
+}
+
+/// Connect to the adb-forwarded port and read the dummy handshake byte,
+/// retrying the whole sequence on early-EOF. With tunnel_forward=true there
+/// is a window where our local TCP connect succeeds (the host adb listener
+/// is always up after `adb forward`) but adbd has nothing to bridge it to,
+/// because the server hasn't run `new LocalServerSocket(name)` yet — adbd
+/// closes the stream and we read 0 bytes. Just connecting again later fixes
+/// it. We use a short per-attempt read timeout so the loop pivots quickly.
+async fn connect_and_handshake(port: u16, deadline: Duration) -> Result<TcpStream> {
+    let start = std::time::Instant::now();
+    let mut last_err = anyhow!("no attempts made");
+    while start.elapsed() < deadline {
+        let mut stream = match TcpStream::connect(("127.0.0.1", port)).await {
+            Ok(s) => s,
+            Err(e) => {
+                last_err = anyhow!("TCP connect to 127.0.0.1:{port} failed: {e}");
+                sleep(Duration::from_millis(80)).await;
+                continue;
+            }
+        };
+        let mut dummy = [0u8; 1];
+        match timeout(Duration::from_millis(400), stream.read_exact(&mut dummy)).await {
+            Ok(Ok(_)) => return Ok(stream),
+            Ok(Err(e)) => {
+                last_err =
+                    anyhow!("server abstract socket not yet ready (early eof on dummy: {e})");
+            }
+            Err(_) => {
+                last_err = anyhow!("server didn't send handshake byte within 400ms");
+            }
+        }
+        drop(stream);
+        sleep(Duration::from_millis(120)).await;
+    }
+    Err(last_err.context(format!(
+        "scrcpy server never completed handshake within {deadline:?}"
+    )))
 }
 
 pub async fn spawn(opts: ScrcpyOpts) -> Result<ScrcpyHandle> {
@@ -178,7 +302,7 @@ pub async fn spawn(opts: ScrcpyOpts) -> Result<ScrcpyHandle> {
     // string — the server compares it to its own constant and exits if it
     // doesn't match.
     let server_args = build_server_args(&version, &scid, &opts);
-    let mut child = Command::new(&opts.adb)
+    let child = Command::new(&opts.adb)
         .args(["-s", &opts.serial, "shell"])
         .arg(format!("CLASSPATH={SERVER_REMOTE_PATH}"))
         .arg("app_process")
@@ -192,36 +316,33 @@ pub async fn spawn(opts: ScrcpyOpts) -> Result<ScrcpyHandle> {
         .spawn()
         .context("spawning adb shell scrcpy")?;
 
-    // 5. Connect to the forwarded port. The server takes a moment to start —
-    // retry until it accepts (capped at 5s).
-    let mut video = match connect_with_retry(local_port, Duration::from_secs(5)).await {
+    // 5+6. Connect and read the dummy handshake byte in a single retry loop.
+    // The server writes one byte on the FIRST accepted socket (video) so we
+    // can confirm the tunnel before blocking on real frames. The retry inside
+    // `connect_and_handshake` handles the inherent race of tunnel_forward=true
+    // (host adb listener accepts before the device-side abstract socket is
+    // bound).
+    let video = match connect_and_handshake(local_port, Duration::from_secs(8)).await {
         Ok(s) => s,
         Err(e) => {
-            // Best-effort cleanup if the server never came up.
+            let logs = capture_failure_logs(&opts.adb, &opts.serial, child).await;
             let _ = run_adb(&opts.adb, &opts.serial, &["forward", "--remove", &local_spec]).await;
-            let _ = child.start_kill();
-            return Err(e);
+            return Err(e.context(format!(
+                "scrcpy {version} server (JAR at {})",
+                server_path.display()
+            ))
+            .context(logs));
         }
     };
-
-    // 6. Skip the dummy handshake byte. With send_dummy_byte=true, the server
-    // writes one byte on the FIRST accepted socket (video) so we can confirm
-    // the tunnel succeeded before we start blocking on real frames. The
-    // control socket has no dummy byte.
-    let mut dummy = [0u8; 1];
-    timeout(Duration::from_secs(3), video.read_exact(&mut dummy))
-        .await
-        .context("waiting for scrcpy dummy byte (server may have failed to start)")?
-        .context("reading scrcpy dummy byte")?;
 
     // 7. Second connection: control socket. The server accepts in declaration
     // order — video, then (optional audio), then control.
     let control = match connect_with_retry(local_port, Duration::from_secs(3)).await {
         Ok(s) => s,
         Err(e) => {
+            let logs = capture_failure_logs(&opts.adb, &opts.serial, child).await;
             let _ = run_adb(&opts.adb, &opts.serial, &["forward", "--remove", &local_spec]).await;
-            let _ = child.start_kill();
-            return Err(e.context("connecting to scrcpy control socket"));
+            return Err(e.context("connecting to scrcpy control socket").context(logs));
         }
     };
 
