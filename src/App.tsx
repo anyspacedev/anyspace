@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "./stores/themeStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useKanbanStore } from "./stores/kanbanStore";
@@ -102,6 +103,18 @@ export default function App() {
       cancelled = true;
       unlisten?.();
     };
+  }, []);
+
+  // Tauri's data-tauri-drag-region handles drag, but not double-click maximize.
+  // Wire it manually so the titlebar/brand behave like a native title bar.
+  useEffect(() => {
+    const onDblClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest("[data-tauri-drag-region]")) return;
+      void getCurrentWindow().toggleMaximize().catch(() => {/* noop */});
+    };
+    window.addEventListener("dblclick", onDblClick);
+    return () => window.removeEventListener("dblclick", onDblClick);
   }, []);
 
   useEffect(() => {

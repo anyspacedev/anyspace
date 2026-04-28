@@ -41,7 +41,7 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
+      <div className="sidebar-brand" data-tauri-drag-region="deep">
         <div
           className="brand-mark"
           style={{
