@@ -173,4 +173,19 @@ export async function clipboardSaveBlob(bytes: Uint8Array, ext: string): Promise
   return rawInvoke<string>("clipboard_save_blob", { bytes: Array.from(bytes), ext });
 }
 
+export type ScreenshotResult = { path: string; dataUrl: string };
+
+export async function screenshotCaptureRegion(args: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}): Promise<ScreenshotResult> {
+  return rawInvoke<ScreenshotResult>("screenshot_capture_region", args);
+}
+
+export async function screenshotSavePngBytes(bytes: Uint8Array): Promise<string> {
+  return rawInvoke<string>("screenshot_save_png_bytes", { bytes: Array.from(bytes) });
+}
+
 export { Channel };

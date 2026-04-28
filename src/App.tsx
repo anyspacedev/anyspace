@@ -19,6 +19,7 @@ import { StatusBar } from "./components/workspace/StatusBar";
 import { TemplatePicker } from "./components/workspace/TemplatePicker";
 import { QuickOpen } from "./components/sidebar/QuickOpen";
 import { SttBubble } from "./components/stt/SttBubble";
+import { ScreenshotStack } from "./components/screenshot/ScreenshotStack";
 
 export default function App() {
   const loadTheme = useThemeStore((s) => s.load);
@@ -178,6 +179,7 @@ export default function App() {
       <TemplatePicker />
       <QuickOpen />
       <SttBubble />
+      <ScreenshotStack />
     </div>
   );
 }

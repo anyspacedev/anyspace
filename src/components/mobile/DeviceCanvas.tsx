@@ -11,6 +11,7 @@ import {
 } from "../../lib/mobile";
 import { AnnexbDeframer, isKeyAU } from "../../lib/h264";
 import { Icon } from "../ui/Icon";
+import { captureMobileCanvas } from "../screenshot/captureMobile";
 
 // View + control DeviceCanvas. Owns:
 //
@@ -327,6 +328,17 @@ export function DeviceCanvas({ pane, tabId }: { pane: PaneType; tabId: string })
             onClick={() => sendInput({ kind: "appSwitch" })}
           >
             <Icon name="square-dashed" size={14} />
+          </button>
+          <button
+            className="icon-btn"
+            title="Screenshot device"
+            aria-label="Screenshot device"
+            disabled={inputDisabled}
+            onClick={() => {
+              if (canvasRef.current) void captureMobileCanvas(canvasRef.current);
+            }}
+          >
+            <Icon name="camera" size={14} />
           </button>
         </div>
         <button

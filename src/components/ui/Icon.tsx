@@ -34,7 +34,8 @@ export type IconName =
   | "mic"
   | "clipboard"
   | "crosshair"
-  | "smartphone";
+  | "smartphone"
+  | "camera";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -227,6 +228,12 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <rect x="6" y="3" width="12" height="18" rx="2" />
       <path d="M11 18h2" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
+      <circle cx="12" cy="13" r="3.5" />
     </>
   ),
 };

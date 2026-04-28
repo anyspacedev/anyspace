@@ -28,6 +28,7 @@ export function PreviewToolbar({
   loadedAt,
   pickerActive,
   onTogglePicker,
+  onScreenshot,
 }: {
   url: string;
   device: Device;
@@ -44,6 +45,7 @@ export function PreviewToolbar({
   loadedAt: number | null;
   pickerActive: boolean;
   onTogglePicker: () => void;
+  onScreenshot: () => void;
 }) {
   const [draft, setDraft] = useState(url);
   useEffect(() => setDraft(url), [url]);
@@ -61,6 +63,14 @@ export function PreviewToolbar({
         onClick={onTogglePicker}
       >
         <Icon name="crosshair" size={14} />
+      </button>
+      <button
+        className="icon-btn"
+        title="Screenshot preview"
+        aria-label="Screenshot preview"
+        onClick={onScreenshot}
+      >
+        <Icon name="camera" size={14} />
       </button>
       <div className={`url-input-wrap status-${loadStatus}`}>
         <span className="url-status-dot" aria-hidden />

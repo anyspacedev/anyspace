@@ -17,6 +17,7 @@ import { DeviceFrame } from "./DeviceFrame";
 import { Icon } from "../ui/Icon";
 import { LaunchAgentDialog } from "./LaunchAgentDialog";
 import type { ElementCapture, PickerMessage } from "../../lib/elementContext";
+import { capturePreviewIframe } from "../screenshot/capturePreview";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -213,6 +214,11 @@ export function PreviewPane({ pane, tabId }: Props) {
     setPickerActive((v) => !v);
   };
 
+  const onScreenshot = () => {
+    if (!iframeRef.current) return;
+    void capturePreviewIframe(iframeRef.current);
+  };
+
   if (!url) {
     return (
       <div className="preview-empty">
@@ -276,6 +282,7 @@ export function PreviewPane({ pane, tabId }: Props) {
         loadedAt={load.kind === "loaded" ? load.at : null}
         pickerActive={pickerActive}
         onTogglePicker={togglePicker}
+        onScreenshot={onScreenshot}
       />
       <div className="preview-stage scrollbar">
         <DeviceFrame device={device} zoom={zoom}>

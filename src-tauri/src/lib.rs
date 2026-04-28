@@ -10,6 +10,7 @@ mod mobile;
 mod net;
 mod preview;
 mod pty;
+mod screenshot;
 mod settings;
 mod shell_integration;
 mod stt;
@@ -125,6 +126,9 @@ pub fn run() {
             ai::commands::ai_chat,
             // Clipboard
             clipboard::commands::clipboard_save_blob,
+            // Screenshot (preview / mobile capture, terminal drop attach)
+            screenshot::commands::screenshot_capture_region,
+            screenshot::commands::screenshot_save_png_bytes,
             // Mobile (Android / iOS pane)
             mobile::commands::mobile_list_devices,
             mobile::commands::mobile_connect,
