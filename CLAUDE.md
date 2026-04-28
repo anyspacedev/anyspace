@@ -120,11 +120,13 @@ The `tasks` table column is `column_name`, not `column`. SQLite tolerates `colum
 
 Migrations live in `src-tauri/migrations/*.sql` and are registered in `src-tauri/src/kanban/db.rs` via `MigrationKind::Up`. They run automatically on `Database.load("sqlite:teamship.db")`.
 
+**Migrations are immutable once shipped.** `tauri-plugin-sql` records each migration's checksum; editing an applied SQL file makes the DB refuse to load on next launch. Always add a new numbered migration (`004_*.sql`, `005_*.sql`, …) instead of mutating an existing one.
+
 ### Theme system
 
 A `Theme` (`src/themes/definitions.ts`) bundles three palettes: UI tokens (CSS vars), a full xterm.js `ITheme`, and via `monacoThemeFor()` a Monaco theme derived from those tokens. `applyTheme()` writes CSS custom properties to `:root` and stamps `data-theme` / `data-theme-kind`. `Terminal.tsx` and `Editor.tsx` both subscribe to `useThemeStore` and re-apply on change — themes hot-swap without restart.
 
-Adding a theme = one entry in `definitions.ts`. The 5 shipping themes (Void, Dracula, Synthwave, Paper, Solar) are foundational; the spec calls for 25+, all data-only.
+Adding a theme = one entry in `definitions.ts` — purely data, no code change. The five "foundational" themes (Void, Dracula, Synthwave, Paper, Solar) are listed first; the rest follow in the same array.
 
 ### Live preview
 
@@ -143,7 +145,30 @@ The script also re-runs on every iframe `load`, so `PreviewPane.onIframeLoad` re
 
 ### Frontend state
 
-Zustand stores in `src/stores/` — `themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`, `aiStore`, `proxyStore` (plus the in-memory-only `paneDragStore`). None are global singletons that auto-load — `App.tsx`'s mount effect explicitly calls each one's `load()`/`hydrate()`. Forgetting to await before reading is a common pitfall (the stores expose `loaded: boolean`).
+Zustand stores in `src/stores/` — `themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`, `aiStore`, `proxyStore`, `screenshotStore` (plus the in-memory-only `paneDragStore`). The persisted ones are not auto-loaded — `App.tsx`'s mount effect explicitly calls each one's `load()`/`hydrate()`. Forgetting to await before reading is a common pitfall (the stores expose `loaded: boolean`). `aiStore.load()` deliberately awaits `useSttStore.load()` first to seed its API key on first run; preserve that ordering.
+
+### App shell layout
+
+`App.tsx`'s root is a 2×2 CSS grid (`grid-template-areas: "sidebar titlebar" / "sidebar main"`): the sidebar spans both rows on the left, the tabbar (`app-titlebar`) sits in the top-right cell, and `app-main` (workspace content + status bar) fills the bottom-right cell. There is no `app-body` wrapper — sidebar, titlebar, and main are all direct children of `app-root`. Don't reintroduce a wrapper; it breaks the grid placement.
+
+Drag regions are marked with `data-tauri-drag-region="deep"` (currently on `app-titlebar` and `sidebar-brand`). Tauri only handles drag, not double-click maximize — `App.tsx` wires a delegated `dblclick` listener that calls `getCurrentWindow().toggleMaximize()` when the click target sits inside any drag region. Adding a new drag region inherits this for free; removing the listener breaks native title-bar feel.
+
+On macOS (`titleBarStyle: "Overlay"`, `hiddenTitle: true`), the traffic lights overlay the top-left corner of the sidebar — `[data-platform="macos"] .sidebar-brand` adds top padding to clear them. Don't add `padding-left: 78px` to the titlebar anymore; that was for the old full-width titlebar layout.
+
+### Terminal broadcast & Super Brain
+
+Multi-pane selection (`tab.selectedPaneIds`) drives two cooperating flows that both write to terminal PTYs:
+
+- `src/lib/paneBroadcast.ts` — `broadcastBytes(originPaneId, bytes)` mirrors every keystroke from the active terminal to the other selected terminals in the same tab. Single-pane sessions short-circuit early so the registered `onData` wrapper is free when broadcast is off. STT dictation also fans out through this path.
+- `src/lib/superBrain.ts` — for each selected terminal, captures the latest OSC-133 command + output via `getTerminalContext()` (`terminalRegistry`), asks the AI for the next command, and writes the suggestion into the PTY **without a trailing newline**. The user reviews, then a single Enter is broadcast across all selected panes so each runs its tailored draft in parallel. Never auto-execute on the AI's behalf — the no-newline rule and the `sanitize()` stripping of fences/leading `$` exist precisely to prevent prompt-injection from running arbitrary commands.
+
+Both rely on `terminalRegistry`'s per-pane handles. Anything that needs to read terminal context or write into a specific PTY by `paneId` should go through that registry, not by walking the DOM.
+
+### Screenshot stack & mobile pane
+
+`src/components/screenshot/` plus `screenshotStore` implement a clipboard-like stack of captured frames (preview iframe via `capturePreview.ts`, mobile pane via `captureMobile.ts`) that the user drags onto a terminal pane to attach as input. The drop hit-test runs in `App.tsx`'s `onDragDropEvent` — it iterates `[data-pane-id]` rects directly because `elementFromPoint` gets confused by `.pane-drop-hint` and command-block overlays. The drag itself uses native pointer events (not HTML5 drag), same reasoning as pane-header drag.
+
+The mobile pane (`src-tauri/src/mobile/`, `src/lib/mobile.ts`) is **stage-1 skeleton** — `mobile_connect` and friends return "not implemented" until the scrcpy launcher (Android) and ScreenCaptureKit helper (iOS) land. The TS contract is locked so the React side can be wired against a stable shape; adding new mobile commands should match this skeleton-first pattern (Rust returns a typed error, TS wrapper is real).
 
 ### Build artifacts
 
