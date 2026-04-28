@@ -321,7 +321,13 @@ type Snapshot = { tabs: Tab[]; activeTabId: string | null };
 
 // Strip ephemeral session refs from payload before persisting — old session IDs
 // are stale across launches and would confuse the terminal pane.
-const EPHEMERAL_KEYS = new Set(["sessionId", "pendingCommand", "pickerActive"]);
+const EPHEMERAL_KEYS = new Set([
+  "sessionId",
+  "pendingCommand",
+  "pickerActive",
+  "connectionId",
+  "logsChannelId",
+]);
 function stripEphemeral(payload: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!payload) return {};
   const out: Record<string, unknown> = {};

@@ -6,6 +6,7 @@ mod clipboard;
 mod fs_ops;
 mod git;
 mod kanban;
+mod mobile;
 mod net;
 mod preview;
 mod pty;
@@ -96,6 +97,7 @@ pub fn run() {
         )
         .manage(pty::PtyManager::new())
         .manage(preview::PreviewManager::new())
+        .manage(mobile::MobileManager::new())
         .invoke_handler(tauri::generate_handler![
             // PTY
             pty::commands::pty_spawn,
@@ -123,6 +125,13 @@ pub fn run() {
             ai::commands::ai_chat,
             // Clipboard
             clipboard::commands::clipboard_save_blob,
+            // Mobile (Android / iOS pane)
+            mobile::commands::mobile_list_devices,
+            mobile::commands::mobile_connect,
+            mobile::commands::mobile_disconnect,
+            mobile::commands::mobile_input,
+            mobile::commands::mobile_logs_start,
+            mobile::commands::mobile_logs_stop,
             // Workspace persistence
             workspace::commands::workspace_save,
             workspace::commands::workspace_load,

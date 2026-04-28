@@ -1,6 +1,6 @@
 // Shared types for tabs, panes, kanban, agents.
 
-export type PaneKind = "terminal" | "editor" | "preview" | "filebrowser" | "empty";
+export type PaneKind = "terminal" | "editor" | "preview" | "filebrowser" | "mobile" | "empty";
 
 export type Pane = {
   id: string;

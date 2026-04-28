@@ -10,6 +10,7 @@ const KIND_LABELS: Record<PaneKind, string> = {
   editor: "Editor",
   preview: "Preview",
   filebrowser: "Files",
+  mobile: "Mobile",
   empty: "Empty",
 };
 
@@ -18,6 +19,7 @@ const KIND_ICONS: Record<PaneKind, IconName> = {
   editor: "file-edit",
   preview: "globe",
   filebrowser: "folder-tree",
+  mobile: "smartphone",
   empty: "square-dashed",
 };
 

@@ -5,6 +5,7 @@ import { Terminal } from "../terminal/Terminal";
 import { Editor } from "../editor/Editor";
 import { PreviewPane } from "../preview/PreviewPane";
 import { FileBrowser } from "../sidebar/FileBrowser";
+import { MobilePane } from "../mobile/MobilePane";
 import { PaneHeader } from "./PaneHeader";
 import { Icon, type IconName } from "../ui/Icon";
 import { modKey } from "../../lib/shortcuts";
@@ -60,6 +61,7 @@ function PaneBody({ kind, pane, tabId }: { kind: PaneKind; pane: PaneType; tabId
     case "editor": return <Editor pane={pane} tabId={tabId} />;
     case "preview": return <PreviewPane pane={pane} tabId={tabId} />;
     case "filebrowser": return <FileBrowser pane={pane} tabId={tabId} />;
+    case "mobile": return <MobilePane pane={pane} tabId={tabId} />;
     case "empty":
     default:
       return <EmptyPane pane={pane} tabId={tabId} />;
@@ -71,6 +73,7 @@ const QUICK_PICKS: Array<{ kind: PaneKind; label: string; icon: IconName; hint: 
   { kind: "editor", label: "Editor", icon: "file-edit", hint: "Edit code" },
   { kind: "preview", label: "Preview", icon: "globe", hint: "Live web preview" },
   { kind: "filebrowser", label: "Files", icon: "folder-tree", hint: "Browse a folder" },
+  { kind: "mobile", label: "Mobile", icon: "smartphone", hint: "Android / iOS device" },
 ];
 
 function EmptyPane({ pane, tabId }: { pane: PaneType; tabId: string }) {
