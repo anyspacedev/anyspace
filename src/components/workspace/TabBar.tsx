@@ -34,7 +34,7 @@ export function TabBar() {
 
   if (view !== "workspace") {
     return (
-      <div className="tabbar" data-tauri-drag-region>
+      <div className="tabbar">
         <div className="tabbar-title">
           {view === "kanban" && "Task Board"}
           {view === "agents" && "Agents"}
@@ -45,8 +45,8 @@ export function TabBar() {
   }
 
   return (
-    <div className="tabbar" data-tauri-drag-region>
-      <div className="tabbar-tabs scrollbar" data-tauri-drag-region>
+    <div className="tabbar">
+      <div className="tabbar-tabs scrollbar">
         {tabs.map((tab) => (
           <div
             key={tab.id}

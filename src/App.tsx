@@ -150,7 +150,7 @@ export default function App() {
 
   return (
     <div className="app-root">
-      <header className="app-titlebar" data-tauri-drag-region>
+      <header className="app-titlebar" data-tauri-drag-region="deep">
         <TabBar />
       </header>
       <div className="app-body">
