@@ -114,19 +114,11 @@ function Notice({
   );
 }
 
-type DragSession = {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  active: boolean;
-  follower: HTMLImageElement | null;
-  hoveredPane: HTMLElement | null;
-};
-
 function paneElementAt(x: number, y: number): HTMLElement | null {
   // Same hit-test pattern App.tsx uses for OS file drops — iterate panes
   // and check bounding rects directly. elementFromPoint can't be trusted
-  // here because command-block overlays sit on top of terminals.
+  // here because command-block overlays sit on top of terminals (and an
+  // iframe under the cursor would return the iframe element itself).
   for (const el of document.querySelectorAll<HTMLElement>("[data-pane-id]")) {
     const r = el.getBoundingClientRect();
     if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return el;
@@ -145,103 +137,99 @@ function Thumb({
   total: number;
   onRemove: () => void;
 }) {
-  const sessionRef = useRef<DragSession | null>(null);
   const sourceLabel = item.source === "preview" ? "Preview" : "Mobile";
   const altText = `${sourceLabel} screenshot ${position} of ${total}`;
 
-  const setHoveredPane = (next: HTMLElement | null) => {
-    const session = sessionRef.current;
-    if (!session) return;
-    if (session.hoveredPane === next) return;
-    if (session.hoveredPane) {
-      delete session.hoveredPane.dataset.screenshotDropover;
-    }
-    if (next) {
-      next.dataset.screenshotDropover = "true";
-    }
-    session.hoveredPane = next;
-  };
-
-  const teardown = () => {
-    const session = sessionRef.current;
-    if (!session) return;
-    if (session.hoveredPane) {
-      delete session.hoveredPane.dataset.screenshotDropover;
-    }
-    if (session.follower) {
-      session.follower.remove();
-    }
-    document.body.classList.remove("screenshot-dragging");
-    sessionRef.current = null;
-  };
-
+  // Native pointer-event drag — mirrors PaneHeader.tsx's drag-to-swap
+  // pattern. We attach pointermove/pointerup directly on the captured
+  // element instead of going through React synthetic events: with
+  // setPointerCapture + iframes in the page, React's synthetic delegation
+  // does not reliably deliver subsequent move/up events to the source.
   const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     // Clicks on the close button or its children should never start a drag.
     if ((e.target as HTMLElement).closest(".screenshot-thumb-close")) return;
-    // Suppress text-selection and any browser-side drag gesture so we own
-    // the interaction end-to-end.
     e.preventDefault();
-    sessionRef.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      active: false,
-      follower: null,
-      hoveredPane: null,
+
+    const elem = e.currentTarget;
+    const pointerId = e.pointerId;
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    try {
+      elem.setPointerCapture(pointerId);
+    } catch {
+      /* capture can fail if pointer already released */
+    }
+
+    let started = false;
+    let follower: HTMLImageElement | null = null;
+    let hoveredPane: HTMLElement | null = null;
+
+    const setHoveredPane = (next: HTMLElement | null) => {
+      if (hoveredPane === next) return;
+      if (hoveredPane) delete hoveredPane.dataset.screenshotDropover;
+      if (next) next.dataset.screenshotDropover = "true";
+      hoveredPane = next;
     };
-    // Pointer capture on the thumb keeps move/up flowing here even when
-    // the cursor is over an iframe / different pane / outside the window.
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
 
-  const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
-    const session = sessionRef.current;
-    if (!session || session.pointerId !== e.pointerId) return;
+    const teardown = () => {
+      elem.removeEventListener("pointermove", onMove);
+      elem.removeEventListener("pointerup", onUp);
+      elem.removeEventListener("pointercancel", onUp);
+      if (elem.hasPointerCapture(pointerId)) {
+        elem.releasePointerCapture(pointerId);
+      }
+      if (hoveredPane) {
+        delete hoveredPane.dataset.screenshotDropover;
+        hoveredPane = null;
+      }
+      if (follower) {
+        follower.remove();
+        follower = null;
+      }
+      document.body.classList.remove("screenshot-dragging");
+    };
 
-    if (!session.active) {
-      const dx = e.clientX - session.startX;
-      const dy = e.clientY - session.startY;
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-      // Cross threshold → start the drag.
-      session.active = true;
-      const follower = document.createElement("img");
-      follower.src = item.dataUrl;
-      follower.alt = "";
-      follower.className = "screenshot-drag-follower";
-      follower.style.left = `${e.clientX}px`;
-      follower.style.top = `${e.clientY}px`;
-      document.body.appendChild(follower);
-      document.body.classList.add("screenshot-dragging");
-      session.follower = follower;
-    }
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      if (!started) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) {
+          return;
+        }
+        started = true;
+        follower = document.createElement("img");
+        follower.src = item.dataUrl;
+        follower.alt = "";
+        follower.className = "screenshot-drag-follower";
+        follower.style.left = `${ev.clientX}px`;
+        follower.style.top = `${ev.clientY}px`;
+        document.body.appendChild(follower);
+        document.body.classList.add("screenshot-dragging");
+      }
+      if (follower) {
+        follower.style.left = `${ev.clientX}px`;
+        follower.style.top = `${ev.clientY}px`;
+      }
+      const pane = paneElementAt(ev.clientX, ev.clientY);
+      const paneId = pane?.dataset.paneId;
+      setHoveredPane(paneId && paneAcceptsDrop(paneId) ? pane : null);
+    };
 
-    if (session.follower) {
-      session.follower.style.left = `${e.clientX}px`;
-      session.follower.style.top = `${e.clientY}px`;
-    }
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const wasStarted = started;
+      const finalPane = hoveredPane;
+      teardown();
+      if (!wasStarted || !finalPane) return;
+      const paneId = finalPane.dataset.paneId;
+      if (!paneId) return;
+      dispatchDropToPane(paneId, [item.path]);
+    };
 
-    const pane = paneElementAt(e.clientX, e.clientY);
-    const paneId = pane?.dataset.paneId;
-    setHoveredPane(paneId && paneAcceptsDrop(paneId) ? pane : null);
-  };
-
-  const onPointerUp = (e: RPointerEvent<HTMLDivElement>) => {
-    const session = sessionRef.current;
-    if (!session || session.pointerId !== e.pointerId) return;
-    const wasActive = session.active;
-    const finalPane = session.hoveredPane;
-    teardown();
-    if (!wasActive) return;
-    const paneId = finalPane?.dataset.paneId;
-    if (!paneId) return;
-    dispatchDropToPane(paneId, [item.path]);
-  };
-
-  const onPointerCancel = (e: RPointerEvent<HTMLDivElement>) => {
-    const session = sessionRef.current;
-    if (!session || session.pointerId !== e.pointerId) return;
-    teardown();
+    elem.addEventListener("pointermove", onMove);
+    elem.addEventListener("pointerup", onUp);
+    elem.addEventListener("pointercancel", onUp);
   };
 
   // Keyboard: Delete/Backspace removes a focused thumb. Drag-drop itself
@@ -260,9 +248,6 @@ function Thumb({
       role="listitem"
       tabIndex={0}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
       onKeyDown={onKeyDown}
       aria-label={`${altText}. Drag onto a terminal to attach. Press Delete to remove.`}
       title={`${sourceLabel} screenshot — drag onto a terminal`}
