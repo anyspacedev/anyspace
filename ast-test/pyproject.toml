@@ -1,0 +1,49 @@
+[project]
+name = "ast-test"
+version = "0.0.0"
+description = "Self-hosted ASR benchmark: SenseVoice (PyTorch + sherpa-onnx int8) + Fun-ASR-MLT-Nano on en/zh/ja/ko 60s clips"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    # Core ASR stack — CPU torch (saves ~3 GB vs the default CUDA wheel)
+    "funasr>=1.1.16",
+    "torch>=2.2",
+    "torchaudio>=2.2",
+    # Fun-ASR-MLT-Nano uses HuggingFace tokenizer files; funasr defers the
+    # import and silently fails without it.
+    "transformers>=4.40",
+    # Fun-ASR-MLT-Nano's tokenizer is the Whisper multilingual one — funasr
+    # imports it lazily via `whisper.tokenizer.get_tokenizer`.
+    "openai-whisper>=20240930",
+    # sherpa-onnx pypi wheel doesn't bundle libonnxruntime.so; pull a matching
+    # ORT in. sherpa-onnx 1.13.x links against ORT 1.24.x — keep them aligned.
+    "sherpa-onnx==1.13.*",
+    "onnxruntime>=1.24,<1.25",
+    # Audio I/O + resampling
+    "soundfile>=0.12",
+    "librosa>=0.10",
+    "numpy>=1.26",
+    # Model hub access
+    "modelscope>=1.18",
+    "huggingface-hub>=0.24",
+    # HTTP for fetch_audio.py
+    "requests>=2.32",
+    "tqdm>=4.66",
+    # Demo HTTP server
+    "fastapi>=0.110",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+]
+
+[tool.uv]
+cache-dir = ".uv-cache"
+
+# Force CPU-only torch wheels — the default index ships ~5 GB of CUDA libs we
+# can't use on this box.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchaudio = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

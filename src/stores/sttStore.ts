@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { settingsGet, settingsSet, sttHotkeySet, sttTranscribe } from "../lib/tauri";
+import { TEAMSHIP_CLOUD_URL, getAuthToken, isSignedIn } from "../lib/auth";
 import {
   cancelRecording,
   isRecording,
@@ -23,7 +24,7 @@ export type SttSettings = {
   apiKey: string;
   model: string;
   language: string; // empty = auto-detect
-  presetId: "groq" | "openai" | "elevenlabs" | "custom";
+  presetId: "groq" | "openai" | "elevenlabs" | "teamship-cloud" | "custom";
   // KeyboardEvent.code of the hold-to-talk hotkey. Apple-built keyboards have
   // no Right Control key, so the default differs by platform; user can rebind
   // in Settings.
@@ -377,6 +378,35 @@ export const useSttStore = create<SttState>((set, get) => ({
     const { settings } = get();
     const provider: "openai" | "elevenlabs" =
       settings.presetId === "elevenlabs" ? "elevenlabs" : "openai";
+
+    // Teamship Cloud uses the OpenAI-shaped endpoint with a Clerk JWT
+    // injected in place of an API key. Mint it fresh per call (Clerk
+    // tokens TTL ~60s; never persist).
+    let endpoint = settings.endpoint;
+    let apiKey = settings.apiKey;
+    if (settings.presetId === "teamship-cloud") {
+      if (!isSignedIn()) {
+        set({
+          phase: "error",
+          message: "Sign in to use Teamship Cloud (Settings → Account)",
+          analyser: null,
+        });
+        scheduleDismiss(set, 2500);
+        return;
+      }
+      const token = await getAuthToken();
+      if (!token) {
+        set({
+          phase: "error",
+          message: "Could not get auth token — try signing in again",
+          analyser: null,
+        });
+        scheduleDismiss(set, 2500);
+        return;
+      }
+      endpoint = TEAMSHIP_CLOUD_URL;
+      apiKey = token;
+    }
     try {
       const audio = new Uint8Array(await result.blob.arrayBuffer());
       if (gen !== startGen) {
@@ -385,17 +415,17 @@ export const useSttStore = create<SttState>((set, get) => ({
       }
 
       console.log(
-        "[stt] sttTranscribe → provider=%s endpoint=%s model=%s lang=%s bytes=%d",
-        provider,
-        settings.endpoint,
+        "[stt] sttTranscribe → preset=%s endpoint=%s model=%s lang=%s bytes=%d",
+        settings.presetId,
+        endpoint,
         settings.model,
         settings.language || "(auto)",
         audio.byteLength,
       );
       const t0 = performance.now();
       const text = await sttTranscribe({
-        endpoint: settings.endpoint,
-        apiKey: settings.apiKey,
+        endpoint,
+        apiKey,
         model: settings.model,
         language: settings.language || undefined,
         audio,

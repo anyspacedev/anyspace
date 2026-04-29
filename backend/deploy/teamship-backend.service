@@ -1,0 +1,42 @@
+[Unit]
+Description=Teamship backend (FastAPI + sherpa-onnx)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=debian
+Group=debian
+WorkingDirectory=/home/debian/app/backend
+EnvironmentFile=-/home/debian/app/backend/.env
+Environment=LISTEN_HOST=127.0.0.1
+Environment=LISTEN_PORT=9100
+Environment=LOG_JSON=true
+# Invoke the venv's python directly — `uv run` writes a lockfile under
+# .uv-cache which collides with ProtectHome=read-only. The venv is built
+# at deploy time by deploy.sh.
+ExecStart=/home/debian/app/backend/.venv/bin/python -m app.main
+
+# Resilience
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+
+# Resource ceilings — sherpa-onnx int8 holds ~810 MB; leave headroom for
+# concurrent requests and audit_log writes. Box has ~5.4 GB free RAM.
+MemoryMax=4G
+CPUQuota=300%
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/debian/app/backend/data
+PrivateTmp=true
+
+# Standard logging (journalctl -u teamship-backend)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

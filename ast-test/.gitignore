@@ -1,0 +1,9 @@
+.venv/
+models/
+audio/
+results/*.json
+__pycache__/
+*.pyc
+.uv-cache/
+# Third-party repo cloned at runtime by scripts/bench_funasr_mlt.py.
+vendor/

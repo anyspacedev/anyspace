@@ -1,0 +1,11 @@
+.venv/
+.uv-cache/
+data/teamship.db*
+data/models/
+__pycache__/
+*.pyc
+.env
+.env.local
+.pytest_cache/
+.coverage
+htmlcov/
