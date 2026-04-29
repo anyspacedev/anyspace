@@ -1,0 +1,267 @@
+---
+const plans = [
+  {
+    id: "free",
+    name: "Free",
+    tagline: "For solo projects and casual use.",
+    monthly: "0",
+    annual: "0",
+    cta: "Download free",
+    features: [
+      "Up to 4 panes per workspace",
+      "2 saved layouts",
+      "Warp-style command blocks",
+      "Live preview pane",
+      "Community support",
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    tagline: "For developers shipping with AI agents.",
+    monthly: "12",
+    annual: "120",
+    annualNote: "$10/mo billed annually",
+    cta: "Start 14-day free trial",
+    featured: true,
+    features: [
+      "Unlimited panes & workspaces",
+      "AI agent orchestration & Kanban",
+      "Keystroke broadcast & Super Brain",
+      "Speech-to-text dictation",
+      "Element picker → agent context",
+      "Priority support, BYO API keys",
+    ],
+  },
+  {
+    id: "team",
+    name: "Team",
+    tagline: "Shared agents & layouts for small teams.",
+    monthly: "20",
+    annual: "200",
+    perSeat: true,
+    annualNote: "$16.66/seat/mo billed annually",
+    cta: "Contact sales",
+    features: [
+      "Everything in Pro, per seat",
+      "Shared agent templates",
+      "Workspace presets across the team",
+      "SSO (Google, GitHub, Okta)",
+      "Centralized billing",
+      "Onboarding session",
+    ],
+  },
+];
+---
+
+<section class="section pricing" id="pricing">
+  <div class="container">
+    <header class="section-head">
+      <span class="eyebrow">Pricing</span>
+      <h2>Free forever for solo work. Pro when AI is part of your loop.</h2>
+      <p class="lead">
+        Cancel anytime. 30-day money-back guarantee on Pro. All plans include
+        the full local app — paid features unlock once you sign in.
+      </p>
+    </header>
+
+    <div class="billing-toggle" role="radiogroup" aria-label="Billing period">
+      <button data-billing="monthly" class="bt active" type="button" role="radio" aria-checked="true">Monthly</button>
+      <button data-billing="annual" class="bt" type="button" role="radio" aria-checked="false">
+        Annual <span class="save">save 17%</span>
+      </button>
+    </div>
+
+    <ul class="plans">
+      {
+        plans.map((p) => (
+          <li class={`plan card ${p.featured ? "featured" : ""}`}>
+            {p.featured && <span class="badge">Most popular</span>}
+            <div class="plan-head">
+              <h3>{p.name}</h3>
+              <p class="plan-tag">{p.tagline}</p>
+            </div>
+            <div class="price" data-price-monthly={p.monthly} data-price-annual={p.annual}>
+              <span class="price-currency">$</span>
+              <span class="price-num" data-price-num>{p.monthly}</span>
+              <span class="price-suffix">{p.perSeat ? "/seat /mo" : "/mo"}</span>
+            </div>
+            <p class="price-note" data-price-note hidden={!p.annualNote}>
+              {p.annualNote ?? ""}
+            </p>
+            <a href="#" class={`btn ${p.featured ? "btn-primary" : "btn-ghost"}`}>{p.cta}</a>
+            <ul class="plan-features">
+              {p.features.map((f) => (
+                <li>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .billing-toggle {
+    display: inline-flex;
+    padding: 4px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    margin-bottom: 32px;
+  }
+  .bt {
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    transition:
+      background var(--duration) var(--ease-out),
+      color var(--duration) var(--ease-out);
+  }
+  .bt.active {
+    background: var(--bg-elev-3);
+    color: var(--fg);
+  }
+  .bt:hover:not(.active) {
+    color: var(--fg);
+  }
+  .save {
+    margin-left: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--success);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .plans {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  @media (min-width: 880px) {
+    .plans {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .plan {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 32px 28px;
+  }
+  .plan.featured {
+    border-color: color-mix(in oklab, var(--accent) 50%, var(--border));
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--accent) 6%, var(--bg-elev)), var(--bg-elev) 60%);
+  }
+  .badge {
+    position: absolute;
+    top: -10px;
+    left: 28px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .plan-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .plan-tag {
+    color: var(--fg-muted);
+    font-size: 14px;
+  }
+  .price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-family: var(--font-mono);
+  }
+  .price-currency {
+    font-size: 20px;
+    color: var(--fg-dim);
+    font-weight: 500;
+  }
+  .price-num {
+    font-size: 48px;
+    font-weight: 600;
+    color: var(--fg);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .price-suffix {
+    font-size: 14px;
+    color: var(--fg-muted);
+    margin-left: 4px;
+  }
+  .price-note {
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin-top: -10px;
+    min-height: 1.2em;
+  }
+  .price-note[hidden] {
+    visibility: hidden;
+    display: block;
+  }
+  .plan-features {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--fg-muted);
+  }
+  .plan-features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .plan-features svg {
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const buttons = document.querySelectorAll(".bt");
+    const setBilling = (period) => {
+      buttons.forEach((b) => {
+        const active = b.getAttribute("data-billing") === period;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-checked", String(active));
+      });
+      document.querySelectorAll(".price").forEach((p) => {
+        const m = p.getAttribute("data-price-monthly");
+        const a = p.getAttribute("data-price-annual");
+        const num = p.querySelector("[data-price-num]");
+        const suffix = p.querySelector(".price-suffix");
+        if (!num || !suffix) return;
+        if (period === "annual") {
+          num.textContent = a;
+          suffix.textContent = suffix.textContent?.includes("seat") ? "/seat /yr" : "/yr";
+        } else {
+          num.textContent = m;
+          suffix.textContent = suffix.textContent?.includes("seat") ? "/seat /mo" : "/mo";
+        }
+      });
+    };
+    buttons.forEach((b) =>
+      b.addEventListener("click", () => setBilling(b.getAttribute("data-billing"))),
+    );
+  })();
+</script>
