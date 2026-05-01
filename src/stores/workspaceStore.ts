@@ -313,8 +313,6 @@ function makeTab(
   };
 }
 
-const initial = makeTab("workspace 1", 1);
-
 const PERSIST_KEY = "workspaceSnapshot";
 
 type Snapshot = { tabs: Tab[]; activeTabId: string | null };
@@ -358,8 +356,8 @@ function persist(state: WorkspaceState) {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  tabs: [initial],
-  activeTabId: initial.id,
+  tabs: [],
+  activeTabId: null,
   selectedView: "workspace",
   hydrated: false,
   setView: (view) => set({ selectedView: view }),
@@ -407,8 +405,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id);
       if (remaining.length === 0) {
-        const fresh = makeTab("workspace 1", 1);
-        return { tabs: [fresh], activeTabId: fresh.id };
+        return { tabs: [], activeTabId: null };
       }
       const newActive =
         s.activeTabId === id ? remaining[remaining.length - 1].id : s.activeTabId;

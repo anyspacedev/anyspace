@@ -39,18 +39,17 @@ export function WorkspaceView() {
           >
             T
           </div>
-          <div className="welcome-title">Welcome to Teamship</div>
+          <div className="welcome-title">Welcome aboard</div>
           <div className="welcome-sub">
-            A multi-pane terminal multiplexer with command blocks,
-            an editor, live preview, and a Kanban-driven AI agent launcher.
+            Open a terminal to get started, or browse your task board.
           </div>
           <div className="welcome-actions">
             <button
               className="btn btn-primary btn-with-icon"
               onClick={() => newTab(1)}
             >
-              <Icon name="plus" size={14} />
-              <span>New workspace</span>
+              <Icon name="terminal" size={14} />
+              <span>Open Terminal</span>
             </button>
             <button
               className="btn btn-with-icon"
