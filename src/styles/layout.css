@@ -3617,13 +3617,51 @@ body.screenshot-dragging {
   gap: 6px;
   margin-top: 8px;
 }
-.team-skill-add input {
+.team-skill-add input,
+.team-skill-add textarea {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 5px 8px;
   color: var(--fg);
   font-size: var(--font-size-sm);
+  font-family: inherit;
+}
+.team-skill-add textarea {
+  resize: vertical;
+  min-height: 32px;
+  font-family: var(--font-mono);
+}
+.team-custom-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.team-custom-role {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.team-custom-role-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.team-custom-role-body {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  margin-top: 2px;
+}
+.team-custom-role-actions {
+  display: flex;
+  align-items: flex-start;
 }
 .team-attachments {
   display: flex;

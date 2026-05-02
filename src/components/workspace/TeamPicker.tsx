@@ -5,9 +5,17 @@ import { useFocusReturn } from "../../lib/useFocusReturn";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
-import { defaultRoster, ROLE_LABELS, TEAM_ROLES, type TeamRole } from "../../lib/teamRoles";
+import {
+  BUILTIN_ROLES,
+  defaultRoster,
+  isBuiltinRole,
+  roleLabel,
+  type TeamCustomRole,
+  type TeamRole,
+} from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 import { launchTeam } from "../../lib/teamLauncher";
+import { decomposeWithAi } from "../../lib/teamDecompose";
 
 type RosterRow = {
   label: string;
@@ -34,8 +42,18 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
   const createTeam = useTeamStore((s) => s.create);
   const customSkills = useTeamSettingsStore((s) => s.settings.customSkills);
   const saveCustomSkills = useTeamSettingsStore((s) => s.saveCustomSkills);
+  const customRoles = useTeamSettingsStore((s) => s.settings.customRoles);
+  const saveCustomRoles = useTeamSettingsStore((s) => s.saveCustomRoles);
+  const templates = useTeamSettingsStore((s) => s.settings.templates);
+  const saveTemplates = useTeamSettingsStore((s) => s.saveTemplates);
   const [draftSkillLabel, setDraftSkillLabel] = useState("");
   const [draftSkillBody, setDraftSkillBody] = useState("");
+  const [draftRoleLabel, setDraftRoleLabel] = useState("");
+  const [draftRoleBody, setDraftRoleBody] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [draftTemplateName, setDraftTemplateName] = useState("");
+  const [decomposing, setDecomposing] = useState(false);
+  const [decomposeNote, setDecomposeNote] = useState<string | null>(null);
 
   const titleId = useId();
   useFocusReturn(open);
@@ -129,7 +147,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
         skillIds: skills,
         attachments: attachments.map((p) => ({ path: p })),
       });
-      const result = await launchTeam(team.id, { customSkills });
+      const result = await launchTeam(team.id, { customSkills, customRoles });
       if (!result) {
         setError("Failed to launch team — check that every agent has a configured program.");
         setBusy(false);
@@ -159,6 +177,55 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
           its own pane and they coordinate through a markdown message bus.
         </div>
 
+        {templates.length > 0 && (
+          <div className="form-row">
+            <label>Use template</label>
+            <div className="form-row-inline">
+              <select
+                aria-label="Apply template"
+                defaultValue=""
+                onChange={(e) => {
+                  const tpl = templates.find((t) => t.id === e.target.value);
+                  if (!tpl) return;
+                  if (!name.trim() || tpl.reuseTeamName) setName(tpl.name);
+                  if (tpl.goalSeed && !goal.trim()) setGoal(tpl.goalSeed);
+                  if (tpl.roster.length > 0) {
+                    const fallback = agents[0]?.id ?? "";
+                    setRoster(
+                      tpl.roster.map((r) => ({
+                        role: r.role,
+                        label: r.label,
+                        agentId:
+                          r.agentId && agents.some((a) => a.id === r.agentId)
+                            ? r.agentId
+                            : fallback,
+                      })),
+                    );
+                  }
+                  if (tpl.skillIds.length > 0) setSkills(tpl.skillIds);
+                  e.target.value = ""; // reset so re-applying works
+                }}
+              >
+                <option value="">— pick to apply —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} · {t.roster.length} agents</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  // Delete the most recently used template only after a confirm;
+                  // skip this affordance for now — manage via re-saving with same name.
+                }}
+                style={{ display: "none" }}
+              >
+                Manage
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="form-row">
           <label>Team name</label>
           <input
@@ -169,13 +236,59 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
         </div>
 
         <div className="form-row">
-          <label>Goal</label>
+          <div className="form-row-inline" style={{ alignItems: "baseline" }}>
+            <label style={{ flex: 1 }}>Goal</label>
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={async () => {
+                setError(null);
+                setDecomposeNote(null);
+                setDecomposing(true);
+                try {
+                  const out = await decomposeWithAi({
+                    goal,
+                    projectPath,
+                    defaultName: name || "Team",
+                  });
+                  if (!name.trim()) setName(out.teamName);
+                  const fallback = agents[0]?.id ?? "";
+                  setRoster(
+                    out.roster.map((r) => {
+                      const matched = r.programHint
+                        ? agents.find((a) =>
+                            a.name.toLowerCase().includes(r.programHint!.toLowerCase()),
+                          )
+                        : undefined;
+                      return {
+                        role: r.role,
+                        label: r.label,
+                        agentId: matched?.id ?? fallback,
+                      };
+                    }),
+                  );
+                  if (out.skillIds.length > 0) setSkills(out.skillIds);
+                  if (out.notes) setDecomposeNote(out.notes);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setDecomposing(false);
+                }
+              }}
+              disabled={decomposing || !goal.trim()}
+              title="Ask the configured AI to propose a roster + skills"
+            >
+              <Icon name="sparkles" size={12} />
+              <span>{decomposing ? "Thinking…" : "Decompose with AI"}</span>
+            </button>
+          </div>
           <textarea
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             placeholder="What is this team trying to accomplish?"
             rows={3}
           />
+          {decomposeNote && <div className="form-hint">AI: {decomposeNote}</div>}
         </div>
 
         <div className="form-row">
@@ -206,9 +319,16 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
                   value={r.role}
                   onChange={(e) => updateRow(i, { role: e.target.value as TeamRole })}
                 >
-                  {TEAM_ROLES.map((role) => (
-                    <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                  {BUILTIN_ROLES.map((role) => (
+                    <option key={role} value={role}>{roleLabel(role)}</option>
                   ))}
+                  {customRoles.length > 0 && (
+                    <optgroup label="Custom roles">
+                      {customRoles.map((role) => (
+                        <option key={role.id} value={role.id}>{role.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <input
                   aria-label="Label"
@@ -245,6 +365,81 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
           {!labelsUnique && (
             <div className="form-hint form-hint-error">Labels must be unique within a team.</div>
           )}
+        </div>
+
+        <div className="form-row">
+          <label>Custom roles</label>
+          {customRoles.length === 0 && (
+            <div className="form-hint">
+              Add a custom role with its own system-prompt template. Built-in roles cover most cases — only add when you need behavior the existing five don't capture.
+            </div>
+          )}
+          {customRoles.length > 0 && (
+            <div className="team-custom-roles">
+              {customRoles.map((role) => {
+                const inUse = roster.some((r) => r.role === role.id);
+                return (
+                  <div key={role.id} className="team-custom-role">
+                    <div className="team-custom-role-head">
+                      <strong>{role.label}</strong>
+                      <span className="team-skill-tag">{role.id}</span>
+                      {inUse && <span className="team-row-tab-pill">in use</span>}
+                    </div>
+                    <div className="team-custom-role-body">{role.body}</div>
+                    <div className="team-custom-role-actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          if (inUse) return;
+                          void saveCustomRoles(customRoles.filter((c) => c.id !== role.id));
+                        }}
+                        disabled={inUse}
+                        title={inUse ? "In use — change roster first" : "Delete"}
+                      >
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="team-skill-add">
+            <input
+              aria-label="New role label"
+              value={draftRoleLabel}
+              onChange={(e) => setDraftRoleLabel(e.target.value)}
+              placeholder="Role label (e.g. Architect)"
+            />
+            <textarea
+              aria-label="System prompt body"
+              value={draftRoleBody}
+              onChange={(e) => setDraftRoleBody(e.target.value)}
+              placeholder='Behavioral / role instructions. Use ${BOARD_PATH} and ${MESSAGES_PATH} placeholders.'
+              rows={2}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={() => {
+                const label = draftRoleLabel.trim();
+                const body = draftRoleBody.trim();
+                if (!label || !body) return;
+                const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                const id = `custom:${slug}-${Math.random().toString(36).slice(2, 6)}`;
+                if (isBuiltinRole(id)) return; // shouldn't happen with the prefix, but defensive
+                const next: TeamCustomRole = { id, label, body };
+                void saveCustomRoles([...customRoles, next]);
+                setDraftRoleLabel("");
+                setDraftRoleBody("");
+              }}
+              disabled={!draftRoleLabel.trim() || !draftRoleBody.trim()}
+            >
+              <Icon name="plus" size={12} />
+              <span>Add role</span>
+            </button>
+          </div>
         </div>
 
         <div className="form-row">
@@ -357,8 +552,64 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
 
         {error && <div className="form-hint form-hint-error">{error}</div>}
 
+        {savingTemplate ? (
+          <div className="form-row">
+            <label>Save as template</label>
+            <div className="form-row-inline">
+              <input
+                autoFocus
+                value={draftTemplateName}
+                onChange={(e) => setDraftTemplateName(e.target.value)}
+                placeholder="Template name"
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const tplName = draftTemplateName.trim() || name.trim() || "Team template";
+                  const tpl = {
+                    id: `tpl-${Math.random().toString(36).slice(2, 8)}`,
+                    name: tplName,
+                    goalSeed: goal.trim() || undefined,
+                    roster: roster
+                      .filter((r) => r.label.trim())
+                      .map((r) => ({ role: r.role, label: r.label.trim(), agentId: r.agentId })),
+                    skillIds: [...skills],
+                  };
+                  void saveTemplates([...templates, tpl]);
+                  setSavingTemplate(false);
+                  setDraftTemplateName("");
+                }}
+                disabled={roster.filter((r) => r.label.trim()).length === 0}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setSavingTemplate(false);
+                  setDraftTemplateName("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={reset} disabled={busy}>Cancel</button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-with-icon"
+            onClick={() => setSavingTemplate(true)}
+            disabled={busy || savingTemplate || roster.filter((r) => r.label.trim()).length === 0}
+            title="Save current roster + skills as a reusable template"
+          >
+            <Icon name="layers" size={12} />
+            <span>Save as template</span>
+          </button>
           <div style={{ flex: 1 }} />
           <button className="btn btn-primary" onClick={launch} disabled={!canLaunch}>
             {busy ? "Launching…" : "Launch team"}

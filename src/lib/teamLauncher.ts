@@ -2,12 +2,19 @@ import { agentLaunch, teamInit, teamWatchStart, teamWritePrompt } from "./tauri"
 import { useKanbanStore } from "../stores/kanbanStore";
 import { useWorkspaceStore, type PanePreset } from "../stores/workspaceStore";
 import { useTeamStore, type Team, type TeamAgent } from "../stores/teamStore";
-import { renderRolePrompt, ROLE_LABELS, type TeamRole } from "./teamRoles";
+import { useTeamSettingsStore } from "../stores/teamSettingsStore";
+import {
+  renderRolePrompt,
+  roleLabel,
+  type TeamCustomRole,
+  type TeamRole,
+} from "./teamRoles";
 import { renderSkillsMarkdown, type TeamSkill } from "./teamSkills";
 import { subscribeTeamRpc } from "./teamRpc";
 
 export type LaunchTeamOptions = {
   customSkills?: TeamSkill[];
+  customRoles?: TeamCustomRole[];
   /** When true, skip pty respawn — used during resume to re-derive state without
    *  re-creating the tab. (Reserved for future use; currently always launches a tab.) */
   skipNewTab?: boolean;
@@ -18,9 +25,9 @@ export type LaunchTeamResult = {
   paneIdsByLabel: Record<string, string>;
 };
 
-function rosterMarkdown(_team: Team, agents: TeamAgent[]): string {
+function rosterMarkdown(_team: Team, agents: TeamAgent[], customRoles: TeamCustomRole[] = []): string {
   return agents
-    .map((a) => `- **${a.label}** — ${ROLE_LABELS[a.role] ?? a.role}`)
+    .map((a) => `- **${a.label}** — ${roleLabel(a.role, customRoles)}`)
     .join("\n");
 }
 
@@ -34,6 +41,7 @@ function buildBoardMarkdown(
   agents: TeamAgent[],
   skillsMd: string,
   attachmentsMd: string,
+  customRoles: TeamCustomRole[] = [],
 ): string {
   const sections = [
     `# Team Board: ${team.name}`,
@@ -42,7 +50,7 @@ function buildBoardMarkdown(
     `**Project:** ${team.projectPath}`,
     "",
     "## Roster",
-    rosterMarkdown(team, agents),
+    rosterMarkdown(team, agents, customRoles),
     "",
     "## Active Skills",
     skillsMd || "_(none)_",
@@ -54,7 +62,7 @@ function buildBoardMarkdown(
     "| --- | --- | --- | --- | --- |",
     "",
     "## Agent Status",
-    ...agents.flatMap((a) => [`### ${a.label} (${a.role})`, "_WAITING_", ""]),
+    ...agents.flatMap((a) => [`### ${a.label} (${roleLabel(a.role, customRoles)})`, "_WAITING_", ""]),
     "## Completed Work Log",
     "_Append entries as tasks finish._",
     "",
@@ -80,16 +88,18 @@ export async function launchTeam(
   const skillIds = teamState.skills[teamId] ?? [];
   const attachments = teamState.attachments[teamId] ?? [];
 
-  const skillsMd = renderSkillsMarkdown(skillIds, options.customSkills ?? []);
+  const customSkills = options.customSkills ?? [];
+  const customRoles = options.customRoles ?? [];
+  const skillsMd = renderSkillsMarkdown(skillIds, customSkills);
   const attachmentsMd = attachmentsMarkdown(attachments.map((a) => a.path));
 
   const paths = await teamInit({
     teamId: team.id,
     projectPath: team.projectPath,
-    boardMarkdown: buildBoardMarkdown(team, teamAgents, skillsMd, attachmentsMd),
+    boardMarkdown: buildBoardMarkdown(team, teamAgents, skillsMd, attachmentsMd, customRoles),
   });
 
-  const roster = rosterMarkdown(team, teamAgents);
+  const roster = rosterMarkdown(team, teamAgents, customRoles);
   const presets: PanePreset[] = [];
   const labelOrder: string[] = [];
 
@@ -113,6 +123,7 @@ export async function launchTeam(
         rosterMarkdown: roster,
         skillsMarkdown: skillsMd,
         attachmentsMarkdown: attachmentsMd,
+        customRoles,
       });
 
     const promptFile = await teamWritePrompt({
@@ -160,7 +171,7 @@ export async function launchTeam(
       pendingCommand: command,
       spawnEnv: env,
       spawnCwd: team.projectPath,
-      title: `${ta.label} (${ROLE_LABELS[ta.role] ?? ta.role})`,
+      title: `${ta.label} (${roleLabel(ta.role, customRoles)})`,
     });
     labelOrder.push(ta.label);
   }
@@ -243,21 +254,24 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
   console.log("[team.resume] start", { teamId, name: team.name, agentCount: teamAgents.length });
   const skillIds = teamState.skills[teamId] ?? [];
   const attachments = teamState.attachments[teamId] ?? [];
+  const teamSettings = useTeamSettingsStore.getState().settings;
+  const customRoles = teamSettings.customRoles;
+  const customSkills = teamSettings.customSkills;
 
-  const skillsMd = renderSkillsMarkdown(skillIds);
+  const skillsMd = renderSkillsMarkdown(skillIds, customSkills);
   const attachmentsMd = attachmentsMarkdown(attachments.map((a) => a.path));
 
   const paths = await teamInit({
     teamId: team.id,
     projectPath: team.projectPath,
-    boardMarkdown: buildBoardMarkdown(team, teamAgents, skillsMd, attachmentsMd),
+    boardMarkdown: buildBoardMarkdown(team, teamAgents, skillsMd, attachmentsMd, customRoles),
   });
 
   const ws = useWorkspaceStore.getState();
   const tab = ws.tabs.find((t) => t.id === team.tabId);
   if (!tab) return false;
 
-  const roster = rosterMarkdown(team, teamAgents);
+  const roster = rosterMarkdown(team, teamAgents, customRoles);
   const kanbanAgents = useKanbanStore.getState().agents;
 
   let restored = 0;
@@ -300,6 +314,7 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
         rosterMarkdown: roster,
         skillsMarkdown: skillsMd,
         attachmentsMarkdown: attachmentsMd,
+        customRoles,
       });
     const promptFile = await teamWritePrompt({
       teamDir: paths.teamDir,
@@ -332,7 +347,7 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
       pendingCommand: command,
       spawnEnv: env,
       spawnCwd: team.projectPath,
-      title: `${ta.label} (${ROLE_LABELS[ta.role] ?? ta.role})`,
+      title: `${ta.label} (${roleLabel(ta.role, customRoles)})`,
       teamId: team.id,
       teamAgentId: ta.id,
     });

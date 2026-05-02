@@ -14,7 +14,8 @@ import {
   teamWatchStop,
   type TeamMessagesEvent,
 } from "../../lib/tauri";
-import { ROLE_ACCENTS, ROLE_LABELS } from "../../lib/teamRoles";
+import { roleAccent, roleLabel } from "../../lib/teamRoles";
+import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { Icon } from "../ui/Icon";
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -37,6 +38,7 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
   const team = useTeamStore((s) => s.teams.find((t) => t.tabId === tabId));
   const teamAgents = useTeamStore((s) => (team ? s.agents[team.id] ?? [] : []));
   const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === tabId));
+  const customRoles = useTeamSettingsStore((s) => s.settings.customRoles);
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [input, setInput] = useState("");
   const [target, setTarget] = useState<string>("@all");
@@ -165,7 +167,7 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
       { value: "@all", label: "All agents" },
       ...teamAgents.map((a) => ({
         value: `pane:${a.paneId ?? ""}|label:${a.label}`,
-        label: `${a.label} (${ROLE_LABELS[a.role] ?? a.role})`,
+        label: `${a.label} (${roleLabel(a.role, customRoles)})`,
       })),
     ];
   }, [teamAgents]);
@@ -233,8 +235,8 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
           <span
             key={a.id}
             className="team-chat-pill"
-            style={{ borderColor: ROLE_ACCENTS[a.role] }}
-            title={ROLE_LABELS[a.role]}
+            style={{ borderColor: roleAccent(a.role, customRoles) }}
+            title={roleLabel(a.role, customRoles)}
           >
             {a.label}
           </span>

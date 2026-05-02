@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useTeamStore } from "../../stores/teamStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
-import { ROLE_ACCENTS, ROLE_LABELS } from "../../lib/teamRoles";
+import { roleAccent, roleLabel } from "../../lib/teamRoles";
+import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { launchTeam } from "../../lib/teamLauncher";
 import { Icon } from "../ui/Icon";
 
@@ -20,6 +21,7 @@ export function TeamsView() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
   const kanbanAgents = useKanbanStore((s) => s.agents);
+  const customRoles = useTeamSettingsStore((s) => s.settings.customRoles);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -130,8 +132,8 @@ export function TeamsView() {
                     <span
                       key={a.id}
                       className="team-row-pill"
-                      style={{ borderColor: ROLE_ACCENTS[a.role] ?? undefined }}
-                      title={`${ROLE_LABELS[a.role] ?? a.role} • ${programNameForId(a.agentId)}`}
+                      style={{ borderColor: roleAccent(a.role, customRoles) }}
+                      title={`${roleLabel(a.role, customRoles)} • ${programNameForId(a.agentId)}`}
                     >
                       {a.label}
                     </span>
