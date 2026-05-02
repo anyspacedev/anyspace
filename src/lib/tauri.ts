@@ -239,6 +239,16 @@ export async function teamWritePrompt(args: {
   return rawInvoke<{ path: string }>("team_write_prompt", { args });
 }
 
+export type CompactResult = { total: number; archived: number; kept: number };
+
+export async function teamCompactMessages(args: {
+  teamDir: string;
+  maxEntries: number;
+  keepRecent: number;
+}): Promise<CompactResult> {
+  return rawInvoke<CompactResult>("team_compact_messages", { args });
+}
+
 export type TeamMessagesEvent = { teamId: string; messagesPath: string };
 export type TeamRpcEvent = {
   teamId: string;

@@ -148,6 +148,7 @@ pub fn run() {
             team::commands::team_rpc_reply,
             team::commands::team_rpc_drain,
             team::commands::team_write_prompt,
+            team::commands::team_compact_messages,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

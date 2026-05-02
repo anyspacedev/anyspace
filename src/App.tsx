@@ -8,6 +8,7 @@ import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
 import { useTeamStore } from "./stores/teamStore";
+import { useTeamSettingsStore } from "./stores/teamSettingsStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
 import { resumeTeam } from "./lib/teamLauncher";
@@ -17,6 +18,7 @@ import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
 import { AgentManager } from "./components/agents/AgentManager";
+import { TeamsView } from "./components/team/TeamsView";
 import { Settings } from "./components/settings/Settings";
 import { StatusBar } from "./components/workspace/StatusBar";
 import { TemplatePicker } from "./components/workspace/TemplatePicker";
@@ -38,6 +40,7 @@ export default function App() {
   const loadAi = useAiStore((s) => s.load);
   const loadProxy = useProxyStore((s) => s.load);
   const loadTeams = useTeamStore((s) => s.load);
+  const loadTeamSettings = useTeamSettingsStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
@@ -45,6 +48,7 @@ export default function App() {
       await hydrateWorkspace();
       await loadKanban().catch((e) => console.warn("[kanban] load failed", e));
       await loadTeams().catch((e) => console.warn("[team] load failed", e));
+      await loadTeamSettings().catch((e) => console.warn("[team] settings load failed", e));
       // After both workspace + team data are in memory, resume any team tab
       // that survived the restart. resumeTeam re-renders prompt files and
       // re-injects pendingCommand into the existing panes.
@@ -63,7 +67,7 @@ export default function App() {
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams, loadTeamSettings]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
@@ -224,6 +228,7 @@ export default function App() {
           </div>
           {view === "kanban" && <KanbanBoard />}
           {view === "agents" && <AgentManager />}
+          {view === "teams" && <TeamsView />}
           {view === "settings" && <Settings />}
         </div>
         <StatusBar />

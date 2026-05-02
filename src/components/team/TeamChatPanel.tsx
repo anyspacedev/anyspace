@@ -9,12 +9,29 @@ import {
   runSuperBrainTeamBroadcast,
 } from "../../lib/superBrain";
 import {
+  teamCompactMessages,
   teamWatchStart,
   teamWatchStop,
   type TeamMessagesEvent,
 } from "../../lib/tauri";
 import { ROLE_ACCENTS, ROLE_LABELS } from "../../lib/teamRoles";
 import { Icon } from "../ui/Icon";
+
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+const COMPACT_THRESHOLD = 500;
+const COMPACT_KEEP = 250;
+const COMPACT_DEBOUNCE_MS = 60_000;
+
+function tsMillis(ts: string): number {
+  const v = Date.parse(ts);
+  return Number.isNaN(v) ? 0 : v;
+}
+
+function shortTime(ts: string): string {
+  const v = tsMillis(ts);
+  if (!v) return ts;
+  return new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
 
 export function TeamChatPanel({ tabId }: { tabId: string }) {
   const team = useTeamStore((s) => s.teams.find((t) => t.tabId === tabId));
@@ -23,17 +40,41 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [input, setInput] = useState("");
   const [target, setTarget] = useState<string>("@all");
+  const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
+  const lastCompactRef = useRef<number>(0);
   const inputId = useId();
 
   const refresh = useCallback(async () => {
     if (!team) return;
     try {
       const content = await readTextFile(`${team.teamDir}/MESSAGES.md`);
-      setMessages(parseMessages(content));
+      const parsed = parseMessages(content);
+      setMessages(parsed);
+      // Auto-compact when MESSAGES.md crosses the threshold. Debounced so a
+      // burst of refreshes doesn't trigger N rotations; the Rust side holds
+      // the same flock as tmsg.sh so concurrent sends are safe.
+      if (parsed.length > COMPACT_THRESHOLD) {
+        const now = Date.now();
+        if (now - lastCompactRef.current > COMPACT_DEBOUNCE_MS) {
+          lastCompactRef.current = now;
+          teamCompactMessages({
+            teamDir: team.teamDir,
+            maxEntries: COMPACT_THRESHOLD,
+            keepRecent: COMPACT_KEEP,
+          })
+            .then((r) => {
+              if (r.archived > 0) {
+                console.log("[team.chat] compacted", r);
+              }
+            })
+            .catch((e) => console.warn("[team.chat] compact failed", e));
+        }
+      }
     } catch {
       setMessages([]);
     }
@@ -63,10 +104,61 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
     };
   }, [team, refresh]);
 
+  // Auto-scroll to bottom on new messages — but only when the user was
+  // already at the bottom. If they scrolled up to read history, leave
+  // their viewport alone and surface the jump-to-bottom button.
   useEffect(() => {
+    if (!atBottom) return;
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+  }, [messages.length, atBottom]);
+
+  const onScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAtBottom(distance < 24);
+  };
+
+  const jumpToBottom = () => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    setAtBottom(true);
+  };
+
+  // Group consecutive messages from the same sender to the same recipient
+  // within GROUP_WINDOW_MS. Each group renders one meta header and stacks
+  // bodies underneath.
+  const groups = useMemo(() => {
+    const filtered = filter.trim().toLowerCase()
+      ? messages.filter((m) => {
+          const q = filter.trim().toLowerCase();
+          return (
+            m.body.toLowerCase().includes(q) ||
+            m.from.toLowerCase().includes(q) ||
+            m.to.toLowerCase().includes(q)
+          );
+        })
+      : messages;
+    const out: TeamMessage[][] = [];
+    for (const m of filtered) {
+      const last = out[out.length - 1];
+      const prev = last?.[last.length - 1];
+      if (
+        prev &&
+        prev.from === m.from &&
+        prev.to === m.to &&
+        prev.type === m.type &&
+        Math.abs(tsMillis(m.ts) - tsMillis(prev.ts)) < GROUP_WINDOW_MS
+      ) {
+        last.push(m);
+      } else {
+        out.push([m]);
+      }
+    }
+    return out;
+  }, [messages, filter]);
 
   const targetOptions = useMemo(() => {
     return [
@@ -149,23 +241,64 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
         ))}
       </div>
 
-      <div ref={listRef} className="team-chat-list">
-        {messages.length === 0 && (
-          <div className="team-chat-empty">No messages yet.</div>
+      <div className="team-chat-search">
+        <input
+          aria-label="Filter messages"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter… (matches sender / recipient / body)"
+        />
+        {filter && (
+          <button
+            type="button"
+            className="team-chat-search-clear"
+            onClick={() => setFilter("")}
+            aria-label="Clear filter"
+          >
+            <Icon name="x" size={12} />
+          </button>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className="team-chat-message">
-            <div className="team-chat-meta">
-              <span className="team-chat-from">{m.from || "?"}</span>
-              <span className="team-chat-arrow">→</span>
-              <span className="team-chat-to">{m.to || "?"}</span>
-              <span className={`team-chat-type team-chat-type-${m.type}`}>{m.type}</span>
-              <span className="team-chat-ts">{m.ts}</span>
-            </div>
-            <div className="team-chat-body">{m.body}</div>
-          </div>
-        ))}
       </div>
+
+      <div ref={listRef} className="team-chat-list" onScroll={onScroll}>
+        {groups.length === 0 && (
+          <div className="team-chat-empty">
+            {filter ? "No messages match the filter." : "No messages yet."}
+          </div>
+        )}
+        {groups.map((group, gi) => {
+          const head = group[0];
+          const isOperator = head.to === "@operator" || head.from === "@operator";
+          return (
+            <div
+              key={`${head.id}-${gi}`}
+              className={"team-chat-group" + (isOperator ? " team-chat-group-operator" : "")}
+            >
+              <div className="team-chat-meta">
+                <span className="team-chat-from">{head.from || "?"}</span>
+                <span className="team-chat-arrow">→</span>
+                <span className="team-chat-to">{head.to || "?"}</span>
+                <span className={`team-chat-type team-chat-type-${head.type}`}>{head.type}</span>
+                <span className="team-chat-ts">{shortTime(head.ts)}</span>
+              </div>
+              {group.map((m) => (
+                <div key={m.id} className="team-chat-body">{m.body}</div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {!atBottom && (
+        <button
+          type="button"
+          className="team-chat-jump"
+          onClick={jumpToBottom}
+          aria-label="Jump to latest"
+        >
+          ↓ Latest
+        </button>
+      )}
 
       <form
         className="team-chat-input"

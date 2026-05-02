@@ -201,6 +201,140 @@ pub fn team_write_prompt(args: WritePromptArgs) -> Result<WritePromptResult, Str
     })
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactArgs {
+    pub team_dir: String,
+    pub max_entries: usize,
+    pub keep_recent: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactResult {
+    pub total: usize,
+    pub archived: usize,
+    pub kept: usize,
+}
+
+/// Compact `<team_dir>/MESSAGES.md` when its block count exceeds `max_entries`,
+/// keeping the last `keep_recent` blocks active and appending the rest to
+/// `MESSAGES.archive.md`. Holds the same `.lock` file `tmsg.sh` uses so writes
+/// from agent shells don't race the rotation. No-op (returns total == kept)
+/// when below the threshold.
+#[tauri::command]
+pub fn team_compact_messages(args: CompactArgs) -> Result<CompactResult, String> {
+    compact_impl(&args).map_err(|e| format!("{e:#}"))
+}
+
+#[cfg(unix)]
+fn compact_impl(args: &CompactArgs) -> anyhow::Result<CompactResult> {
+    use std::io::Write;
+    use std::os::unix::io::AsRawFd;
+
+    let team_dir = Path::new(&args.team_dir);
+    let messages_path = team_dir.join("MESSAGES.md");
+    let archive_path = team_dir.join("MESSAGES.archive.md");
+    let lock_path = team_dir.join(".lock");
+
+    let lock_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&lock_path)
+        .with_context(|| format!("open lock {}", lock_path.display()))?;
+    // BSD flock — same primitive `flock` shell util uses, so tmsg.sh's
+    // `flock -x 9` and our LOCK_EX coordinate via the kernel.
+    let fd = lock_file.as_raw_fd();
+    let rc = unsafe { libc::flock(fd, libc::LOCK_EX) };
+    if rc != 0 {
+        anyhow::bail!("flock LOCK_EX failed");
+    }
+
+    let result = (|| -> anyhow::Result<CompactResult> {
+        let content = match std::fs::read_to_string(&messages_path) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(CompactResult { total: 0, archived: 0, kept: 0 })
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let blocks = split_blocks(&content);
+        let total = blocks.len();
+        if total <= args.max_entries {
+            return Ok(CompactResult { total, archived: 0, kept: total });
+        }
+        let keep_from = total.saturating_sub(args.keep_recent);
+        let to_archive = &blocks[..keep_from];
+        let to_keep = &blocks[keep_from..];
+
+        if !to_archive.is_empty() {
+            let mut archive = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&archive_path)
+                .with_context(|| format!("open archive {}", archive_path.display()))?;
+            for block in to_archive {
+                archive.write_all(block.as_bytes()).context("append archive block")?;
+                if !block.ends_with('\n') {
+                    archive.write_all(b"\n").context("append archive newline")?;
+                }
+            }
+            archive.flush().ok();
+        }
+
+        // Atomic replace via tmp + rename so a crash mid-write doesn't leave
+        // a half-written MESSAGES.md.
+        let tmp_path = team_dir.join("MESSAGES.md.tmp");
+        let mut tmp = std::fs::File::create(&tmp_path)
+            .with_context(|| format!("create {}", tmp_path.display()))?;
+        for block in to_keep {
+            tmp.write_all(block.as_bytes()).context("write kept block")?;
+            if !block.ends_with('\n') {
+                tmp.write_all(b"\n").context("write kept newline")?;
+            }
+        }
+        tmp.flush().ok();
+        drop(tmp);
+        std::fs::rename(&tmp_path, &messages_path)
+            .with_context(|| format!("rename {} -> {}", tmp_path.display(), messages_path.display()))?;
+
+        Ok(CompactResult { total, archived: to_archive.len(), kept: to_keep.len() })
+    })();
+
+    let _ = unsafe { libc::flock(fd, libc::LOCK_UN) };
+    drop(lock_file);
+    result
+}
+
+#[cfg(not(unix))]
+fn compact_impl(_args: &CompactArgs) -> anyhow::Result<CompactResult> {
+    Ok(CompactResult { total: 0, archived: 0, kept: 0 })
+}
+
+/// Split MESSAGES.md content into its `<!-- msg ... --> ... <!-- /msg -->`
+/// blocks. Anything outside a fenced pair is dropped (the file format is
+/// append-only fenced blocks separated by blank lines).
+fn split_blocks(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current: Option<String> = None;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("<!-- msg ") && current.is_none() {
+            current = Some(format!("{line}\n"));
+        } else if trimmed.starts_with("<!-- /msg") {
+            if let Some(mut block) = current.take() {
+                block.push_str(line);
+                block.push('\n');
+                out.push(block);
+            }
+        } else if let Some(block) = current.as_mut() {
+            block.push_str(line);
+            block.push('\n');
+        }
+    }
+    out
+}
+
 fn label_slug(label: &str) -> String {
     let mut out = String::with_capacity(label.len());
     for ch in label.chars() {

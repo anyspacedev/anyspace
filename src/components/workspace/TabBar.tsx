@@ -39,6 +39,7 @@ export function TabBar() {
         <div className="tabbar-title">
           {view === "kanban" && "Task Board"}
           {view === "agents" && "Agents"}
+          {view === "teams" && "Teams"}
           {view === "settings" && "Settings"}
         </div>
       </div>

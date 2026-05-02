@@ -4,8 +4,9 @@ import { Icon } from "../ui/Icon";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
+import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { defaultRoster, ROLE_LABELS, TEAM_ROLES, type TeamRole } from "../../lib/teamRoles";
-import { BUILTIN_SKILLS } from "../../lib/teamSkills";
+import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 import { launchTeam } from "../../lib/teamLauncher";
 
 type RosterRow = {
@@ -31,6 +32,10 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
 
   const agents = useKanbanStore((s) => s.agents);
   const createTeam = useTeamStore((s) => s.create);
+  const customSkills = useTeamSettingsStore((s) => s.settings.customSkills);
+  const saveCustomSkills = useTeamSettingsStore((s) => s.saveCustomSkills);
+  const [draftSkillLabel, setDraftSkillLabel] = useState("");
+  const [draftSkillBody, setDraftSkillBody] = useState("");
 
   const titleId = useId();
   useFocusReturn(open);
@@ -124,7 +129,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
         skillIds: skills,
         attachments: attachments.map((p) => ({ path: p })),
       });
-      const result = await launchTeam(team.id);
+      const result = await launchTeam(team.id, { customSkills });
       if (!result) {
         setError("Failed to launch team — check that every agent has a configured program.");
         setBusy(false);
@@ -245,8 +250,9 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
         <div className="form-row">
           <label>Skills</label>
           <div className="team-skill-grid">
-            {BUILTIN_SKILLS.map((s) => {
+            {[...BUILTIN_SKILLS, ...customSkills].map((s) => {
               const checked = skills.includes(s.id);
+              const isCustom = customSkills.some((c) => c.id === s.id);
               return (
                 <label key={s.id} className={"team-skill" + (checked ? " active" : "")}>
                   <input
@@ -260,11 +266,64 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
                       );
                     }}
                   />
-                  <span className="team-skill-label">{s.label}</span>
+                  <span className="team-skill-label">
+                    {s.label}
+                    {isCustom && <span className="team-skill-tag">custom</span>}
+                  </span>
                   <span className="team-skill-body">{s.body}</span>
+                  {isCustom && (
+                    <button
+                      type="button"
+                      className="team-skill-delete"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const next = customSkills.filter((c) => c.id !== s.id);
+                        void saveCustomSkills(next);
+                        setSkills((prev) => prev.filter((x) => x !== s.id));
+                      }}
+                      aria-label={`Delete custom skill ${s.label}`}
+                      title="Delete custom skill"
+                    >
+                      <Icon name="x" size={11} />
+                    </button>
+                  )}
                 </label>
               );
             })}
+          </div>
+          <div className="team-skill-add">
+            <input
+              aria-label="New skill label"
+              value={draftSkillLabel}
+              onChange={(e) => setDraftSkillLabel(e.target.value)}
+              placeholder="Skill label (e.g. Conventional Commits)"
+            />
+            <input
+              aria-label="New skill body"
+              value={draftSkillBody}
+              onChange={(e) => setDraftSkillBody(e.target.value)}
+              placeholder="Behavioral directive — one or two sentences"
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={() => {
+                const label = draftSkillLabel.trim();
+                const body = draftSkillBody.trim();
+                if (!label || !body) return;
+                const id = `custom-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Math.random().toString(36).slice(2, 6)}`;
+                const next: TeamSkill = { id, label, body };
+                void saveCustomSkills([...customSkills, next]);
+                setSkills((prev) => [...prev, id]);
+                setDraftSkillLabel("");
+                setDraftSkillBody("");
+              }}
+              disabled={!draftSkillLabel.trim() || !draftSkillBody.trim()}
+            >
+              <Icon name="plus" size={12} />
+              <span>Add custom</span>
+            </button>
           </div>
         </div>
 

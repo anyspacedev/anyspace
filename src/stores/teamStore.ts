@@ -105,6 +105,8 @@ type TeamState = {
     teamId: string,
     seed: { label: string; role: TeamRole; agentId: string; systemPromptOverride?: string },
   ) => Promise<TeamAgent>;
+  rename: (teamId: string, name: string) => Promise<void>;
+  reactivate: (teamId: string) => Promise<void>;
   archive: (teamId: string) => Promise<void>;
 };
 
@@ -285,6 +287,43 @@ export const useTeamStore = create<TeamState>((set) => ({
       agents: { ...s.agents, [teamId]: [...(s.agents[teamId] ?? []), ta] },
     }));
     return ta;
+  },
+
+  rename: async (teamId, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const db = await getDb();
+    const ts = now();
+    await db.execute("UPDATE teams SET name=?, updated_at=? WHERE id=?", [trimmed, ts, teamId]);
+    set((s) => ({
+      teams: s.teams.map((t) =>
+        t.id === teamId ? { ...t, name: trimmed, updatedAt: ts } : t,
+      ),
+    }));
+  },
+
+  reactivate: async (teamId) => {
+    const db = await getDb();
+    const ts = now();
+    // Clear stale tabId so the next launch creates a fresh tab; resume should
+    // never try to revive into a tab that may have been closed elsewhere.
+    await db.execute(
+      "UPDATE teams SET status='active', tab_id=NULL, updated_at=? WHERE id=?",
+      [ts, teamId],
+    );
+    await db.execute(
+      "UPDATE team_agents SET pane_id=NULL WHERE team_id=?",
+      [teamId],
+    );
+    set((s) => ({
+      teams: s.teams.map((t) =>
+        t.id === teamId ? { ...t, status: "active", tabId: undefined, updatedAt: ts } : t,
+      ),
+      agents: {
+        ...s.agents,
+        [teamId]: (s.agents[teamId] ?? []).map((a) => ({ ...a, paneId: undefined })),
+      },
+    }));
   },
 
   archive: async (teamId) => {
