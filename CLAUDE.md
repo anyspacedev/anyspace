@@ -187,7 +187,7 @@ Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next
 - `tmsg send --to <Label|@all|@operator> [--type message|status|escalation|done] --body "…"` — append a fenced block to `MESSAGES.md` (flock-protected).
 - `tmsg check [--consume]` — print messages addressed to me or `@all` not yet in my `.consumed` file.
 - `tmsg roster` / `tmsg board` — convenience readers.
-- `tmsg pane new|close|read|write` — RPC: writes `<.rpc/uuid>.req`, polls for `.res`. **`tmsg pane new` returns "not supported yet"** — dynamic add isn't implemented; use the Team picker.
+- `tmsg pane new|close|read|write` — RPC: writes `<.rpc/uuid>.req`, polls for `.res`. `tmsg pane new` splits the requester's pane and inserts a sibling running the same AI program with a fresh role+label (see `teamRpc.ts:handleNew`).
 
 **Two watchers per team**, both in `src-tauri/src/team/watcher.rs` and stored in `TeamManager`'s `DashMap<teamId, Vec<Debouncer>>`:
 
@@ -198,7 +198,35 @@ Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next
 
 **Restart resume**: `App.tsx`'s mount effect awaits `hydrateWorkspace()` → `loadKanban()` → `useTeamStore.load()`, then calls `resumeTeam(teamId)` for every active team whose `tab_id` matches a live tab. `resumeTeam` re-renders prompt files (so role/skill changes between releases propagate), re-derives the `pendingCommand`, and writes it back into the existing pane payloads via `setPanePayload`. The Terminal effect at `Terminal.tsx:438` re-fires when `pendingCommand` flips from undefined to a string, even if `sessionId` was already set — so re-injecting after PTY spawn still runs the agent CLI. The team-RPC subscription is also re-established here.
 
-**`tmsg.sh` paths and team data are gitignorable.** Add `.teamship/` to the project's `.gitignore` if you don't want coordination logs in PRs. The directory is intentionally inside the working tree so agents can read it with their normal file tools.
+**`tmsg.sh` paths and team data are gitignorable.** `.teamship/` is in this repo's own `.gitignore`. The directory is intentionally inside the working tree so agents can read it with their normal file tools.
+
+**Auto-archive on tab close.** `App.tsx` subscribes to `useWorkspaceStore` and calls `useTeamStore.archive(teamId)` whenever a team's `tabId` disappears from `tabs`. This stops the watchers, marks `teams.status = 'archived'`, and prevents resume from trying to revive a dead tab. The team's `.teamship/teams/<id>/` files stay on disk; reactivating from the Teams view re-launches a fresh tab against them.
+
+**Teams view (`src/components/team/TeamsView.tsx`)** is a sidebar nav target between Kanban and Agents. Lists active + archived teams with per-row actions: Open (focus existing tab), Launch (active without live tab → fresh tab), Reactivate (archived → active), Rename (double-click team name), Archive. `useTeamStore.reactivate(teamId)` clears stale `tab_id` and per-agent `pane_id` before relaunch, so the next `launchTeam` writes a fresh layout.
+
+**`settings.team` shape** (read/written via `useTeamSettingsStore`, plain JSON in the existing `settings_get/set("team")` slot):
+
+```ts
+{
+  customSkills: { id, label, body }[],         // user-defined skill checkboxes
+  customRoles:  { id, label, accent?, body }[],// user-defined roles
+  templates:    { id, name, goalSeed?, roster, skillIds }[],
+}
+```
+
+Custom role ids must be unique against `BUILTIN_ROLES` — the picker prefixes them with `custom:` so collisions can't happen. Helpers `roleLabel(role, customRoles)` / `roleAccent(role, customRoles)` / `rolePromptBody(role, customRoles)` resolve either built-in or custom; legacy callers can still use `ROLE_LABELS` / `ROLE_ACCENTS` for built-in-only lookup. Adding a new built-in role still requires editing `teamRoles.ts` (BUILTIN_ROLES, BUILTIN_LABELS, BUILTIN_ACCENTS, BUILTIN_BODIES) — TS catches three of those, the body map is the easy miss.
+
+**Templates** snapshot `{ name, goalSeed, roster, skillIds }`. Roster rows store an `agentId` *hint*; if the kanban agent for that hint was deleted, apply falls back to the first available. Apply happens in-form (no commit until the user hits Launch); Save is a button next to Cancel that prompts for a name.
+
+**AI-assisted decomposition** (`src/lib/teamDecompose.ts`) calls the existing `aiChat` Rust command with a strict-JSON system prompt and the catalog of built-in roles, kanban programs, and built-in skills as context. Output schema is `{ teamName, roster: [{role, label, programHint}], skillIds, notes? }`. Parser tolerates one or two stray sentences and ```json fences. Picker button next to the Goal label fills name + roster + skills; missing program hints fall back to the first kanban agent. `notes` shows as a form hint so the operator sees the model's rationale.
+
+**MESSAGES.md compaction.** `team_compact_messages` Rust command (`src-tauri/src/team/commands.rs`) holds the same `flock(.lock)` `tmsg.sh` uses, splits MESSAGES.md at block boundaries, appends the oldest blocks to `MESSAGES.archive.md`, and atomically replaces MESSAGES.md with the recent slice. Threshold defaults to 500/keep 250, fired from the chat panel with a 60s debounce after every refresh. Unix-only — Windows builds get a no-op stub. The `.lock` file is the only place we use `libc::flock`; tmsg.sh's `flock -x 9` and our `LOCK_EX` are the same kernel BSD-flock primitive, so they coordinate even though tmsg uses `/usr/bin/flock`.
+
+**Voice-to-team.** STT `inject.ts` adds `fanToTeamPanes(originPaneId, originSessionId, bytes)` after the normal terminal write. When the source pane belongs to a team tab and `tab.selectedPaneIds.length < 2`, the dictation is fanned into every other team-pane PTY (no newline). With explicit multi-pane selection, `broadcastBytes` already handles fan-out — `fanToTeamPanes` short-circuits to avoid double-writes.
+
+**Chat panel polish.** Messages from the same sender to the same recipient within 5 minutes group under a single meta header. A search input filters by sender / recipient / body. The list auto-scrolls to bottom only when the user is already at the bottom (otherwise a "↓ Latest" pill appears). `@operator` threads get an accent border. Auto-compaction calls happen here.
+
+**Resume logging.** `[team.resume] start/skip/done` in `teamLauncher.ts` and `[terminal] pendingCommand armed/firing` in `Terminal.tsx` are the two log lines to grep when verifying a restart-resume — together they tell you whether (a) the team data hydrated, (b) per-agent prompts re-rendered, (c) the 600ms-delayed effect re-fired after sessionId already settled.
 
 ### Build artifacts
 
