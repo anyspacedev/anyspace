@@ -14,6 +14,7 @@ mod screenshot;
 mod settings;
 mod shell_integration;
 mod stt;
+mod team;
 mod workspace;
 
 const PREVIEW_PICKER_SCRIPT: &str = include_str!("preview/picker_script.js");
@@ -99,6 +100,7 @@ pub fn run() {
         .manage(pty::PtyManager::new())
         .manage(preview::PreviewManager::new())
         .manage(mobile::MobileManager::new())
+        .manage(team::TeamManager::new())
         .invoke_handler(tauri::generate_handler![
             // PTY
             pty::commands::pty_spawn,
@@ -139,6 +141,13 @@ pub fn run() {
             // Workspace persistence
             workspace::commands::workspace_save,
             workspace::commands::workspace_load,
+            // Team mode
+            team::commands::team_init,
+            team::commands::team_watch_start,
+            team::commands::team_watch_stop,
+            team::commands::team_rpc_reply,
+            team::commands::team_rpc_drain,
+            team::commands::team_write_prompt,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

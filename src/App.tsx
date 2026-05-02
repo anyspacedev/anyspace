@@ -7,8 +7,10 @@ import { useKanbanStore } from "./stores/kanbanStore";
 import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
+import { useTeamStore } from "./stores/teamStore";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
+import { resumeTeam } from "./lib/teamLauncher";
 import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
@@ -35,15 +37,33 @@ export default function App() {
   const loadStt = useSttStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
   const loadProxy = useProxyStore((s) => s.load);
+  const loadTeams = useTeamStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
-    void hydrateWorkspace();
-    void loadKanban().catch((e) => console.warn("[kanban] load failed", e));
+    void (async () => {
+      await hydrateWorkspace();
+      await loadKanban().catch((e) => console.warn("[kanban] load failed", e));
+      await loadTeams().catch((e) => console.warn("[team] load failed", e));
+      // After both workspace + team data are in memory, resume any team tab
+      // that survived the restart. resumeTeam re-renders prompt files and
+      // re-injects pendingCommand into the existing panes.
+      const teams = useTeamStore.getState().teams;
+      const tabs = useWorkspaceStore.getState().tabs;
+      for (const team of teams) {
+        if (team.status !== "active" || !team.tabId) continue;
+        if (!tabs.some((t) => t.id === team.tabId)) continue;
+        try {
+          await resumeTeam(team.id);
+        } catch (err) {
+          console.warn("[team] resume failed", team.id, err);
+        }
+      }
+    })();
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest

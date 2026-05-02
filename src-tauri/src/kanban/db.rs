@@ -20,5 +20,11 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/003_update_default_agents.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "team_mode",
+            sql: include_str!("../../migrations/004_team.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

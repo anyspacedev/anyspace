@@ -3515,3 +3515,235 @@ body.screenshot-dragging {
     animation: none;
   }
 }
+
+/* ===== Team picker ===== */
+.form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+.form-hint-error {
+  color: var(--danger);
+}
+.team-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.team-roster-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+.team-roster-row select,
+.team-roster-row input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  color: var(--fg);
+  font-size: var(--font-size);
+}
+.team-skill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+.team-skill {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+.team-skill input[type="checkbox"] {
+  grid-row: 1 / span 2;
+  align-self: start;
+  margin-top: 2px;
+}
+.team-skill-label {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+.team-skill-body {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  grid-column: 2 / 3;
+  line-height: 1.4;
+}
+.team-skill.active {
+  border-color: color-mix(in oklab, var(--accent, var(--fg-muted)) 60%, var(--border));
+  background: color-mix(in oklab, var(--accent, var(--fg)) 6%, var(--bg));
+}
+.team-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.team-attachment-row {
+  display: grid;
+  grid-template-columns: 1fr 32px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.team-attachment-path {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Team chat panel ===== */
+.workspace.has-team-chat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 0;
+}
+.workspace.has-team-chat .workspace-tab {
+  min-width: 0;
+}
+.team-chat {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-elev);
+  height: 100%;
+  min-height: 0;
+}
+.team-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.team-chat-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+.team-chat-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.team-chat-pill {
+  font-size: var(--font-size-xs);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.team-chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.team-chat-empty {
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}
+.team-chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.team-chat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+.team-chat-from { font-weight: 600; color: var(--fg); }
+.team-chat-arrow { opacity: 0.6; }
+.team-chat-to { font-weight: 600; }
+.team-chat-type {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--border);
+  color: var(--fg);
+}
+.team-chat-type-escalation { background: color-mix(in oklab, var(--danger) 25%, var(--bg)); color: var(--danger); }
+.team-chat-type-done { background: color-mix(in oklab, var(--success, #34d399) 25%, var(--bg)); }
+.team-chat-ts { margin-left: auto; opacity: 0.7; font-family: var(--font-mono); }
+.team-chat-body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.team-chat-input {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.team-chat-input select,
+.team-chat-input textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+.team-chat-input textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--font-mono);
+}
+.team-chat-input .btn {
+  justify-self: end;
+}
+.team-chat-info {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  padding: 4px 10px 8px;
+}
+.team-chat-tab {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding: 8px 6px;
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+.team-chat-tab:hover {
+  color: var(--fg);
+}
+

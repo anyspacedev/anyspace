@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useTeamStore } from "../../stores/teamStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { PaneGrid } from "./PaneGrid";
+import { TeamChatPanel } from "../team/TeamChatPanel";
 import { useThemeStore } from "../../stores/themeStore";
 import { Icon } from "../ui/Icon";
 
@@ -78,8 +80,11 @@ export function WorkspaceView() {
     );
   }
 
+  const teams = useTeamStore((s) => s.teams);
+  const teamForActive = teams.find((t) => t.tabId === activeTabId);
+
   return (
-    <div className="workspace">
+    <div className={"workspace" + (teamForActive ? " has-team-chat" : "")}>
       {tabs.map((t) => (
         <div
           key={t.id}
@@ -89,6 +94,7 @@ export function WorkspaceView() {
           <PaneGrid tab={t} />
         </div>
       ))}
+      {teamForActive && activeTabId && <TeamChatPanel tabId={activeTabId} />}
     </div>
   );
 }
