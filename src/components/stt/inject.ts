@@ -4,8 +4,10 @@ import { ptyWrite } from "../../lib/tauri";
 import { broadcastBytes } from "../../lib/paneBroadcast";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useTeamStore } from "../../stores/teamStore";
+import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { getTerminalContext } from "../terminal/terminalRegistry";
 import { getEditor } from "./editorRegistry";
+import { getSuperAgentInput } from "../superAgent/inputRegistry";
 
 export type InjectTarget =
   | { kind: "terminal"; sessionId: string; paneId: string; label: string }
@@ -123,6 +125,31 @@ export async function inject(text: string, target: InjectTarget): Promise<Inject
     } catch (e) {
       console.error("[stt:inject] contenteditable write failed:", e);
       return clipboardFallback(text, `editable write failed: ${stringifyErr(e)}`);
+    }
+  }
+
+  // Last-resort: if the Super Agent panel is open or its full-page view is
+  // active, route into its textarea. The textarea ref is registered when the
+  // panel mounts and unregisters on unmount; we focus it before writing so
+  // the existing dom-input pipeline takes the result naturally on next runs.
+  const ws = useWorkspaceStore.getState();
+  const sa = useSuperAgentStore.getState();
+  const superAgentReachable =
+    sa.panelOpen || ws.selectedView === "superagent";
+  if (superAgentReachable) {
+    const el = getSuperAgentInput();
+    if (el) {
+      el.focus();
+      try {
+        const start = el.selectionStart ?? el.value.length;
+        const end = el.selectionEnd ?? el.value.length;
+        el.setRangeText(text, start, end, "end");
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        return { ok: true, fallback: null, message: "Pasted to Super Agent" };
+      } catch (e) {
+        return clipboardFallback(text, `super agent write failed: ${stringifyErr(e)}`);
+      }
     }
   }
 

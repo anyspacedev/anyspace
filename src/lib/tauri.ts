@@ -169,6 +169,67 @@ export async function aiChat(args: AiChatArgs): Promise<string> {
   return rawInvoke<string>("ai_chat", { args });
 }
 
+// === Streaming ai chat (Super Agent) ===
+export type AiMessage =
+  | { role: "system" | "user"; content: string }
+  | { role: "assistant"; content: string | null; tool_calls?: AiToolCall[] }
+  | { role: "tool"; tool_call_id: string; content: string };
+
+export type AiToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+};
+
+export type AiToolDef = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+export type ChatStreamArgs = {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  messages: AiMessage[];
+  tools?: AiToolDef[];
+  toolChoice?: "auto" | "none" | { type: "function"; function: { name: string } };
+  streaming?: boolean;
+};
+
+export type AiStreamEvent =
+  | { type: "delta"; content: string }
+  | {
+      type: "tool_call_delta";
+      index: number;
+      id?: string;
+      name?: string;
+      arguments_partial?: string;
+    }
+  | { type: "done"; finish_reason?: string }
+  | { type: "error"; message: string };
+
+export type AiStreamHandle = {
+  streamId: string;
+  abort: () => Promise<void>;
+};
+
+export async function aiChatStream(
+  args: ChatStreamArgs,
+  onEvent: (ev: AiStreamEvent) => void,
+): Promise<AiStreamHandle> {
+  const channel = new Channel<AiStreamEvent>();
+  channel.onmessage = (ev) => onEvent(ev);
+  const streamId = await rawInvoke<string>("ai_chat_stream", { args, onEvent: channel });
+  return {
+    streamId,
+    abort: () => rawInvoke<void>("abort_ai_chat_stream", { streamId }),
+  };
+}
+
 export async function clipboardSaveBlob(bytes: Uint8Array, ext: string): Promise<string> {
   return rawInvoke<string>("clipboard_save_blob", { bytes: Array.from(bytes), ext });
 }

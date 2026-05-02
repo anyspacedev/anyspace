@@ -47,7 +47,7 @@ dashmap = "6"
 libc = "0.2"
 
 # http probe for preview port detection
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks", "stream"] }
 
 # screen-region capture for the preview pane screenshot button. xcap gives us
 # pixel-perfect captures across cross-origin iframes, WebGL canvases, and

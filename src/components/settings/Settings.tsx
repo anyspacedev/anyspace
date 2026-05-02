@@ -13,6 +13,12 @@ import { Icon } from "../ui/Icon";
 import { useSttStore, type SttSettings } from "../../stores/sttStore";
 import { useAiStore, type AiSettings } from "../../stores/aiStore";
 import { useProxyStore, type ProxySettings } from "../../stores/proxyStore";
+import {
+  useSuperAgentSettingsStore,
+  isToolEnabled,
+} from "../../stores/superAgentSettingsStore";
+import { useSuperAgentStore } from "../../stores/superAgentStore";
+import { TOOLS } from "../../lib/superAgent/tools";
 
 const CLERK_CONFIGURED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -56,6 +62,8 @@ export function Settings() {
       <SttSettingsSection />
 
       <AiSettingsSection />
+
+      <SuperAgentSettingsSection />
 
       <ProxySettingsSection />
 
@@ -770,6 +778,162 @@ function SignedInRow() {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ fontWeight: 500 }}>{user?.fullName || email}</div>
         <div style={{ color: "var(--mut, #888)", fontSize: 12 }}>{email}</div>
+      </div>
+    </div>
+  );
+}
+
+function SuperAgentSettingsSection() {
+  const settings = useSuperAgentSettingsStore((s) => s.settings);
+  const update = useSuperAgentSettingsStore((s) => s.update);
+  const setToolEnabled = useSuperAgentSettingsStore((s) => s.setToolEnabled);
+  const ai = useAiStore((s) => s.settings);
+  const activeSessionId = useSuperAgentStore((s) => s.activeSessionId);
+  const resetSession = useSuperAgentStore((s) => s.resetSession);
+
+  const effectiveEndpoint = settings.endpoint || ai.endpoint;
+  const effectiveModel = settings.model || ai.model;
+  const hasKey = Boolean(settings.apiKey || ai.apiKey);
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <div className="settings-section-title">Super Agent</div>
+        <div className="settings-section-sub">
+          The in-app chat agent. Defaults to the AI section's endpoint / API key / model unless
+          you override below. Tools run in trust mode — disable any you don't want the model to call.
+        </div>
+      </div>
+      <div className="stt-fields">
+        <label className="stt-field">
+          <span className="stt-field-label">Endpoint override (optional)</span>
+          <input
+            type="text"
+            value={settings.endpoint}
+            placeholder={ai.endpoint || "(uses AI section endpoint)"}
+            onChange={(e) => void update({ endpoint: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">API key override (optional)</span>
+          <input
+            type="password"
+            value={settings.apiKey}
+            placeholder={hasKey ? "(uses AI section key)" : "sk-…"}
+            onChange={(e) => void update({ apiKey: e.target.value })}
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">Model override (optional)</span>
+          <input
+            type="text"
+            value={settings.model}
+            placeholder={ai.model || "(uses AI section model)"}
+            onChange={(e) => void update({ model: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">System prompt</span>
+          <textarea
+            value={settings.systemPrompt}
+            rows={5}
+            onChange={(e) => void update({ systemPrompt: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <div className="form-row-inline" style={{ gap: 12 }}>
+          <label className="stt-field" style={{ flex: 1 }}>
+            <span className="stt-field-label">Memory window (turns)</span>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={settings.memoryWindow}
+              onChange={(e) => void update({ memoryWindow: Math.max(1, Number(e.target.value) || 30) })}
+            />
+          </label>
+          <label className="stt-field" style={{ flex: 1 }}>
+            <span className="stt-field-label">Max tool calls / turn</span>
+            <input
+              type="number"
+              min={0}
+              max={32}
+              value={settings.maxToolCallsPerTurn}
+              onChange={(e) =>
+                void update({ maxToolCallsPerTurn: Math.max(0, Number(e.target.value) || 6) })
+              }
+            />
+          </label>
+        </div>
+
+        <label className="stt-field">
+          <span className="stt-field-label">
+            <input
+              type="checkbox"
+              checked={settings.streaming}
+              onChange={(e) => void update({ streaming: e.target.checked })}
+              style={{ marginRight: 6 }}
+            />
+            Stream tokens (falls back to one-shot if endpoint rejects stream:true)
+          </span>
+        </label>
+      </div>
+
+      <div className="settings-section-head" style={{ marginTop: 16 }}>
+        <div className="settings-section-title" style={{ fontSize: 14 }}>Tools</div>
+        <div className="settings-section-sub">
+          Disabled tools are stripped from the model's tools[] payload and short-circuited at
+          execution if the model still names them. Effective endpoint:{" "}
+          <code>{effectiveEndpoint || "(none)"}</code>
+          {effectiveModel ? <> · <code>{effectiveModel}</code></> : null}
+        </div>
+      </div>
+      <div className="sa-tools-list">
+        {TOOLS.map((t) => (
+          <label key={t.name} className="sa-tools-row">
+            <input
+              type="checkbox"
+              checked={isToolEnabled(t.name, settings)}
+              onChange={(e) => void setToolEnabled(t.name, e.target.checked)}
+            />
+            <div>
+              <div className="sa-tools-name">
+                <code>{t.name}</code>
+                <span className={"sa-tools-kind" + (t.readOnly ? " ro" : " rw")}>
+                  {t.readOnly ? "read" : "write"}
+                </span>
+              </div>
+              <div className="sa-tools-desc">{t.description}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      <div className="modal-actions" style={{ justifyContent: "flex-start", marginTop: 12 }}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            if (!activeSessionId) return;
+            void resetSession(activeSessionId);
+          }}
+          disabled={!activeSessionId}
+          title={
+            activeSessionId
+              ? "Clear the current session's message history"
+              : "No active session"
+          }
+        >
+          Reset session memory
+        </button>
       </div>
     </div>
   );

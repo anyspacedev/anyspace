@@ -43,6 +43,35 @@ function guardDraft(cmd: string): string {
   return DESTRUCTIVE.test(cmd) ? `# ${cmd}` : cmd;
 }
 
+/** Capture context from a single pane and return the sanitized + guarded
+ *  next-command suggestion. Used both by the legacy ⌘⇧B keybind (write=true,
+ *  default) and by the Super Agent's quick_suggest tool (write=false). */
+export async function runQuickSuggest(opts: {
+  paneId: string;
+  write?: boolean;
+}): Promise<string> {
+  const ctx = getTerminalContext(opts.paneId);
+  if (!ctx) throw new Error("no completed command block on that pane");
+  const ai = useAiStore.getState().settings;
+  if (!ai.endpoint || !ai.apiKey || !ai.model) {
+    throw new Error("AI not configured (Settings → AI)");
+  }
+  const reply = await aiChat({
+    endpoint: ai.endpoint,
+    apiKey: ai.apiKey,
+    model: ai.model,
+    systemPrompt: SUPER_BRAIN_SYSTEM_PROMPT,
+    userMessage: buildUserMessage(ctx),
+  });
+  const cmd = sanitize(reply);
+  if (!cmd) throw new Error("model returned no usable command");
+  const safe = guardDraft(cmd);
+  if (opts.write !== false) {
+    await ptyWrite(ctx.sessionId, new TextEncoder().encode(safe));
+  }
+  return safe;
+}
+
 export async function runSuperBrain(tabId: string): Promise<void> {
   console.log("[superBrain] invoked", { tabId });
   const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);

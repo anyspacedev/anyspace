@@ -349,6 +349,19 @@
   position: absolute;
   inset: 0;
 }
+/* Grid-aware wrapper that holds the active tab's pane grid. Becomes the 1fr
+   column when team-chat or super-agent rails are docked. position:relative so
+   the absolutely-positioned .workspace-tab children scope to it (not the full
+   .workspace which would visually leak under the rails). */
+.workspace-content {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+}
+.workspace:not(.has-team-chat):not(.has-super-agent) .workspace-content {
+  position: absolute;
+  inset: 0;
+}
 
 .workspace-tab {
   position: absolute;
@@ -3805,6 +3818,411 @@ body.screenshot-dragging {
 .team-chat-resize:hover,
 .team-chat-resize:active {
   background: color-mix(in oklab, var(--accent, var(--fg-muted)) 30%, transparent);
+}
+
+/* ===== Super Agent panel ===== */
+.workspace.has-super-agent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--super-agent-w, 360px);
+}
+.workspace.has-team-chat.has-super-agent {
+  grid-template-columns: minmax(0, 1fr) var(--super-agent-w, 360px) var(--team-chat-w, 320px);
+}
+.sa-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+  height: 100%;
+  min-height: 0;
+}
+.sa-panel-full {
+  border-left: none;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+.sa-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+}
+.sa-resize:hover,
+.sa-resize:active {
+  background: color-mix(in oklab, var(--accent, var(--fg-muted)) 30%, transparent);
+}
+.sa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.sa-header-titles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.sa-title {
+  background: none;
+  border: none;
+  padding: 0;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.sa-title:hover { color: var(--accent, var(--fg)); }
+.sa-title-input {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  max-width: 180px;
+}
+.sa-session-switch {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  color: var(--fg-muted);
+  font-size: var(--font-size-xs);
+  max-width: 140px;
+}
+.sa-header-actions {
+  display: flex;
+  gap: 2px;
+}
+.sa-header-actions .btn.active {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+}
+.sa-search {
+  position: relative;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.sa-search input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 26px 5px 8px;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+}
+.sa-search-clear {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+.sa-search-clear:hover {
+  color: var(--fg);
+  background: var(--border);
+}
+.sa-list-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sa-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.sa-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--fg-muted);
+  padding: 20px;
+}
+.sa-empty-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  margin-bottom: 6px;
+}
+.sa-empty-sub {
+  font-size: var(--font-size-sm);
+  max-width: 360px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+.sa-jump {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+.sa-jump:hover {
+  background: var(--border);
+}
+
+/* === Bubbles === */
+.sa-msg {
+  display: flex;
+  flex-direction: column;
+}
+.sa-msg-user { align-items: flex-end; }
+.sa-msg-assistant { align-items: flex-start; }
+.sa-bubble {
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 92%;
+}
+.sa-bubble-user {
+  background: color-mix(in oklab, var(--accent, var(--fg)) 14%, var(--bg));
+  border: 1px solid color-mix(in oklab, var(--accent, var(--fg)) 30%, var(--border));
+  color: var(--fg);
+}
+.sa-bubble-assistant {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+.sa-bubble-assistant.streaming {
+  border-color: color-mix(in oklab, var(--accent, var(--fg)) 40%, var(--border));
+}
+.sa-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  animation: sa-cursor-blink 1s steps(2) infinite;
+  color: var(--accent, var(--fg));
+}
+@keyframes sa-cursor-blink {
+  to { opacity: 0; }
+}
+
+/* === Tool call cards === */
+.sa-msg-tool { gap: 6px; }
+.sa-toolcard {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+}
+.sa-toolcard-running {
+  border-color: color-mix(in oklab, var(--accent, var(--fg)) 40%, var(--border));
+}
+.sa-toolcard-error {
+  border-color: color-mix(in oklab, var(--danger) 40%, var(--border));
+  background: color-mix(in oklab, var(--danger) 6%, var(--bg));
+}
+.sa-toolcard-disabled,
+.sa-toolcard-skipped {
+  opacity: 0.6;
+}
+.sa-toolcard-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sa-toolcard-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--fg);
+}
+.sa-toolcard-status {
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--border);
+  color: var(--fg-muted);
+}
+.sa-toolcard-status-ok { background: color-mix(in oklab, var(--success, #34d399) 25%, var(--bg)); color: var(--success, #34d399); }
+.sa-toolcard-status-error { background: color-mix(in oklab, var(--danger) 25%, var(--bg)); color: var(--danger); }
+.sa-toolcard-status-running { background: color-mix(in oklab, var(--accent, var(--fg)) 22%, var(--bg)); color: var(--accent, var(--fg)); }
+.sa-toolcard-status-queued { background: color-mix(in oklab, var(--warning, #f59e0b) 25%, var(--bg)); color: var(--warning, #f59e0b); }
+.sa-toolcard-duration {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--fg-muted);
+}
+.sa-toolcard-args-toggle,
+.sa-toolcard-result-toggle {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 6px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  align-items: baseline;
+}
+.sa-toolcard-args-toggle:hover,
+.sa-toolcard-result-toggle:hover {
+  color: var(--fg);
+}
+.sa-toolcard-args-toggle code,
+.sa-toolcard-result-toggle code {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 5%, transparent);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 10.5px;
+}
+.sa-toolcard-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* === Input === */
+.sa-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.sa-input textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  resize: vertical;
+  min-height: 64px;
+}
+.sa-input-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sa-input-hint {
+  font-size: 10px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed pill (when panel is hidden) */
+.sa-collapsed-tab {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding: 8px 6px;
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+.sa-collapsed-tab:hover { color: var(--fg); }
+
+/* Super Agent settings — tools list */
+.sa-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.sa-tools-row {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  align-items: start;
+  cursor: pointer;
+}
+.sa-tools-row input[type="checkbox"] {
+  margin-top: 2px;
+}
+.sa-tools-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sa-tools-name code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  font-weight: 600;
+}
+.sa-tools-kind {
+  font-size: 9px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+.sa-tools-kind.ro {
+  background: color-mix(in oklab, var(--accent, var(--fg)) 14%, var(--bg));
+  color: var(--accent, var(--fg));
+}
+.sa-tools-kind.rw {
+  background: color-mix(in oklab, var(--warning, #f59e0b) 18%, var(--bg));
+  color: var(--warning, #f59e0b);
+}
+.sa-tools-desc {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  line-height: 1.4;
+  margin-top: 2px;
 }
 .team-chat-header {
   display: flex;
