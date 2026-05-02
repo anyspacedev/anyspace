@@ -125,6 +125,27 @@ export default function App() {
     };
   }, []);
 
+  // When a team's tab is closed (manually via the X, or the last tab gone),
+  // archive the team so resume on next launch doesn't try to re-spawn into
+  // a tab that no longer exists. Subscribed once at the workspace-store level
+  // so we don't entangle workspaceStore with team logic directly.
+  useEffect(() => {
+    const unsub = useWorkspaceStore.subscribe((state, prev) => {
+      if (state.tabs === prev.tabs) return;
+      const liveTabIds = new Set(state.tabs.map((t) => t.id));
+      const teams = useTeamStore.getState().teams;
+      for (const team of teams) {
+        if (team.status !== "active" || !team.tabId) continue;
+        if (!liveTabIds.has(team.tabId)) {
+          void useTeamStore.getState().archive(team.id).catch((e) => {
+            console.warn("[team] auto-archive on tab close failed", team.id, e);
+          });
+        }
+      }
+    });
+    return unsub;
+  }, []);
+
   // Tauri's data-tauri-drag-region handles drag, but not double-click maximize.
   // Wire it manually so the titlebar/brand behave like a native title bar.
   useEffect(() => {

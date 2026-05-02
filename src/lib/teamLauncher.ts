@@ -231,9 +231,16 @@ function shellQuote(v: string): string {
 export async function resumeTeam(teamId: string): Promise<boolean> {
   const teamState = useTeamStore.getState();
   const team = teamState.teams.find((t) => t.id === teamId);
-  if (!team || team.status !== "active" || !team.tabId) return false;
+  if (!team || team.status !== "active" || !team.tabId) {
+    console.log("[team.resume] skip", { teamId, found: !!team, status: team?.status, tabId: team?.tabId });
+    return false;
+  }
   const teamAgents = teamState.agents[teamId] ?? [];
-  if (teamAgents.length === 0) return false;
+  if (teamAgents.length === 0) {
+    console.log("[team.resume] skip — no agents in roster", { teamId });
+    return false;
+  }
+  console.log("[team.resume] start", { teamId, name: team.name, agentCount: teamAgents.length });
   const skillIds = teamState.skills[teamId] ?? [];
   const attachments = teamState.attachments[teamId] ?? [];
 
@@ -253,12 +260,33 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
   const roster = rosterMarkdown(team, teamAgents);
   const kanbanAgents = useKanbanStore.getState().agents;
 
+  let restored = 0;
+  let skipped = 0;
   for (const ta of teamAgents) {
-    if (!ta.paneId) continue;
+    if (!ta.paneId) {
+      console.log("[team.resume] skip agent — no paneId", { label: ta.label });
+      skipped++;
+      continue;
+    }
     const pane = tab.panes[ta.paneId];
-    if (!pane || pane.kind !== "terminal") continue;
+    if (!pane || pane.kind !== "terminal") {
+      console.log("[team.resume] skip agent — pane missing or wrong kind", {
+        label: ta.label,
+        paneId: ta.paneId,
+        kind: pane?.kind,
+      });
+      skipped++;
+      continue;
+    }
     const programAgent = kanbanAgents.find((a) => a.id === ta.agentId);
-    if (!programAgent) continue;
+    if (!programAgent) {
+      console.log("[team.resume] skip agent — program agent gone", {
+        label: ta.label,
+        agentId: ta.agentId,
+      });
+      skipped++;
+      continue;
+    }
 
     const promptBody =
       ta.systemPromptOverride ??
@@ -308,7 +336,9 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
       teamId: team.id,
       teamAgentId: ta.id,
     });
+    restored++;
   }
+  console.log("[team.resume] done", { teamId, restored, skipped });
 
   try {
     await teamWatchStart(team.id, paths.teamDir);

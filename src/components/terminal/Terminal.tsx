@@ -437,7 +437,13 @@ export function Terminal({ pane, tabId }: Props) {
   const sessionId = pane.payload?.sessionId as string | undefined;
   useEffect(() => {
     if (!pendingCommand || !sessionId) return;
+    console.log("[terminal] pendingCommand armed", {
+      paneId: pane.id,
+      sessionId,
+      cmdPreview: pendingCommand.slice(0, 80),
+    });
     const id = window.setTimeout(() => {
+      console.log("[terminal] pendingCommand firing", { paneId: pane.id });
       void ptyWrite(sessionId, new TextEncoder().encode(pendingCommand + "\n"));
       setPanePayload(tabId, pane.id, { pendingCommand: undefined });
     }, 600);
