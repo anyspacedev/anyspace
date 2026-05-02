@@ -69,17 +69,17 @@ export function WorkspaceView() {
                 className="btn btn-with-icon"
                 onClick={() => setTeamPickerOpen(true)}
               >
-                <Icon name="sparkles" size={14} />
+                <Icon name="users-round" size={14} />
                 <span>Start team</span>
               </button>
-              <button
-                className="btn btn-with-icon"
-                onClick={() => setView("kanban")}
-              >
-                <Icon name="list-checks" size={14} />
-                <span>Browse tasks</span>
-              </button>
             </div>
+            <button
+              type="button"
+              className="welcome-tertiary"
+              onClick={() => setView("kanban")}
+            >
+              or browse your task board →
+            </button>
             <div className="welcome-hints">
               <div className="welcome-hint">
                 <kbd>⌘T</kbd>

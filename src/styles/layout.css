@@ -623,6 +623,24 @@
   gap: var(--pad-sm);
   margin-top: 4px;
 }
+.welcome-tertiary {
+  background: transparent;
+  border: none;
+  padding: 6px 4px;
+  margin-top: 6px;
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  align-self: center;
+}
+.welcome-tertiary:hover {
+  color: var(--fg);
+}
+.welcome-tertiary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .welcome-hints {
   display: flex;
   flex-wrap: wrap;
@@ -3544,6 +3562,10 @@ body.screenshot-dragging {
   color: var(--fg);
   font-size: var(--font-size);
 }
+.team-roster-row input[aria-invalid="true"] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 20%, transparent);
+}
 .team-skill-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -3687,6 +3709,46 @@ body.screenshot-dragging {
   text-overflow: ellipsis;
 }
 
+/* Save-as-template popover anchored to the action-row button so opening it
+   doesn't shift the modal-actions row layout. */
+.team-tpl-save-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.team-tpl-save-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-elev-2, var(--bg-elev));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  animation: modal-in var(--duration-fast) var(--ease-out);
+}
+.team-tpl-save-pop-label {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+.team-tpl-save-pop input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+}
+.team-tpl-save-pop-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 /* ===== Team chat panel ===== */
 .workspace.has-team-chat {
   display: grid;
@@ -3799,10 +3861,20 @@ body.screenshot-dragging {
   color: var(--fg);
   background: var(--border);
 }
+.team-chat-list-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.team-chat-list-wrap > .team-chat-list {
+  flex: 1;
+}
 .team-chat-jump {
   position: absolute;
-  bottom: 130px;
-  right: 16px;
+  bottom: 8px;
+  right: 12px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -3811,6 +3883,7 @@ body.screenshot-dragging {
   color: var(--fg);
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1;
 }
 .team-chat-jump:hover {
   background: var(--border);

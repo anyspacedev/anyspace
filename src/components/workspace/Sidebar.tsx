@@ -26,7 +26,7 @@ const NAV_ITEMS: Array<{
 }> = [
   { id: "workspace", label: "Workspaces", icon: "layers" },
   { id: "kanban", label: "Tasks", icon: "list-checks" },
-  { id: "teams", label: "Teams", icon: "circle" },
+  { id: "teams", label: "Teams", icon: "users-round" },
   { id: "agents", label: "Agents", icon: "sparkles" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];

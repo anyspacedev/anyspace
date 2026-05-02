@@ -181,7 +181,7 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
         aria-label="Open team chat"
         title="Open team chat"
       >
-        <Icon name="sparkles" size={14} />
+        <Icon name="users-round" size={14} />
       </button>
     );
   }
@@ -262,45 +262,46 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
         )}
       </div>
 
-      <div ref={listRef} className="team-chat-list" onScroll={onScroll}>
-        {groups.length === 0 && (
-          <div className="team-chat-empty">
-            {filter ? "No messages match the filter." : "No messages yet."}
-          </div>
-        )}
-        {groups.map((group, gi) => {
-          const head = group[0];
-          const isOperator = head.to === "@operator" || head.from === "@operator";
-          return (
-            <div
-              key={`${head.id}-${gi}`}
-              className={"team-chat-group" + (isOperator ? " team-chat-group-operator" : "")}
-            >
-              <div className="team-chat-meta">
-                <span className="team-chat-from">{head.from || "?"}</span>
-                <span className="team-chat-arrow">→</span>
-                <span className="team-chat-to">{head.to || "?"}</span>
-                <span className={`team-chat-type team-chat-type-${head.type}`}>{head.type}</span>
-                <span className="team-chat-ts">{shortTime(head.ts)}</span>
-              </div>
-              {group.map((m) => (
-                <div key={m.id} className="team-chat-body">{m.body}</div>
-              ))}
+      <div className="team-chat-list-wrap">
+        <div ref={listRef} className="team-chat-list" onScroll={onScroll}>
+          {groups.length === 0 && (
+            <div className="team-chat-empty">
+              {filter ? "No messages match the filter." : "No messages yet."}
             </div>
-          );
-        })}
+          )}
+          {groups.map((group, gi) => {
+            const head = group[0];
+            const isOperator = head.to === "@operator" || head.from === "@operator";
+            return (
+              <div
+                key={`${head.id}-${gi}`}
+                className={"team-chat-group" + (isOperator ? " team-chat-group-operator" : "")}
+              >
+                <div className="team-chat-meta">
+                  <span className="team-chat-from">{head.from || "?"}</span>
+                  <span className="team-chat-arrow">→</span>
+                  <span className="team-chat-to">{head.to || "?"}</span>
+                  <span className={`team-chat-type team-chat-type-${head.type}`}>{head.type}</span>
+                  <span className="team-chat-ts">{shortTime(head.ts)}</span>
+                </div>
+                {group.map((m) => (
+                  <div key={m.id} className="team-chat-body">{m.body}</div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+        {!atBottom && (
+          <button
+            type="button"
+            className="team-chat-jump"
+            onClick={jumpToBottom}
+            aria-label="Jump to latest"
+          >
+            ↓ Latest
+          </button>
+        )}
       </div>
-
-      {!atBottom && (
-        <button
-          type="button"
-          className="team-chat-jump"
-          onClick={jumpToBottom}
-          aria-label="Jump to latest"
-        >
-          ↓ Latest
-        </button>
-      )}
 
       <form
         className="team-chat-input"

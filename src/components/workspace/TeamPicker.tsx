@@ -123,6 +123,20 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
   const validRoster = roster.filter((r) => r.label.trim() && r.agentId);
   const labelsUnique =
     new Set(validRoster.map((r) => r.label.trim().toLowerCase())).size === validRoster.length;
+  // Per-row duplicate detection: any normalized label that appears more than
+  // once is flagged on every row that has it (so all duplicates highlight,
+  // not just the second).
+  const duplicateLabels = (() => {
+    const seen = new Map<string, number>();
+    for (const r of roster) {
+      const key = r.label.trim().toLowerCase();
+      if (!key) continue;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    return new Set([...seen].filter(([, n]) => n > 1).map(([k]) => k));
+  })();
+  const isDuplicateRow = (label: string) =>
+    duplicateLabels.has(label.trim().toLowerCase());
   const canLaunch =
     !busy &&
     projectPath.trim().length > 0 &&
@@ -335,6 +349,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
                   value={r.label}
                   onChange={(e) => updateRow(i, { label: e.target.value })}
                   placeholder="Builder 1"
+                  aria-invalid={isDuplicateRow(r.label) || undefined}
                 />
                 <select
                   aria-label="AI program"
@@ -552,64 +567,94 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
 
         {error && <div className="form-hint form-hint-error">{error}</div>}
 
-        {savingTemplate ? (
-          <div className="form-row">
-            <label>Save as template</label>
-            <div className="form-row-inline">
-              <input
-                autoFocus
-                value={draftTemplateName}
-                onChange={(e) => setDraftTemplateName(e.target.value)}
-                placeholder="Template name"
-              />
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  const tplName = draftTemplateName.trim() || name.trim() || "Team template";
-                  const tpl = {
-                    id: `tpl-${Math.random().toString(36).slice(2, 8)}`,
-                    name: tplName,
-                    goalSeed: goal.trim() || undefined,
-                    roster: roster
-                      .filter((r) => r.label.trim())
-                      .map((r) => ({ role: r.role, label: r.label.trim(), agentId: r.agentId })),
-                    skillIds: [...skills],
-                  };
-                  void saveTemplates([...templates, tpl]);
-                  setSavingTemplate(false);
-                  setDraftTemplateName("");
-                }}
-                disabled={roster.filter((r) => r.label.trim()).length === 0}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setSavingTemplate(false);
-                  setDraftTemplateName("");
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={reset} disabled={busy}>Cancel</button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-with-icon"
-            onClick={() => setSavingTemplate(true)}
-            disabled={busy || savingTemplate || roster.filter((r) => r.label.trim()).length === 0}
-            title="Save current roster + skills as a reusable template"
-          >
-            <Icon name="layers" size={12} />
-            <span>Save as template</span>
-          </button>
+          <div className="team-tpl-save-wrap">
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={() => {
+                if (!savingTemplate) {
+                  setDraftTemplateName(name.trim());
+                  setSavingTemplate(true);
+                } else {
+                  setSavingTemplate(false);
+                }
+              }}
+              disabled={busy || roster.filter((r) => r.label.trim()).length === 0}
+              title="Save current roster + skills as a reusable template"
+              aria-expanded={savingTemplate}
+            >
+              <Icon name="layers" size={12} />
+              <span>Save as template</span>
+            </button>
+            {savingTemplate && (
+              <div className="team-tpl-save-pop" role="dialog" aria-label="Save template">
+                <label className="team-tpl-save-pop-label" htmlFor="tpl-name-input">
+                  Template name
+                </label>
+                <input
+                  id="tpl-name-input"
+                  autoFocus
+                  value={draftTemplateName}
+                  onChange={(e) => setDraftTemplateName(e.target.value)}
+                  placeholder="e.g. Refactor squad"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSavingTemplate(false);
+                      setDraftTemplateName("");
+                    }
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const btn = e.currentTarget.parentElement?.querySelector(
+                        "button.btn-primary",
+                      ) as HTMLButtonElement | null;
+                      btn?.click();
+                    }
+                  }}
+                />
+                <div className="team-tpl-save-pop-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      setSavingTemplate(false);
+                      setDraftTemplateName("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      const tplName =
+                        draftTemplateName.trim() || name.trim() || "Team template";
+                      const tpl = {
+                        id: `tpl-${Math.random().toString(36).slice(2, 8)}`,
+                        name: tplName,
+                        goalSeed: goal.trim() || undefined,
+                        roster: roster
+                          .filter((r) => r.label.trim())
+                          .map((r) => ({
+                            role: r.role,
+                            label: r.label.trim(),
+                            agentId: r.agentId,
+                          })),
+                        skillIds: [...skills],
+                      };
+                      void saveTemplates([...templates, tpl]);
+                      setSavingTemplate(false);
+                      setDraftTemplateName("");
+                    }}
+                    disabled={roster.filter((r) => r.label.trim()).length === 0}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <div style={{ flex: 1 }} />
           <button className="btn btn-primary" onClick={launch} disabled={!canLaunch}>
             {busy ? "Launching…" : "Launch team"}
@@ -629,7 +674,7 @@ export function TeamPickerTrigger() {
         onClick={() => setOpen(true)}
         title="New Team workspace"
       >
-        <Icon name="plus" size={14} />
+        <Icon name="users-round" size={14} />
         <span>Team</span>
       </button>
       <TeamPickerModal open={open} onClose={() => setOpen(false)} />
