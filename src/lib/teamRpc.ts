@@ -2,6 +2,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   agentLaunch,
   ptyWrite,
+  teamInit,
   teamRpcDrain,
   teamRpcReply,
   teamWritePrompt,
@@ -11,8 +12,14 @@ import { getTerminalContext } from "../components/terminal/terminalRegistry";
 import { useKanbanStore } from "../stores/kanbanStore";
 import { useTeamStore } from "../stores/teamStore";
 import { useWorkspaceStore, type PanePreset } from "../stores/workspaceStore";
-import { renderRolePrompt, ROLE_LABELS, type TeamRole } from "./teamRoles";
+import {
+  renderRolePrompt,
+  ROLE_LABELS,
+  TEAM_ROLES,
+  type TeamRole,
+} from "./teamRoles";
 import { renderSkillsMarkdown } from "./teamSkills";
+import type { LayoutNode } from "./types";
 
 type RpcRequest = {
   action:
@@ -192,7 +199,10 @@ async function handleClose(req: RpcRequest): Promise<RpcResult> {
 
 async function handleNew(req: RpcRequest, teamDir: string): Promise<RpcResult> {
   const label = req.label?.trim();
-  const role = (req.role ?? "builder").toLowerCase() as TeamRole;
+  const roleRaw = (req.role ?? "builder").toLowerCase();
+  const role = (TEAM_ROLES as readonly string[]).includes(roleRaw)
+    ? (roleRaw as TeamRole)
+    : ("custom" as TeamRole);
   const fromLabel = req.from;
   if (!label) return { ok: false, error: "missing --label" };
   const fromInfo = findAgentByLabel(fromLabel);
@@ -200,104 +210,122 @@ async function handleNew(req: RpcRequest, teamDir: string): Promise<RpcResult> {
   const team = fromInfo.team;
   if (!team.tabId) return { ok: false, error: `team ${team.name} has no live tab` };
 
-  // Reuse the requester's program agent (Claude/Codex/...) for the new pane.
+  // Reuse the requester's AI program (Claude/Codex/...) for the new pane.
+  // The Coordinator can re-target by editing team_agents later.
   const kanbanAgents = useKanbanStore.getState().agents;
   const programAgent = kanbanAgents.find((a) => a.id === fromInfo.agent.agentId);
-  if (!programAgent) return { ok: false, error: `agent program for ${fromLabel} not found` };
+  if (!programAgent) return { ok: false, error: `AI program for ${fromLabel} not found` };
 
-  // Persist the new team_agents row.
-  const teamState = useTeamStore.getState();
-  const existing = teamState.agents[team.id] ?? [];
-  if (existing.some((a) => a.label === label)) {
-    return { ok: false, error: `label ${label} already in roster` };
+  // Persist the new team_agents row first so resume can pick it up even if
+  // the split fails partway.
+  let newTa;
+  try {
+    newTa = await useTeamStore.getState().addAgent(team.id, {
+      label,
+      role,
+      agentId: fromInfo.agent.agentId,
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
-  const ordinal = existing.length;
-  const newAgent = {
-    label,
-    role,
-    agentId: fromInfo.agent.agentId,
-  };
 
-  // Insert via the store's create helper would re-create the team; instead
-  // we mint a row directly. Reuse the existing patterns in teamStore by
-  // calling create on a one-off, but for simplicity here we just call the
-  // db through a thin path. For now, fail with a clear message and let the
-  // operator add the agent through the picker — full dynamic add is
-  // out-of-scope of this request.
-  // (The frontend RPC bridge stays read-mostly until we surface a
-  //  teamStore.addAgent helper.)
-  void newAgent;
-  void programAgent;
+  // Re-run team_init so prompt files / paths refresh (idempotent — BOARD.md
+  // is preserved if it exists). teamDir from the event already points here,
+  // but we use the result to keep the contract identical to launchTeam.
   void teamDir;
-  void ordinal;
-  return {
-    ok: false,
-    error: "tmsg pane new is not supported yet — add the agent via the Team picker",
-  };
-}
+  const teamState = useTeamStore.getState();
+  const skillIds = teamState.skills[team.id] ?? [];
+  const teamAgents = teamState.agents[team.id] ?? [];
+  const skillsMd = renderSkillsMarkdown(skillIds);
+  const rosterMd = teamAgents
+    .map((a) => `- **${a.label}** — ${ROLE_LABELS[a.role] ?? a.role}`)
+    .join("\n");
+  const paths = await teamInit({
+    teamId: team.id,
+    projectPath: team.projectPath,
+    boardMarkdown: `# Team Board: ${team.name}\n\n## Roster\n${rosterMd}\n`,
+  });
 
-/**
- * Helper used by teamLauncher / resume to (re)build a PanePreset for a single
- * agent. Kept here so the launcher and a future "add agent dynamically" path
- * share one source of truth.
- */
-export async function buildAgentPreset(args: {
-  team: { id: string; name: string; goal: string; projectPath: string; teamDir: string };
-  agent: { id: string; label: string; role: TeamRole };
-  programCommand: string;
-  programSystemPrompt: string;
-  programEnvJson: string;
-  paths: { boardPath: string; messagesPath: string; tmsgPath: string };
-  rosterMarkdown: string;
-  skillIds: string[];
-}): Promise<PanePreset> {
+  // Build the role prompt and the pendingCommand the same way the launcher does.
   const promptBody = renderRolePrompt({
-    role: args.agent.role,
-    label: args.agent.label,
-    goal: args.team.goal,
-    teamDir: args.team.teamDir,
-    boardPath: args.paths.boardPath,
-    messagesPath: args.paths.messagesPath,
-    rosterMarkdown: args.rosterMarkdown,
-    skillsMarkdown: renderSkillsMarkdown(args.skillIds),
+    role,
+    label,
+    goal: team.goal,
+    teamDir: paths.teamDir,
+    boardPath: paths.boardPath,
+    messagesPath: paths.messagesPath,
+    rosterMarkdown: rosterMd,
+    skillsMarkdown: skillsMd,
     attachmentsMarkdown: "",
   });
   const promptFile = await teamWritePrompt({
-    teamDir: args.team.teamDir,
-    label: args.agent.label,
+    teamDir: paths.teamDir,
+    label,
     body: promptBody,
   });
   const plan = await agentLaunch({
-    agentCommand: args.programCommand,
-    taskId: `${args.team.id}:${args.agent.id}`,
-    taskTitle: `${args.agent.label} — ${args.team.name}`,
+    agentCommand: programAgent.command,
+    taskId: `${team.id}:${newTa.id}`,
+    taskTitle: `${label} — ${team.name}`,
     taskBody: promptBody,
     taskColumn: "",
-    systemPrompt: args.programSystemPrompt,
-    envJson: args.programEnvJson,
+    systemPrompt: programAgent.systemPrompt,
+    envJson: programAgent.envJson,
   });
-  const command = args.programCommand
+  const command = programAgent.command
     .replace(/\{task_file\}/g, promptFile.path)
-    .replace(/\{task_id\}/g, `'${args.team.id}:${args.agent.id}'`)
-    .replace(/\{task_title\}/g, `'${args.agent.label.replace(/'/g, "'\\''")} — ${args.team.name.replace(/'/g, "'\\''")}'`)
-    .replace(/\{task_column\}/g, "''");
-  return {
+    .replace(/\{task_id\}/g, shellQuote(`${team.id}:${newTa.id}`))
+    .replace(/\{task_title\}/g, shellQuote(`${label} — ${team.name}`))
+    .replace(/\{task_column\}/g, shellQuote(""));
+
+  const preset: PanePreset = {
     kind: "terminal",
     pendingCommand: command,
     spawnEnv: {
       ...plan.env,
       TEAMSHIP_TASK_FILE: promptFile.path,
-      TEAMSHIP_TEAM_DIR: args.team.teamDir,
-      TEAMSHIP_TEAM_ID: args.team.id,
-      TEAMSHIP_TEAM_NAME: args.team.name,
-      TEAMSHIP_AGENT_LABEL: args.agent.label,
-      TEAMSHIP_AGENT_ROLE: args.agent.role,
-      TEAMSHIP_AGENT_ID: args.agent.id,
-      TEAMSHIP_BOARD_PATH: args.paths.boardPath,
-      TEAMSHIP_MESSAGES_PATH: args.paths.messagesPath,
-      TEAMSHIP_TEAM_TMSG: args.paths.tmsgPath,
+      TEAMSHIP_TEAM_DIR: paths.teamDir,
+      TEAMSHIP_TEAM_ID: team.id,
+      TEAMSHIP_TEAM_NAME: team.name,
+      TEAMSHIP_AGENT_LABEL: label,
+      TEAMSHIP_AGENT_ROLE: role,
+      TEAMSHIP_AGENT_ID: newTa.id,
+      TEAMSHIP_BOARD_PATH: paths.boardPath,
+      TEAMSHIP_MESSAGES_PATH: paths.messagesPath,
+      TEAMSHIP_TEAM_TMSG: paths.tmsgPath,
     },
-    spawnCwd: args.team.projectPath,
-    title: `${args.agent.label} (${ROLE_LABELS[args.agent.role] ?? args.agent.role})`,
+    spawnCwd: team.projectPath,
+    title: `${label} (${ROLE_LABELS[role] ?? role})`,
   };
+
+  // Split off the requester's own pane so the new agent ends up adjacent.
+  // Identify the new pane by diffing the layout's leaf set.
+  const ws = useWorkspaceStore.getState();
+  const tabBefore = ws.tabs.find((t) => t.id === team.tabId);
+  const before = tabBefore ? new Set(collectLeafIds(tabBefore.layout)) : new Set<string>();
+  const requesterPaneId = fromInfo.agent.paneId;
+  if (!requesterPaneId) {
+    return { ok: false, error: `requester ${fromLabel} has no live pane to split from` };
+  }
+  ws.splitPane(team.tabId, requesterPaneId, "vertical", preset);
+  const tabAfter = useWorkspaceStore.getState().tabs.find((t) => t.id === team.tabId);
+  if (!tabAfter) return { ok: false, error: "tab disappeared during split" };
+  const newPaneId = collectLeafIds(tabAfter.layout).find((id) => !before.has(id));
+  if (!newPaneId) return { ok: false, error: "split succeeded but new pane id not found" };
+
+  await useTeamStore.getState().setPaneId(newTa.id, newPaneId);
+
+  return {
+    ok: true,
+    data: `added ${label} (${role}) — pane ${newPaneId}`,
+  };
+}
+
+function collectLeafIds(layout: LayoutNode): string[] {
+  if (layout.type === "leaf") return [layout.paneId];
+  return layout.children.flatMap(collectLeafIds);
+}
+
+function shellQuote(v: string): string {
+  return `'${v.replace(/'/g, `'\\''`)}'`;
 }

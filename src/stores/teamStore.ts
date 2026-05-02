@@ -101,6 +101,10 @@ type TeamState = {
   create: (input: TeamCreateInput) => Promise<{ team: Team; agents: TeamAgent[] }>;
   setTabId: (teamId: string, tabId: string | undefined) => Promise<void>;
   setPaneId: (teamAgentId: string, paneId: string | undefined) => Promise<void>;
+  addAgent: (
+    teamId: string,
+    seed: { label: string; role: TeamRole; agentId: string; systemPromptOverride?: string },
+  ) => Promise<TeamAgent>;
   archive: (teamId: string) => Promise<void>;
 };
 
@@ -255,6 +259,32 @@ export const useTeamStore = create<TeamState>((set) => ({
       }
       return { agents: next };
     });
+  },
+
+  addAgent: async (teamId, seed) => {
+    const db = await getDb();
+    const existing = useTeamStore.getState().agents[teamId] ?? [];
+    if (existing.some((a) => a.label === seed.label)) {
+      throw new Error(`label ${seed.label} already in roster`);
+    }
+    const ordinal = existing.length;
+    const ta: TeamAgent = {
+      id: newId(),
+      teamId,
+      label: seed.label,
+      role: seed.role,
+      agentId: seed.agentId,
+      systemPromptOverride: seed.systemPromptOverride,
+      ordinal,
+    };
+    await db.execute(
+      "INSERT INTO team_agents (id, team_id, pane_id, label, role, agent_id, system_prompt_override, ordinal) VALUES (?,?,?,?,?,?,?,?)",
+      [ta.id, ta.teamId, null, ta.label, ta.role, ta.agentId, ta.systemPromptOverride ?? null, ta.ordinal],
+    );
+    set((s) => ({
+      agents: { ...s.agents, [teamId]: [...(s.agents[teamId] ?? []), ta] },
+    }));
+    return ta;
   },
 
   archive: async (teamId) => {

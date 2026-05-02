@@ -196,6 +196,12 @@ export function TeamPickerTrigger() {
               </div>
             </div>
 
+            {agents.length === 0 && (
+              <div className="form-hint form-hint-error">
+                No AI agents configured. Open the Agents panel to add Claude / Codex / etc. before launching a team.
+              </div>
+            )}
+
             <div className="form-row">
               <label>Roster</label>
               <div className="team-roster">

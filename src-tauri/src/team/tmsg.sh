@@ -101,7 +101,7 @@ __tmsg_check() {
       if (match(s, re)) {
         m = substr(s, RSTART, RLENGTH)
         sub(k "=\"", "", m)
-        sub(/\"$/, "", m)
+        sub(/"$/, "", m)
         return m
       }
       return ""
