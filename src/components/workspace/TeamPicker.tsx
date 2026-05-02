@@ -5,6 +5,7 @@ import { useFocusReturn } from "../../lib/useFocusReturn";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
+import { useTeamPickerStore } from "../../stores/teamPickerStore";
 import {
   BUILTIN_ROLES,
   defaultRoster,
@@ -54,6 +55,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
   const [draftTemplateName, setDraftTemplateName] = useState("");
   const [decomposing, setDecomposing] = useState(false);
   const [decomposeNote, setDecomposeNote] = useState<string | null>(null);
+  const [decomposeError, setDecomposeError] = useState<string | null>(null);
 
   const titleId = useId();
   useFocusReturn(open);
@@ -256,7 +258,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
               type="button"
               className="btn btn-ghost btn-with-icon"
               onClick={async () => {
-                setError(null);
+                setDecomposeError(null);
                 setDecomposeNote(null);
                 setDecomposing(true);
                 try {
@@ -284,7 +286,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
                   if (out.skillIds.length > 0) setSkills(out.skillIds);
                   if (out.notes) setDecomposeNote(out.notes);
                 } catch (err) {
-                  setError(err instanceof Error ? err.message : String(err));
+                  setDecomposeError(err instanceof Error ? err.message : String(err));
                 } finally {
                   setDecomposing(false);
                 }
@@ -302,6 +304,9 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
             placeholder="What is this team trying to accomplish?"
             rows={3}
           />
+          {decomposeError && (
+            <div className="form-hint form-hint-error">AI: {decomposeError}</div>
+          )}
           {decomposeNote && <div className="form-hint">AI: {decomposeNote}</div>}
         </div>
 
@@ -420,7 +425,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
               })}
             </div>
           )}
-          <div className="team-skill-add">
+          <div className="team-custom-role-add">
             <input
               aria-label="New role label"
               value={draftRoleLabel}
@@ -432,28 +437,30 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
               value={draftRoleBody}
               onChange={(e) => setDraftRoleBody(e.target.value)}
               placeholder='Behavioral / role instructions. Use ${BOARD_PATH} and ${MESSAGES_PATH} placeholders.'
-              rows={2}
+              rows={3}
             />
-            <button
-              type="button"
-              className="btn btn-ghost btn-with-icon"
-              onClick={() => {
-                const label = draftRoleLabel.trim();
-                const body = draftRoleBody.trim();
-                if (!label || !body) return;
-                const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                const id = `custom:${slug}-${Math.random().toString(36).slice(2, 6)}`;
-                if (isBuiltinRole(id)) return; // shouldn't happen with the prefix, but defensive
-                const next: TeamCustomRole = { id, label, body };
-                void saveCustomRoles([...customRoles, next]);
-                setDraftRoleLabel("");
-                setDraftRoleBody("");
-              }}
-              disabled={!draftRoleLabel.trim() || !draftRoleBody.trim()}
-            >
-              <Icon name="plus" size={12} />
-              <span>Add role</span>
-            </button>
+            <div className="team-custom-role-add-actions">
+              <button
+                type="button"
+                className="btn btn-ghost btn-with-icon"
+                onClick={() => {
+                  const label = draftRoleLabel.trim();
+                  const body = draftRoleBody.trim();
+                  if (!label || !body) return;
+                  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                  const id = `custom:${slug}-${Math.random().toString(36).slice(2, 6)}`;
+                  if (isBuiltinRole(id)) return;
+                  const next: TeamCustomRole = { id, label, body };
+                  void saveCustomRoles([...customRoles, next]);
+                  setDraftRoleLabel("");
+                  setDraftRoleBody("");
+                }}
+                disabled={!draftRoleLabel.trim() || !draftRoleBody.trim()}
+              >
+                <Icon name="plus" size={12} />
+                <span>Add role</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -666,18 +673,15 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
 }
 
 export function TeamPickerTrigger() {
-  const [open, setOpen] = useState(false);
+  const setOpen = useTeamPickerStore((s) => s.setOpen);
   return (
-    <>
-      <button
-        className="btn btn-ghost btn-with-icon"
-        onClick={() => setOpen(true)}
-        title="New Team workspace"
-      >
-        <Icon name="users-round" size={14} />
-        <span>Team</span>
-      </button>
-      <TeamPickerModal open={open} onClose={() => setOpen(false)} />
-    </>
+    <button
+      className="btn btn-ghost btn-with-icon"
+      onClick={() => setOpen(true)}
+      title="New Team workspace (⌘⇧T)"
+    >
+      <Icon name="users-round" size={14} />
+      <span>Team</span>
+    </button>
   );
 }

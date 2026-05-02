@@ -9,6 +9,8 @@ import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
 import { useTeamStore } from "./stores/teamStore";
 import { useTeamSettingsStore } from "./stores/teamSettingsStore";
+import { useTeamPickerStore } from "./stores/teamPickerStore";
+import { TeamPickerModal } from "./components/workspace/TeamPicker";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
 import { resumeTeam } from "./lib/teamLauncher";
@@ -166,6 +168,7 @@ export default function App() {
     const detach = attachGlobalShortcuts();
     const unregisters = [
       registerShortcut("newTab", () => newTab(1)),
+      registerShortcut("newTeam", () => useTeamPickerStore.getState().setOpen(true)),
       registerShortcut("closeTab", () => activeTabId && closeTab(activeTabId)),
       registerShortcut("switchTab1", () => switchToTabIndex(0)),
       registerShortcut("switchTab2", () => switchToTabIndex(1)),
@@ -234,9 +237,16 @@ export default function App() {
         <StatusBar />
       </div>
       <TemplatePicker />
+      <TeamPickerHost />
       <QuickOpen />
       <SttBubble />
       <ScreenshotStack />
     </div>
   );
+}
+
+function TeamPickerHost() {
+  const open = useTeamPickerStore((s) => s.open);
+  const setOpen = useTeamPickerStore((s) => s.setOpen);
+  return <TeamPickerModal open={open} onClose={() => setOpen(false)} />;
 }

@@ -39,6 +39,37 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
   const teamAgents = useTeamStore((s) => (team ? s.agents[team.id] ?? [] : []));
   const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === tabId));
   const customRoles = useTeamSettingsStore((s) => s.settings.customRoles);
+  const setChatPanelWidth = useTeamSettingsStore((s) => s.setChatPanelWidth);
+  const saveChatPanelWidth = useTeamSettingsStore((s) => s.saveChatPanelWidth);
+
+  // Pointer-driven horizontal resize handle on the chat panel's left edge.
+  // Live-updates the store width during drag (cheap; no IPC), persists once
+  // on pointerup. Same approach the pane drag uses — avoids HTML5 drag
+  // quirks in the Tauri WebView.
+  const onResizePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = useTeamSettingsStore.getState().settings.chatPanelWidth;
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    let lastWidth = startW;
+    const onMove = (ev: PointerEvent) => {
+      // Drag-right shrinks the panel (panel is on the right side).
+      const next = startW - (ev.clientX - startX);
+      lastWidth = next;
+      setChatPanelWidth(next);
+    };
+    const onUp = (ev: PointerEvent) => {
+      handle.releasePointerCapture(ev.pointerId);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+      void saveChatPanelWidth(lastWidth);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  }, [setChatPanelWidth, saveChatPanelWidth]);
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [input, setInput] = useState("");
   const [target, setTarget] = useState<string>("@all");
@@ -47,7 +78,9 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
   const [collapsed, setCollapsed] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
+  const [unread, setUnread] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef<number>(0);
   const lastCompactRef = useRef<number>(0);
   const inputId = useId();
 
@@ -108,18 +141,29 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
 
   // Auto-scroll to bottom on new messages — but only when the user was
   // already at the bottom. If they scrolled up to read history, leave
-  // their viewport alone and surface the jump-to-bottom button.
+  // their viewport alone and surface the jump-to-bottom button with an
+  // unread count of messages received while they were away.
   useEffect(() => {
-    if (!atBottom) return;
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, atBottom]);
+    const prev = prevCountRef.current;
+    const next = messages.length;
+    prevCountRef.current = next;
+    const arrived = Math.max(0, next - prev);
+    if (atBottom) {
+      const el = listRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      if (unread !== 0) setUnread(0);
+      return;
+    }
+    if (arrived > 0) setUnread((u) => u + arrived);
+  }, [messages.length, atBottom, unread]);
 
   const onScroll = () => {
     const el = listRef.current;
     if (!el) return;
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setAtBottom(distance < 24);
+    const isBottom = distance < 24;
+    setAtBottom(isBottom);
+    if (isBottom && unread !== 0) setUnread(0);
   };
 
   const jumpToBottom = () => {
@@ -127,6 +171,7 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
     setAtBottom(true);
+    setUnread(0);
   };
 
   // Group consecutive messages from the same sender to the same recipient
@@ -217,6 +262,13 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
 
   return (
     <aside className="team-chat" aria-label="Team chat">
+      <div
+        className="team-chat-resize"
+        onPointerDown={onResizePointerDown}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize team chat"
+      />
       <header className="team-chat-header">
         <div className="team-chat-title">{team.name}</div>
         <button
@@ -278,10 +330,12 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
                 className={"team-chat-group" + (isOperator ? " team-chat-group-operator" : "")}
               >
                 <div className="team-chat-meta">
-                  <span className="team-chat-from">{head.from || "?"}</span>
-                  <span className="team-chat-arrow">→</span>
-                  <span className="team-chat-to">{head.to || "?"}</span>
-                  <span className={`team-chat-type team-chat-type-${head.type}`}>{head.type}</span>
+                  <div className="team-chat-meta-left">
+                    <span className="team-chat-from">{head.from || "?"}</span>
+                    <span className="team-chat-arrow">→</span>
+                    <span className="team-chat-to">{head.to || "?"}</span>
+                    <span className={`team-chat-type team-chat-type-${head.type}`}>{head.type}</span>
+                  </div>
                   <span className="team-chat-ts">{shortTime(head.ts)}</span>
                 </div>
                 {group.map((m) => (
@@ -296,9 +350,9 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
             type="button"
             className="team-chat-jump"
             onClick={jumpToBottom}
-            aria-label="Jump to latest"
+            aria-label={unread > 0 ? `Jump to latest, ${unread} new` : "Jump to latest"}
           >
-            ↓ Latest
+            ↓ {unread > 0 ? `${unread} new` : "Latest"}
           </button>
         )}
       </div>
@@ -310,20 +364,25 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
           void send();
         }}
       >
-        <select
-          aria-label="Target"
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-        >
-          {targetOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <div className="team-chat-input-top">
+          <select
+            aria-label="Target"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+          >
+            {targetOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <button type="submit" className="btn btn-primary" disabled={busy || !input.trim()}>
+            {busy ? "…" : "Push draft"}
+          </button>
+        </div>
         <textarea
           id={inputId}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Write a directive… (writes draft into pane; user presses Enter to send)"
+          placeholder="Write a directive — writes the text as a draft into each pane; user presses Enter to send."
           rows={2}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -332,9 +391,7 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
             }
           }}
         />
-        <button type="submit" className="btn btn-primary" disabled={busy || !input.trim()}>
-          {busy ? "…" : "Push draft"}
-        </button>
+        <div className="team-chat-input-hint">⌘⏎ to push</div>
       </form>
       {info && <div className="team-chat-info">{info}</div>}
     </aside>

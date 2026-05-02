@@ -84,7 +84,7 @@ export function TeamsView() {
           {teams.filter((t) => t.status === "active").length} active · {teams.filter((t) => t.status === "archived").length} archived
         </div>
       </header>
-      {error && <div className="form-hint form-hint-error" style={{ padding: "8px 16px" }}>{error}</div>}
+      {error && <div className="teams-error">{error}</div>}
       <div className="teams-list">
         {teams.map((team) => {
           const agents = teamAgents[team.id] ?? [];
@@ -157,6 +157,7 @@ export function TeamsView() {
                   onClick={() => setEditingId(team.id)}
                   disabled={busy}
                   title="Rename"
+                  aria-label={`Rename team ${team.name}`}
                 >
                   <Icon name="file-edit" size={12} />
                 </button>
@@ -166,6 +167,7 @@ export function TeamsView() {
                     onClick={() => archive(team.id)}
                     disabled={busy}
                     title="Archive (keeps BOARD.md / MESSAGES.md on disk)"
+                    aria-label={`Archive team ${team.name}`}
                   >
                     <Icon name="x" size={12} />
                   </button>

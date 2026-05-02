@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useTeamStore } from "../../stores/teamStore";
+import { useTeamPickerStore } from "../../stores/teamPickerStore";
+import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { PaneGrid } from "./PaneGrid";
 import { TeamChatPanel } from "../team/TeamChatPanel";
-import { TeamPickerModal } from "./TeamPicker";
 import { useThemeStore } from "../../stores/themeStore";
 import { Icon } from "../ui/Icon";
 
@@ -18,7 +19,8 @@ export function WorkspaceView() {
   const theme = useThemeStore((s) => s.current);
   const teams = useTeamStore((s) => s.teams);
   const teamForActive = teams.find((t) => t.tabId === activeTabId);
-  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
+  const setTeamPickerOpen = useTeamPickerStore((s) => s.setOpen);
+  const chatPanelWidth = useTeamSettingsStore((s) => s.settings.chatPanelWidth);
 
   useEffect(() => {
     if (!tab) return;
@@ -31,13 +33,6 @@ export function WorkspaceView() {
     const u2 = registerShortcut("splitPaneVertical", split("vertical"));
     return () => { u1(); u2(); };
   }, [tab, splitPane]);
-
-  // The picker stays mounted across the welcome→workspace transition so
-  // launchTeam (which adds a tab mid-flight, flipping the conditional) can
-  // finish without the modal unmounting underneath it.
-  const modal = (
-    <TeamPickerModal open={teamPickerOpen} onClose={() => setTeamPickerOpen(false)} />
-  );
 
   if (tabs.length === 0) {
     return (
@@ -96,26 +91,29 @@ export function WorkspaceView() {
             </div>
           </div>
         </div>
-        {modal}
       </>
     );
   }
 
   return (
-    <>
-      <div className={"workspace" + (teamForActive ? " has-team-chat" : "")}>
-        {tabs.map((t) => (
-          <div
-            key={t.id}
-            className={"workspace-tab" + (t.id === activeTabId ? " active" : "")}
-            aria-hidden={t.id !== activeTabId}
-          >
-            <PaneGrid tab={t} />
-          </div>
-        ))}
-        {teamForActive && activeTabId && <TeamChatPanel tabId={activeTabId} />}
-      </div>
-      {modal}
-    </>
+    <div
+      className={"workspace" + (teamForActive ? " has-team-chat" : "")}
+      style={
+        teamForActive
+          ? ({ "--team-chat-w": `${chatPanelWidth}px` } as React.CSSProperties)
+          : undefined
+      }
+    >
+      {tabs.map((t) => (
+        <div
+          key={t.id}
+          className={"workspace-tab" + (t.id === activeTabId ? " active" : "")}
+          aria-hidden={t.id !== activeTabId}
+        >
+          <PaneGrid tab={t} />
+        </div>
+      ))}
+      {teamForActive && activeTabId && <TeamChatPanel tabId={activeTabId} />}
+    </div>
   );
 }

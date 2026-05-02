@@ -1758,6 +1758,7 @@
 }
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--pad-sm);
   justify-content: flex-end;
   align-items: center;
@@ -3549,7 +3550,7 @@ body.screenshot-dragging {
 }
 .team-roster-row {
   display: grid;
-  grid-template-columns: 140px 1fr 1fr 32px;
+  grid-template-columns: 120px minmax(140px, 1fr) minmax(180px, 1.4fr) 32px;
   gap: 8px;
   align-items: center;
 }
@@ -3685,6 +3686,30 @@ body.screenshot-dragging {
   display: flex;
   align-items: flex-start;
 }
+.team-custom-role-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.team-custom-role-add input,
+.team-custom-role-add textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+}
+.team-custom-role-add textarea {
+  resize: vertical;
+  min-height: 64px;
+  font-family: var(--font-mono);
+}
+.team-custom-role-add-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 .team-attachments {
   display: flex;
   flex-direction: column;
@@ -3752,19 +3777,34 @@ body.screenshot-dragging {
 /* ===== Team chat panel ===== */
 .workspace.has-team-chat {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) var(--team-chat-w, 320px);
   gap: 0;
 }
 .workspace.has-team-chat .workspace-tab {
   min-width: 0;
 }
 .team-chat {
+  position: relative;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
   background: var(--bg-elev);
   height: 100%;
   min-height: 0;
+}
+.team-chat-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+}
+.team-chat-resize:hover,
+.team-chat-resize:active {
+  background: color-mix(in oklab, var(--accent, var(--fg-muted)) 30%, transparent);
 }
 .team-chat-header {
   display: flex;
@@ -3889,12 +3929,19 @@ body.screenshot-dragging {
   background: var(--border);
 }
 .team-chat-meta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 6px;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+.team-chat-meta-left {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
-  font-size: var(--font-size-xs);
-  color: var(--fg-muted);
+  min-width: 0;
 }
 .team-chat-from { font-weight: 600; color: var(--fg); }
 .team-chat-arrow { opacity: 0.6; }
@@ -3910,7 +3957,7 @@ body.screenshot-dragging {
 }
 .team-chat-type-escalation { background: color-mix(in oklab, var(--danger) 25%, var(--bg)); color: var(--danger); }
 .team-chat-type-done { background: color-mix(in oklab, var(--success, #34d399) 25%, var(--bg)); }
-.team-chat-ts { margin-left: auto; opacity: 0.7; font-family: var(--font-mono); }
+.team-chat-ts { opacity: 0.7; font-family: var(--font-mono); white-space: nowrap; }
 .team-chat-body {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
@@ -3918,11 +3965,20 @@ body.screenshot-dragging {
   word-break: break-word;
 }
 .team-chat-input {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   padding: 8px 10px;
   border-top: 1px solid var(--border);
+}
+.team-chat-input-top {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.team-chat-input-top select {
+  flex: 1;
+  min-width: 0;
 }
 .team-chat-input select,
 .team-chat-input textarea {
@@ -3939,8 +3995,12 @@ body.screenshot-dragging {
   min-height: 60px;
   font-family: var(--font-mono);
 }
-.team-chat-input .btn {
-  justify-self: end;
+.team-chat-input-hint {
+  font-size: 10px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  text-align: right;
+  margin-top: -2px;
 }
 .team-chat-info {
   font-size: var(--font-size-xs);
@@ -4011,6 +4071,15 @@ body.screenshot-dragging {
   font-size: var(--font-size-sm);
   max-width: 420px;
   margin: 0 auto;
+}
+.teams-error {
+  margin: 0 16px;
+  padding: 8px 12px;
+  font-size: var(--font-size-sm);
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 8%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 30%, var(--border));
+  border-radius: var(--radius-sm);
 }
 .team-row {
   display: grid;
