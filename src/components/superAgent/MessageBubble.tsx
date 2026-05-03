@@ -40,6 +40,17 @@ export function MessageBubble({
     );
   }
 
+  if (message.role === "system") {
+    // Visible-only context note (e.g. an @operator escalation handed off
+    // from the inbox). The runner skips role:"system" history when calling
+    // the model, so this never round-trips as duplicate system prompt.
+    return (
+      <div className="sa-msg sa-msg-system">
+        <div className="sa-bubble sa-bubble-system">{message.content}</div>
+      </div>
+    );
+  }
+
   // assistant
   return (
     <div className="sa-msg sa-msg-assistant">

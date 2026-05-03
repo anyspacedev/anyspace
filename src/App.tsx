@@ -14,6 +14,7 @@ import { TeamPickerModal } from "./components/workspace/TeamPicker";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
 import { resumeTeam } from "./lib/teamLauncher";
+import { syncOperatorInboxSubscriptions } from "./lib/operatorInbox";
 import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
@@ -74,6 +75,11 @@ export default function App() {
           console.warn("[team] resume failed", team.id, err);
         }
       }
+      // Hook up @operator inbox watchers for every active team. Subsequent
+      // launches / archives are handled by the team-store subscriber below.
+      await syncOperatorInboxSubscriptions().catch((e) =>
+        console.warn("[operatorInbox] initial sync failed", e),
+      );
     })();
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
@@ -157,6 +163,19 @@ export default function App() {
           });
         }
       }
+    });
+    return unsub;
+  }, []);
+
+  // Re-sync @operator inbox subscriptions whenever the team list changes
+  // (new launch, archive, reactivate). syncOperatorInboxSubscriptions is
+  // idempotent — already-subscribed teams are skipped.
+  useEffect(() => {
+    const unsub = useTeamStore.subscribe((state, prev) => {
+      if (state.teams === prev.teams) return;
+      void syncOperatorInboxSubscriptions().catch((e) =>
+        console.warn("[operatorInbox] resync failed", e),
+      );
     });
     return unsub;
   }, []);

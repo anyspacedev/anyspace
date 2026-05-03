@@ -1,5 +1,7 @@
 import { useThemeStore } from "../../stores/themeStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useOperatorInboxStore } from "../../stores/operatorInboxStore";
+import { handoffInboxToSuperAgent } from "../../lib/operatorInboxHandoff";
 import { themes } from "../../themes/definitions";
 
 export function StatusBar() {
@@ -9,6 +11,8 @@ export function StatusBar() {
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const tab = tabs.find((t) => t.id === activeTabId);
   const paneCount = tab ? Object.keys(tab.panes).length : 0;
+  const inboxCount = useOperatorInboxStore((s) => s.pings.length);
+  const markAllRead = useOperatorInboxStore((s) => s.markAllRead);
 
   const darkThemes = themes.filter((t) => t.kind === "dark");
   const lightThemes = themes.filter((t) => t.kind === "light");
@@ -21,6 +25,28 @@ export function StatusBar() {
         <span>{tabs.length} tab{tabs.length === 1 ? "" : "s"}</span>
         <span className="status-divider" />
         <span>{paneCount} pane{paneCount === 1 ? "" : "s"}</span>
+        {inboxCount > 0 && (
+          <>
+            <span className="status-divider" />
+            <button
+              type="button"
+              className="status-inbox-badge"
+              title={`${inboxCount} unread @operator message${inboxCount === 1 ? "" : "s"} — click to hand off to Super Agent (Alt+click to dismiss)`}
+              onClick={(e) => {
+                if (e.altKey) {
+                  markAllRead();
+                  return;
+                }
+                void handoffInboxToSuperAgent().catch((err) =>
+                  console.warn("[inbox] handoff failed", err),
+                );
+              }}
+            >
+              <span className="status-inbox-dot" />
+              {inboxCount} @operator
+            </button>
+          </>
+        )}
       </div>
       <div className="status-right">
         <span className="status-theme">

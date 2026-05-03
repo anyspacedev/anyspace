@@ -205,20 +205,3 @@ export async function runSuperBrainTeamBroadcast(
   }
   return { written, skipped };
 }
-
-export async function runSuperBrainTeamAsk(
-  paneId: string,
-  prompt: string,
-): Promise<boolean> {
-  const text = prompt.trim();
-  if (!text) return false;
-  const ctx = getTerminalContext(paneId);
-  if (!ctx) return false;
-  try {
-    await ptyWrite(ctx.sessionId, new TextEncoder().encode(text));
-    return true;
-  } catch (e) {
-    console.warn("[superBrain.teamAsk] failed", e);
-    return false;
-  }
-}

@@ -22,7 +22,8 @@ import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { getTerminalContext } from "../../components/terminal/terminalRegistry";
 import { launchTeam } from "../teamLauncher";
-import { runQuickSuggest } from "../superBrain";
+import { runQuickSuggest, runSuperBrainTeamBroadcast } from "../superBrain";
+import { parseMessages, type TeamMessage } from "../teamMessages";
 import type { TeamRole } from "../teamRoles";
 
 export type ToolName =
@@ -40,6 +41,9 @@ export type ToolName =
   | "close_pane"
   | "create_kanban_task"
   | "tmsg_send"
+  | "team_broadcast"
+  | "team_send_to_pane"
+  | "read_team_messages"
   | "launch_team"
   | "quick_suggest";
 
@@ -430,6 +434,150 @@ export const TOOLS: Tool[] = [
         }
         await writeTextFile(path, prev + block);
         return ok({ id, ts, teamId, to });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "team_broadcast",
+    description:
+      "Write text into every terminal pane of a team (the multi-agent equivalent of write_pane). with_newline=false (default) leaves the bytes at each prompt for the operator to review and press Enter; with_newline=true executes immediately in every pane.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        team_id: { type: "string" },
+        text: { type: "string" },
+        with_newline: {
+          type: "boolean",
+          description: "Append \\n in every pane to execute. Default false.",
+        },
+      },
+      required: ["team_id", "text"],
+    },
+    handler: async (args) => {
+      const teamId = arg<string>(args, "team_id");
+      const text = arg<string>(args, "text");
+      const withNewline = arg<boolean>(args, "with_newline") ?? false;
+      if (!teamId) return bad("missing team_id");
+      if (text == null) return bad("missing text");
+      const team = useTeamStore.getState().teams.find((t) => t.id === teamId);
+      if (!team) return bad(`team ${teamId} not found`);
+      if (!team.tabId) return bad(`team ${teamId} has no live tab`);
+      try {
+        const payload = withNewline ? `${text}\n` : text;
+        const result = await runSuperBrainTeamBroadcast(team.tabId, payload);
+        return ok({ teamId, ...result, submitted: withNewline });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "team_send_to_pane",
+    description:
+      "Write text into one specific team pane, addressed by paneId or by the team-agent label (e.g. \"Coordinator 1\"). with_newline=false (default) leaves bytes at the prompt; with_newline=true executes.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        team_id: { type: "string" },
+        pane_id: { type: "string", description: "Exact paneId; takes precedence over label" },
+        label: { type: "string", description: "Team-agent label, e.g. \"Coordinator 1\"" },
+        text: { type: "string" },
+        with_newline: { type: "boolean", description: "Append \\n. Default false." },
+      },
+      required: ["team_id", "text"],
+    },
+    handler: async (args) => {
+      const teamId = arg<string>(args, "team_id");
+      const text = arg<string>(args, "text");
+      const withNewline = arg<boolean>(args, "with_newline") ?? false;
+      let paneId = arg<string>(args, "pane_id");
+      const label = arg<string>(args, "label");
+      if (!teamId) return bad("missing team_id");
+      if (text == null) return bad("missing text");
+      const team = useTeamStore.getState().teams.find((t) => t.id === teamId);
+      if (!team) return bad(`team ${teamId} not found`);
+      if (!paneId && label) {
+        const roster = useTeamStore.getState().agents[teamId] ?? [];
+        const match = roster.find((a) => a.label === label);
+        if (!match) return bad(`label "${label}" not found in team roster`);
+        if (!match.paneId) return bad(`agent "${label}" has no live pane`);
+        paneId = match.paneId;
+      }
+      if (!paneId) return bad("provide pane_id or label");
+      const ctx = getTerminalContext(paneId);
+      if (!ctx) return bad(`pane ${paneId} has no live PTY session`);
+      const payload = withNewline ? `${text}\n` : text;
+      try {
+        await ptyWrite(ctx.sessionId, new TextEncoder().encode(payload));
+        return ok({ teamId, paneId, wroteBytes: payload.length, submitted: withNewline });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "read_team_messages",
+    description:
+      "On-demand read of a team's MESSAGES.md log (the inter-agent + @operator chat). Returns parsed messages newest-first. Use filters to scope by sender/recipient/type or to fetch only messages newer than a known timestamp.",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: {
+        team_id: { type: "string" },
+        since_ts: {
+          type: "string",
+          description: "ISO timestamp; only messages with ts > since_ts are returned",
+        },
+        from: { type: "string", description: "Filter by sender label" },
+        to: {
+          type: "string",
+          description: "Filter by recipient (label, @all, or @operator)",
+        },
+        type: {
+          type: "string",
+          enum: ["message", "status", "escalation", "done"],
+        },
+        limit: { type: "integer", minimum: 1, description: "Cap; default 50" },
+      },
+      required: ["team_id"],
+    },
+    handler: async (args) => {
+      const teamId = arg<string>(args, "team_id");
+      if (!teamId) return bad("missing team_id");
+      const team = useTeamStore.getState().teams.find((t) => t.id === teamId);
+      if (!team) return bad(`team ${teamId} not found`);
+      const sinceTs = arg<string>(args, "since_ts");
+      const fromFilter = arg<string>(args, "from");
+      const toFilter = arg<string>(args, "to");
+      const typeFilter = arg<string>(args, "type");
+      const limit = arg<number>(args, "limit") ?? 50;
+      try {
+        let content = "";
+        try {
+          content = await readTextFile(`${team.teamDir}/MESSAGES.md`);
+        } catch {
+          // file may not exist yet — empty log
+        }
+        const all = parseMessages(content);
+        const filtered = all.filter((m: TeamMessage) => {
+          if (sinceTs && m.ts <= sinceTs) return false;
+          if (fromFilter && m.from !== fromFilter) return false;
+          if (toFilter && m.to !== toFilter) return false;
+          if (typeFilter && m.type !== typeFilter) return false;
+          return true;
+        });
+        const sliced = filtered.slice(-limit).reverse();
+        return ok({
+          teamId,
+          total: filtered.length,
+          returned: sliced.length,
+          truncated: filtered.length > sliced.length,
+          messages: sliced,
+        });
       } catch (e) {
         return bad(e instanceof Error ? e.message : String(e));
       }

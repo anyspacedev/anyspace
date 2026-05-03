@@ -1,13 +1,10 @@
 import { useEffect } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useTeamStore } from "../../stores/teamStore";
 import { useTeamPickerStore } from "../../stores/teamPickerStore";
-import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { PaneGrid } from "./PaneGrid";
-import { TeamChatPanel } from "../team/TeamChatPanel";
 import { SuperAgentPanel } from "../superAgent/SuperAgentPanel";
 import { useThemeStore } from "../../stores/themeStore";
 import { Icon } from "../ui/Icon";
@@ -20,10 +17,7 @@ export function WorkspaceView() {
   const newTab = useWorkspaceStore((s) => s.newTab);
   const setView = useWorkspaceStore((s) => s.setView);
   const theme = useThemeStore((s) => s.current);
-  const teams = useTeamStore((s) => s.teams);
-  const teamForActive = teams.find((t) => t.tabId === activeTabId);
   const setTeamPickerOpen = useTeamPickerStore((s) => s.setOpen);
-  const chatPanelWidth = useTeamSettingsStore((s) => s.settings.chatPanelWidth);
   const superAgentOpen = useSuperAgentStore((s) => s.panelOpen);
   const setSuperAgentOpen = useSuperAgentStore((s) => s.setPanelOpen);
   const superAgentWidth = useSuperAgentSettingsStore((s) => s.settings.panelWidth);
@@ -103,10 +97,8 @@ export function WorkspaceView() {
 
   const cls = ["workspace"];
   if (superAgentOpen) cls.push("has-super-agent");
-  if (teamForActive) cls.push("has-team-chat");
 
   const cssVars: React.CSSProperties = {};
-  if (teamForActive) (cssVars as Record<string, string>)["--team-chat-w"] = `${chatPanelWidth}px`;
   if (superAgentOpen) (cssVars as Record<string, string>)["--super-agent-w"] = `${superAgentWidth}px`;
 
   return (
@@ -134,7 +126,6 @@ export function WorkspaceView() {
         )}
       </div>
       {superAgentOpen && <SuperAgentPanel mode="rail" />}
-      {teamForActive && activeTabId && <TeamChatPanel tabId={activeTabId} />}
     </div>
   );
 }

@@ -191,10 +191,14 @@ Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next
 
 **Two watchers per team**, both in `src-tauri/src/team/watcher.rs` and stored in `TeamManager`'s `DashMap<teamId, Vec<Debouncer>>`:
 
-- MESSAGES.md changes → emit `team:messages:<teamId>` (the chat panel re-reads + re-renders).
+- MESSAGES.md changes → emit `team:messages:<teamId>`. The only frontend subscriber today is `src/lib/operatorInbox.ts` (see "Operator inbox" below). The legacy `TeamChatPanel.tsx` was deleted — the `read_team_messages` Super Agent tool reads MESSAGES.md on demand instead.
 - New `.rpc/<uuid>.req` files → emit `team:rpc:<teamId>` (`src/lib/teamRpc.ts` dispatches to `getTerminalContext` / `closePane` / `ptyWrite`, calls `team_rpc_reply` to write the `.res` that unblocks the agent).
 
-**The chat panel (`TeamChatPanel.tsx`)** reads `MESSAGES.md` via the existing `@tauri-apps/plugin-fs` (project paths must fall under the `fs:scope` allow-list — `$HOME/**` covers most cases). Its input box pushes drafts into PTYs via `runSuperBrainTeamBroadcast` / `runSuperBrainTeamAsk` — same no-newline contract as Super Brain (the user reviews, then presses Enter; broadcast fans Enter to selected panes).
+**Operator inbox.** `src/lib/operatorInbox.ts` per-team listens on `team:messages:<teamId>`, re-reads MESSAGES.md via `parseMessages`, filters `to=@operator || type=escalation`, dedupes against `lastSeenTs[teamId]`, and pushes new pings into `useOperatorInboxStore`. `App.tsx`'s mount effect calls `syncOperatorInboxSubscriptions()` after `resumeTeam`, and a `useTeamStore.subscribe` re-runs the sync on launch/archive (idempotent — already-subscribed teams are skipped). The status-bar `● N @operator` pill renders when `pings.length > 0`; clicking it calls `handoffInboxToSuperAgent` (`src/lib/operatorInboxHandoff.ts`) which opens the SA rail, ensures an active session, and appends a single `role:"system"` message summarizing the unread pings before clearing the inbox. Initial drain on first subscribe surfaces escalations that arrived while the app was closed; if MESSAGES.md has content but no pings, the seed sets `lastSeenTs` to the newest existing ts so the inbox doesn't replay history.
+
+**Operator → team panes.** Two parallel paths, both no-newline by default (Super Brain contract; the operator reviews and presses Enter to actually run):
+- *Direct manipulation* — multi-select panes (`tab.selectedPaneIds`) and type. `paneBroadcast.ts` fans every keystroke to selected sibling terminals.
+- *Conversational* — Super Agent's `team_broadcast(team_id, text, with_newline?)` and `team_send_to_pane(team_id, text, pane_id?|label?, with_newline?)` tools. Broadcast wraps `runSuperBrainTeamBroadcast`; targeted writes resolve `label` against `useTeamStore.agents[teamId]` to find the live `paneId`.
 
 **Restart resume**: `App.tsx`'s mount effect awaits `hydrateWorkspace()` → `loadKanban()` → `useTeamStore.load()`, then calls `resumeTeam(teamId)` for every active team whose `tab_id` matches a live tab. `resumeTeam` re-renders prompt files (so role/skill changes between releases propagate), re-derives the `pendingCommand`, and writes it back into the existing pane payloads via `setPanePayload`. The Terminal effect at `Terminal.tsx:438` re-fires when `pendingCommand` flips from undefined to a string, even if `sessionId` was already set — so re-injecting after PTY spawn still runs the agent CLI. The team-RPC subscription is also re-established here.
 
@@ -214,17 +218,17 @@ Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next
 }
 ```
 
+Old keys `chatPanelWidth` / `chatPanelMode` may exist in stored JSON from prior versions — the loader's spread + array filtering ignores them silently. No migration needed.
+
 Custom role ids must be unique against `BUILTIN_ROLES` — the picker prefixes them with `custom:` so collisions can't happen. Helpers `roleLabel(role, customRoles)` / `roleAccent(role, customRoles)` / `rolePromptBody(role, customRoles)` resolve either built-in or custom; legacy callers can still use `ROLE_LABELS` / `ROLE_ACCENTS` for built-in-only lookup. Adding a new built-in role still requires editing `teamRoles.ts` (BUILTIN_ROLES, BUILTIN_LABELS, BUILTIN_ACCENTS, BUILTIN_BODIES) — TS catches three of those, the body map is the easy miss.
 
 **Templates** snapshot `{ name, goalSeed, roster, skillIds }`. Roster rows store an `agentId` *hint*; if the kanban agent for that hint was deleted, apply falls back to the first available. Apply happens in-form (no commit until the user hits Launch); Save is a button next to Cancel that prompts for a name.
 
 **AI-assisted decomposition** (`src/lib/teamDecompose.ts`) calls the existing `aiChat` Rust command with a strict-JSON system prompt and the catalog of built-in roles, kanban programs, and built-in skills as context. Output schema is `{ teamName, roster: [{role, label, programHint}], skillIds, notes? }`. Parser tolerates one or two stray sentences and ```json fences. Picker button next to the Goal label fills name + roster + skills; missing program hints fall back to the first kanban agent. `notes` shows as a form hint so the operator sees the model's rationale.
 
-**MESSAGES.md compaction.** `team_compact_messages` Rust command (`src-tauri/src/team/commands.rs`) holds the same `flock(.lock)` `tmsg.sh` uses, splits MESSAGES.md at block boundaries, appends the oldest blocks to `MESSAGES.archive.md`, and atomically replaces MESSAGES.md with the recent slice. Threshold defaults to 500/keep 250, fired from the chat panel with a 60s debounce after every refresh. Unix-only — Windows builds get a no-op stub. The `.lock` file is the only place we use `libc::flock`; tmsg.sh's `flock -x 9` and our `LOCK_EX` are the same kernel BSD-flock primitive, so they coordinate even though tmsg uses `/usr/bin/flock`.
+**MESSAGES.md compaction.** `team_compact_messages` Rust command (`src-tauri/src/team/commands.rs`) holds the same `flock(.lock)` `tmsg.sh` uses, splits MESSAGES.md at block boundaries, appends the oldest blocks to `MESSAGES.archive.md`, and atomically replaces MESSAGES.md with the recent slice. Threshold defaults to 500/keep 250. Now triggered from `operatorInbox.ts:maybeCompact` after every watcher refresh, debounced 60s per team — the chat panel was the previous trigger. Unix-only — Windows builds get a no-op stub. The `.lock` file is the only place we use `libc::flock`; tmsg.sh's `flock -x 9` and our `LOCK_EX` are the same kernel BSD-flock primitive, so they coordinate even though tmsg uses `/usr/bin/flock`.
 
 **Voice-to-team.** STT `inject.ts` adds `fanToTeamPanes(originPaneId, originSessionId, bytes)` after the normal terminal write. When the source pane belongs to a team tab and `tab.selectedPaneIds.length < 2`, the dictation is fanned into every other team-pane PTY (no newline). With explicit multi-pane selection, `broadcastBytes` already handles fan-out — `fanToTeamPanes` short-circuits to avoid double-writes.
-
-**Chat panel polish.** Messages from the same sender to the same recipient within 5 minutes group under a single meta header. A search input filters by sender / recipient / body. The list auto-scrolls to bottom only when the user is already at the bottom (otherwise a "↓ Latest" pill appears). `@operator` threads get an accent border. Auto-compaction calls happen here.
 
 **Resume logging.** `[team.resume] start/skip/done` in `teamLauncher.ts` and `[terminal] pendingCommand armed/firing` in `Terminal.tsx` are the two log lines to grep when verifying a restart-resume — together they tell you whether (a) the team data hydrated, (b) per-agent prompts re-rendered, (c) the 600ms-delayed effect re-fired after sessionId already settled.
 
@@ -233,7 +237,7 @@ Custom role ids must be unique against `BUILTIN_ROLES` — the picker prefixes t
 Multi-turn AI chat that lives **inside the app** and can call tools to inspect/manipulate the workspace. Distinct from Team mode (external CLIs in PTYs) and from Super Brain v1 (one-shot ⌘⇧B draft writer — preserved unchanged).
 
 **Two surfaces, one runtime:**
-- **Side rail** in the workspace (`SuperAgentPanel mode="rail"`, mounted in `WorkspaceView` when `useSuperAgentStore.panelOpen`). Coexists with the team-chat rail; CSS grid extends to 3 columns when both are open. Pointer-drag resize handle on the left edge persists `settings.superAgent.panelWidth` (clamped 240–720).
+- **Side rail** in the workspace (`SuperAgentPanel mode="rail"`, mounted in `WorkspaceView` when `useSuperAgentStore.panelOpen`). The workspace grid is 1fr + `var(--super-agent-w)` when open. Pointer-drag resize handle on the left edge persists `settings.superAgent.panelWidth` (clamped 240–720).
 - **Full-page view** at `selectedView === "superagent"`, sidebar nav between Teams and Agents (`SuperAgentPanel mode="full"`).
 - **Collapsed pill** (`.sa-collapsed-tab`) renders inside `.workspace-content` when `panelOpen` is false; click expands the rail.
 
@@ -248,14 +252,14 @@ Multi-turn AI chat that lives **inside the app** and can call tools to inspect/m
 
 **ReAct loop** (`src/lib/superAgent/runner.ts`):
 1. Append the user message; persist.
-2. Build history (system prompt + last `memoryWindow` messages + `tools[]` for enabled tools).
+2. Build history (system prompt + last `memoryWindow` messages + `tools[]` for enabled tools). `role:"system"` messages in history are skipped — the runner always re-injects the current Settings system prompt fresh, so display-only system bubbles (e.g. operator inbox handoff notes) never duplicate or pollute the model context.
 3. `aiChatStream` → tokens stream into a live assistant bubble; tool_call_deltas accumulate by index.
 4. On `done`, parse completed tool calls; for each: short-circuit if disabled, queue if `pauseToolCalls` is on, else execute immediately.
 5. Persist a `tool` role message with all results; loop back to step 2 until the assistant returns plain content with no tool_calls or `maxToolCallsPerTurn` is hit.
 
 **Trust mode** — there's no approval modal. Write tools execute immediately. The audit surface is the inline `ToolCallCard` in the chat. The panel header has a global **pause-tool-calls** toggle (red dot icon when active) that flips queue mode on; queued cards expose Run/Skip buttons that the runner observes via a Zustand subscription. Per-tool **disable** lives in Settings → Super Agent → Tools — disabled tools are stripped from the model's `tools[]` payload AND short-circuit at execution time as `disabled` cards.
 
-**Tool registry** (`src/lib/superAgent/tools.ts`): typed `Tool[]` with JSON-schema parameters. Read tools wrap `getTerminalContext` / `fsListDirRecursive` / `gitStatus` / `previewDetect` / store accessors; write tools wrap `ptyWrite` / `useWorkspaceStore.newTab+closePane` / `useKanbanStore.createTask` / direct MESSAGES.md append / `useTeamStore.create + launchTeam`. The `quick_suggest` tool wraps `runQuickSuggest` (the renamed Super Brain v1 helper) so the chat can suggest "next command" for any pane.
+**Tool registry** (`src/lib/superAgent/tools.ts`): typed `Tool[]` with JSON-schema parameters. Read tools wrap `getTerminalContext` / `fsListDirRecursive` / `gitStatus` / `previewDetect` / store accessors and include `read_team_messages` (on-demand `parseMessages` over MESSAGES.md, newest-first with `since_ts` / `from` / `to` / `type` / `limit` filters). Write tools wrap `ptyWrite` / `useWorkspaceStore.newTab+closePane` / `useKanbanStore.createTask` / direct MESSAGES.md append / `useTeamStore.create + launchTeam`, plus the team-write helpers `team_broadcast` (fan to every team pane via `runSuperBrainTeamBroadcast`) and `team_send_to_pane` (resolve `paneId` directly or via team-agent `label`). The `quick_suggest` tool wraps `runQuickSuggest` (the renamed Super Brain v1 helper) so the chat can suggest "next command" for any pane. New tools are default-enabled — `superAgentSettings.toolEnabled[name] !== false` is the gate, so unknown keys mean "enabled".
 
 **⌘⇧B is unchanged.** `runSuperBrain(tabId)` keeps the legacy keyboard pipeline (single round-trip via `aiChat`, no chat history, draft into PTY without `\n`). Internally it now delegates to `runQuickSuggest({ paneId, write: true })`. The shortcut wiring in `App.tsx` and `shortcuts.ts` doesn't change.
 
