@@ -11,7 +11,6 @@
 //      or when maxToolCallsPerTurn is reached.
 
 import {
-  aiChat,
   aiChatStream,
   type AiMessage,
   type AiStreamHandle,
@@ -244,74 +243,52 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
     let finishReason: string | undefined;
     let handle: AiStreamHandle | null = null;
 
-    const useStream = sa.streaming !== false;
-
-    if (useStream) {
-      await new Promise<void>((resolve) => {
-        let resolved = false;
-        const settle = () => {
-          if (!resolved) {
-            resolved = true;
-            resolve();
+    // Always go through ai_chat_stream — when sa.streaming is false the Rust
+    // side skips SSE and falls into the one-shot path, which still emits a
+    // single delta + tool_call_deltas + done, so the aggregation logic below
+    // works identically. Avoids regressing to single-turn / no-tools when
+    // streaming is toggled off (aiChat takes only systemPrompt + userMessage).
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      const settle = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+      void aiChatStream(
+        { endpoint, apiKey, model, messages, tools, streaming: sa.streaming !== false },
+        (ev) => {
+          if (ev.type === "delta") {
+            assistantText += ev.content;
+            useSuperAgentStore.setState((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] ?? []).map((m) =>
+                  m.id === liveAssistant.id ? { ...m, content: assistantText } : m,
+                ),
+              },
+            }));
+          } else if (ev.type === "tool_call_delta") {
+            const cur = acc.get(ev.index) ?? { index: ev.index, name: "", argsText: "" };
+            if (ev.id) cur.id = ev.id;
+            if (ev.name) cur.name = ev.name;
+            if (ev.arguments_partial) cur.argsText += ev.arguments_partial;
+            acc.set(ev.index, cur);
+          } else if (ev.type === "done") {
+            finishReason = ev.finish_reason;
+            settle();
+          } else if (ev.type === "error") {
+            assistantText += `\n\n_[error: ${ev.message}]_`;
+            settle();
           }
-        };
-        void aiChatStream(
-          { endpoint, apiKey, model, messages, tools, streaming: true },
-          (ev) => {
-            if (ev.type === "delta") {
-              assistantText += ev.content;
-              useSuperAgentStore.setState((s) => ({
-                messagesBySession: {
-                  ...s.messagesBySession,
-                  [sessionId]: (s.messagesBySession[sessionId] ?? []).map((m) =>
-                    m.id === liveAssistant.id ? { ...m, content: assistantText } : m,
-                  ),
-                },
-              }));
-            } else if (ev.type === "tool_call_delta") {
-              const cur = acc.get(ev.index) ?? { index: ev.index, name: "", argsText: "" };
-              if (ev.id) cur.id = ev.id;
-              if (ev.name) cur.name = ev.name;
-              if (ev.arguments_partial) cur.argsText += ev.arguments_partial;
-              acc.set(ev.index, cur);
-            } else if (ev.type === "done") {
-              finishReason = ev.finish_reason;
-              settle();
-            } else if (ev.type === "error") {
-              assistantText += `\n\n_[error: ${ev.message}]_`;
-              settle();
-            }
-          },
-        ).then((h) => {
-          handle = h;
-          useSuperAgentStore.getState().setActiveStreamId(h.streamId);
-        });
+        },
+      ).then((h) => {
+        handle = h;
+        useSuperAgentStore.getState().setActiveStreamId(h.streamId);
       });
-      if (handle) useSuperAgentStore.getState().setActiveStreamId(null);
-    } else {
-      // Non-streaming fallback path. We synthesize a single delta and a done.
-      try {
-        const reply = await aiChat({
-          endpoint,
-          apiKey,
-          model,
-          systemPrompt,
-          userMessage: messages.filter((m) => m.role === "user").map((m) => (m as { content: string }).content).slice(-1)[0] ?? "",
-        });
-        assistantText = reply;
-        useSuperAgentStore.setState((s) => ({
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: (s.messagesBySession[sessionId] ?? []).map((m) =>
-              m.id === liveAssistant.id ? { ...m, content: assistantText } : m,
-            ),
-          },
-        }));
-        finishReason = "stop";
-      } catch (e) {
-        assistantText = `_[error: ${e instanceof Error ? e.message : String(e)}]_`;
-      }
-    }
+    });
+    if (handle) useSuperAgentStore.getState().setActiveStreamId(null);
 
     const completedCalls: ToolCall[] = [];
     for (const [, c] of acc) {
