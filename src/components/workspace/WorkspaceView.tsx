@@ -125,7 +125,7 @@ export function WorkspaceView() {
           </button>
         )}
       </div>
-      {superAgentOpen && <SuperAgentPanel mode="rail" />}
+      {superAgentOpen && <SuperAgentPanel />}
     </div>
   );
 }

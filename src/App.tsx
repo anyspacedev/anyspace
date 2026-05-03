@@ -22,7 +22,6 @@ import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
 import { AgentManager } from "./components/agents/AgentManager";
 import { TeamsView } from "./components/team/TeamsView";
-import { SuperAgentPanel } from "./components/superAgent/SuperAgentPanel";
 import { Settings } from "./components/settings/Settings";
 import { useSuperAgentStore } from "./stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "./stores/superAgentSettingsStore";
@@ -260,7 +259,6 @@ export default function App() {
           {view === "kanban" && <KanbanBoard />}
           {view === "agents" && <AgentManager />}
           {view === "teams" && <TeamsView />}
-          {view === "superagent" && <SuperAgentPanel mode="full" />}
           {view === "settings" && <Settings />}
         </div>
         <StatusBar />

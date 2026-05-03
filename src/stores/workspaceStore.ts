@@ -155,7 +155,7 @@ export type PanePreset = {
 type WorkspaceState = {
   tabs: Tab[];
   activeTabId: string | null;
-  selectedView: "workspace" | "kanban" | "agents" | "teams" | "superagent" | "settings";
+  selectedView: "workspace" | "kanban" | "agents" | "teams" | "settings";
   hydrated: boolean;
 
   setView: (view: WorkspaceState["selectedView"]) => void;

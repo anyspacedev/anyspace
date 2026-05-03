@@ -128,15 +128,12 @@ export async function inject(text: string, target: InjectTarget): Promise<Inject
     }
   }
 
-  // Last-resort: if the Super Agent panel is open or its full-page view is
-  // active, route into its textarea. The textarea ref is registered when the
-  // panel mounts and unregisters on unmount; we focus it before writing so
-  // the existing dom-input pipeline takes the result naturally on next runs.
-  const ws = useWorkspaceStore.getState();
+  // Last-resort: if the Super Agent rail is open, route into its textarea.
+  // The textarea ref is registered when the panel mounts and unregisters on
+  // unmount; we focus it before writing so the existing dom-input pipeline
+  // takes the result naturally on next runs.
   const sa = useSuperAgentStore.getState();
-  const superAgentReachable =
-    sa.panelOpen || ws.selectedView === "superagent";
-  if (superAgentReachable) {
+  if (sa.panelOpen) {
     const el = getSuperAgentInput();
     if (el) {
       el.focus();

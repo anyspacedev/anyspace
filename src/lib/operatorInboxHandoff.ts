@@ -51,11 +51,8 @@ export async function handoffInboxToSuperAgent(): Promise<void> {
 
   inbox.markAllRead();
   sa.setPanelOpen(true);
-  // Keep the user on the workspace view (rail mode) so they don't lose the
-  // panes they were watching. If they were on a non-workspace view, switch
-  // to workspace so the rail is actually visible.
   const ws = useWorkspaceStore.getState();
-  if (ws.selectedView !== "workspace" && ws.selectedView !== "superagent") {
+  if (ws.selectedView !== "workspace") {
     ws.setView("workspace");
   }
 }

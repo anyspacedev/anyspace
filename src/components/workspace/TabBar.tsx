@@ -40,7 +40,6 @@ export function TabBar() {
           {view === "kanban" && "Task Board"}
           {view === "agents" && "Agents"}
           {view === "teams" && "Teams"}
-          {view === "superagent" && "Super Agent"}
           {view === "settings" && "Settings"}
         </div>
       </div>

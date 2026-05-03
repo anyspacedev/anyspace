@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
-import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSttStore } from "../../stores/sttStore";
 import { abortActive, sendUserMessage } from "../../lib/superAgent/runner";
 import { Icon } from "../ui/Icon";
 import { MessageBubble } from "./MessageBubble";
 import { registerSuperAgentInput } from "./inputRegistry";
 
-export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
+export function SuperAgentPanel() {
   const sessions = useSuperAgentStore((s) => s.sessions);
   const activeSessionId = useSuperAgentStore((s) => s.activeSessionId);
   const messagesBySession = useSuperAgentStore((s) => s.messagesBySession);
@@ -91,7 +90,6 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
 
   const onResizePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (mode !== "rail") return;
       e.preventDefault();
       const startX = e.clientX;
       const startW = useSuperAgentSettingsStore.getState().settings.panelWidth;
@@ -114,7 +112,7 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
       handle.addEventListener("pointerup", onUp);
       handle.addEventListener("pointercancel", onUp);
     },
-    [mode, setPanelWidth, savePanelWidth],
+    [setPanelWidth, savePanelWidth],
   );
 
   const ensureSession = async () => {
@@ -147,16 +145,14 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
   }, [filter, messages]);
 
   return (
-    <aside className={`sa-panel sa-panel-${mode}`} aria-label="Super Agent">
-      {mode === "rail" && (
-        <div
-          className="sa-resize"
-          onPointerDown={onResizePointerDown}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize Super Agent"
-        />
-      )}
+    <aside className="sa-panel sa-panel-rail" aria-label="Super Agent">
+      <div
+        className="sa-resize"
+        onPointerDown={onResizePointerDown}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize Super Agent"
+      />
 
       <header className="sa-header">
         <div className="sa-header-titles">
@@ -228,31 +224,15 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
           >
             <Icon name="plus" size={12} />
           </button>
-          {mode === "rail" && (
-            <>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setPanelOpen(false);
-                  useWorkspaceStore.getState().setView("superagent");
-                }}
-                title="Open as full-page view"
-                aria-label="Pop out to full-page view"
-              >
-                <Icon name="external-link" size={12} />
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setPanelOpen(false)}
-                title="Hide panel"
-                aria-label="Hide panel"
-              >
-                <Icon name="chevron-right" size={12} />
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setPanelOpen(false)}
+            title="Hide panel"
+            aria-label="Hide panel"
+          >
+            <Icon name="chevron-right" size={12} />
+          </button>
         </div>
       </header>
 
