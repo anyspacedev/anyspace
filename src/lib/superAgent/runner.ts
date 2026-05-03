@@ -50,12 +50,39 @@ function buildHistory(sessionId: string, systemPrompt: string): AiMessage[] {
   const sa = useSuperAgentSettingsStore.getState().settings;
   const messages = useSuperAgentStore.getState().messagesBySession[sessionId] ?? [];
   const window = sa.memoryWindow > 0 ? sa.memoryWindow : 30;
-  const tail = messages.slice(-window);
+
+  // Slice the last `window` messages, but back up if the slice would orphan
+  // a tool message (no preceding assistant w/ tool_calls in the window).
+  let startIdx = Math.max(0, messages.length - window);
+  while (startIdx > 0 && messages[startIdx]?.role === "tool") {
+    startIdx--;
+  }
+  const tail = messages.slice(startIdx);
+
   const out: AiMessage[] = [{ role: "system", content: systemPrompt }];
+  // Tracks tool_call_ids emitted by the most recent assistant turn that still
+  // need a matching tool-role reply. DeepSeek (and OpenAI) reject the request
+  // unless every tool_call_id has a corresponding tool message immediately
+  // following the assistant turn.
+  let pending: string[] = [];
+
+  const flushPending = () => {
+    for (const callId of pending) {
+      out.push({
+        role: "tool",
+        tool_call_id: callId,
+        content: JSON.stringify({ error: "tool result missing" }),
+      });
+    }
+    pending = [];
+  };
+
   for (const m of tail) {
     if (m.role === "user") {
+      flushPending();
       out.push({ role: "user", content: m.content });
     } else if (m.role === "assistant") {
+      flushPending();
       const tcs: AiToolCall[] | undefined = m.toolCalls?.map((c) => ({
         id: c.id,
         type: "function" as const,
@@ -70,18 +97,25 @@ function buildHistory(sessionId: string, systemPrompt: string): AiMessage[] {
         // captured one — non-thinking endpoints ignore the field.
         reasoning_content: m.reasoningContent || undefined,
       });
+      pending = m.toolCalls?.map((c) => c.id) ?? [];
     } else if (m.role === "tool") {
       // Each tool result goes back as its own tool-role message keyed by call id.
       for (const result of m.toolResults ?? []) {
+        const idx = pending.indexOf(result.callId);
+        if (idx === -1) continue; // orphan result — skip
         out.push({
           role: "tool",
           tool_call_id: result.callId,
           content: result.resultText,
         });
+        pending.splice(idx, 1);
       }
     }
     // 'system' messages are skipped — we always inject the current system prompt fresh.
   }
+  // Flush any leftover unmatched call_ids before sending — covers partial saves
+  // (runner aborted mid-execution, maxToolCallsPerTurn cap hit, etc.).
+  flushPending();
   return out;
 }
 
@@ -345,11 +379,20 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
     for (const call of completedCalls) {
       calls++;
       if (calls > (sa.maxToolCallsPerTurn || 6)) {
-        results.push({
+        // Persist the synthetic error result on the tool message so the next
+        // history rebuild has a tool reply for this call_id (otherwise the
+        // API rejects the follow-up with "insufficient tool messages").
+        const capped: ToolResult = {
           callId: call.id,
           status: "error",
           resultText: JSON.stringify({ error: "maxToolCallsPerTurn reached" }),
           errorMessage: "maxToolCallsPerTurn reached",
+        };
+        results.push(capped);
+        const cur = useSuperAgentStore.getState().messagesBySession[sessionId] ?? [];
+        const msg = cur.find((m) => m.id === toolMsg.id);
+        await useSuperAgentStore.getState().updateMessage(sessionId, toolMsg.id, {
+          toolResults: [...(msg?.toolResults ?? []), capped],
         });
         continue;
       }
