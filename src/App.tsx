@@ -56,8 +56,10 @@ export default function App() {
       await loadKanban().catch((e) => console.warn("[kanban] load failed", e));
       await loadTeams().catch((e) => console.warn("[team] load failed", e));
       await loadTeamSettings().catch((e) => console.warn("[team] settings load failed", e));
-      await loadSuperAgent().catch((e) => console.warn("[super-agent] load failed", e));
+      // Settings first — superAgent.load reads panelOpen + activeSessionId from
+      // settings to restore the rail visibility and last session on relaunch.
       await loadSuperAgentSettings().catch((e) => console.warn("[super-agent] settings load failed", e));
+      await loadSuperAgent().catch((e) => console.warn("[super-agent] load failed", e));
       // After both workspace + team data are in memory, resume any team tab
       // that survived the restart. resumeTeam re-renders prompt files and
       // re-injects pendingCommand into the existing panes.

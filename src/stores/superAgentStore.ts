@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import Database from "@tauri-apps/plugin-sql";
+import { useSuperAgentSettingsStore } from "./superAgentSettingsStore";
 
 let dbPromise: Promise<Database> | null = null;
 function getDb(): Promise<Database> {
@@ -117,10 +118,28 @@ export const useSuperAgentStore = create<SuperAgentState>((set, get) => ({
     const rows = await db.select<Row[]>(
       "SELECT * FROM super_agent_sessions ORDER BY updated_at DESC",
     );
-    set({ sessions: rows.map(rowToSession), loaded: true });
+    // Restore panelOpen + activeSessionId from settings if they survived the
+    // last shutdown. activeSessionId is only restored if the referenced session
+    // still exists (was deleted? fall through to null).
+    const persisted = useSuperAgentSettingsStore.getState().settings;
+    const sessions = rows.map(rowToSession);
+    const restoredActive =
+      persisted.activeSessionId &&
+      sessions.some((s) => s.id === persisted.activeSessionId)
+        ? persisted.activeSessionId
+        : null;
+    set({
+      sessions,
+      loaded: true,
+      panelOpen: persisted.panelOpen,
+      activeSessionId: restoredActive,
+    });
   },
 
-  setPanelOpen: (panelOpen) => set({ panelOpen }),
+  setPanelOpen: (panelOpen) => {
+    set({ panelOpen });
+    void useSuperAgentSettingsStore.getState().update({ panelOpen });
+  },
   setPauseToolCalls: (pauseToolCalls) => set({ pauseToolCalls }),
   setActiveStreamId: (activeStreamId) => set({ activeStreamId }),
 
@@ -142,6 +161,7 @@ export const useSuperAgentStore = create<SuperAgentState>((set, get) => ({
       activeSessionId: session.id,
       messagesBySession: { ...s.messagesBySession, [session.id]: [] },
     }));
+    void useSuperAgentSettingsStore.getState().update({ activeSessionId: session.id });
     return session;
   },
 
@@ -175,7 +195,10 @@ export const useSuperAgentStore = create<SuperAgentState>((set, get) => ({
     });
   },
 
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId });
+    void useSuperAgentSettingsStore.getState().update({ activeSessionId: sessionId });
+  },
 
   loadMessages: async (sessionId) => {
     if (get().messagesBySession[sessionId]) return; // already loaded

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useSttStore } from "../../stores/sttStore";
 import { abortActive, sendUserMessage } from "../../lib/superAgent/runner";
 import { Icon } from "../ui/Icon";
 import { MessageBubble } from "./MessageBubble";
@@ -22,6 +24,7 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
   const setPanelWidth = useSuperAgentSettingsStore((s) => s.setPanelWidth);
   const savePanelWidth = useSuperAgentSettingsStore((s) => s.savePanelWidth);
   const settings = useSuperAgentSettingsStore((s) => s.settings);
+  const sttPhase = useSttStore((s) => s.phase);
 
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState("");
@@ -217,15 +220,29 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
             <Icon name="plus" size={12} />
           </button>
           {mode === "rail" && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setPanelOpen(false)}
-              title="Hide panel"
-              aria-label="Hide panel"
-            >
-              <Icon name="chevron-right" size={12} />
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setPanelOpen(false);
+                  useWorkspaceStore.getState().setView("superagent");
+                }}
+                title="Open as full-page view"
+                aria-label="Pop out to full-page view"
+              >
+                <Icon name="external-link" size={12} />
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setPanelOpen(false)}
+                title="Hide panel"
+                aria-label="Hide panel"
+              >
+                <Icon name="chevron-right" size={12} />
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -309,6 +326,32 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
           <span className="sa-input-hint">
             {settings.streaming ? "streaming" : "one-shot"} · {settings.model || "(no model)"}
           </span>
+          <button
+            type="button"
+            className={"btn btn-ghost sa-mic" + (sttPhase === "listening" ? " recording" : "")}
+            onPointerDown={(e) => {
+              if (sttPhase !== "idle" && sttPhase !== "error") return;
+              // Focus the textarea so STT's snapshotActiveTarget picks it up
+              // as a writable dom-input. Mirror the focus + startListening +
+              // setPointerCapture pattern from the keyboard hotkey hold.
+              textareaRef.current?.focus();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              void useSttStore.getState().startListening();
+            }}
+            onPointerUp={(e) => {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+              void useSttStore.getState().stopAndTranscribe();
+            }}
+            onPointerCancel={() => useSttStore.getState().cancel()}
+            onPointerLeave={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) return;
+            }}
+            title="Hold to dictate"
+            aria-label="Hold to dictate"
+            aria-pressed={sttPhase === "listening"}
+          >
+            <Icon name="mic" size={12} />
+          </button>
           {activeStreamId ? (
             <button
               type="button"

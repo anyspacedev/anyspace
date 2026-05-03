@@ -4154,6 +4154,18 @@ body.screenshot-dragging {
   text-overflow: ellipsis;
 }
 
+.sa-mic.recording {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 14%, transparent);
+}
+.sa-mic.recording svg {
+  animation: sa-mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes sa-mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Collapsed pill (when panel is hidden) */
 .sa-collapsed-tab {
   position: absolute;

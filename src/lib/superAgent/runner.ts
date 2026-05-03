@@ -406,15 +406,37 @@ export async function decideQueuedToolCall(
   });
 }
 
-/** Stop the active stream and wipe queued cards. */
+/** Stop the active stream and resolve any queued tool calls as skipped so
+ *  awaitQueuedDecision-parked promises unwind cleanly and the ReAct loop
+ *  exits without leaking. */
 export async function abortActive(): Promise<void> {
   const state = useSuperAgentStore.getState();
-  if (!state.activeStreamId) return;
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("abort_ai_chat_stream", { streamId: state.activeStreamId });
-  } catch {
-    /* best-effort */
+  if (state.activeStreamId) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("abort_ai_chat_stream", { streamId: state.activeStreamId });
+    } catch {
+      /* best-effort */
+    }
+    state.setActiveStreamId(null);
   }
-  state.setActiveStreamId(null);
+  // Walk every active session and flip any 'queued' results to 'skipped'.
+  // The runner observer (awaitQueuedDecision) sees the status change and
+  // resolves with a synthetic skip result.
+  for (const [sid, list] of Object.entries(state.messagesBySession)) {
+    for (const msg of list) {
+      if (!msg.toolResults || msg.toolResults.length === 0) continue;
+      const hasQueued = msg.toolResults.some((r) => r.status === "queued");
+      if (!hasQueued) continue;
+      const merged = msg.toolResults.map((r) =>
+        r.status === "queued" ? { ...r, status: "skipped" as const } : r,
+      );
+      await useSuperAgentStore
+        .getState()
+        .updateMessage(sid, msg.id, { toolResults: merged });
+    }
+  }
+  // Clear pause-tool-calls so subsequent prompts aren't accidentally queued
+  // (the next session should start in normal trust mode).
+  if (state.pauseToolCalls) state.setPauseToolCalls(false);
 }
