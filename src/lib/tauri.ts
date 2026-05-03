@@ -172,7 +172,14 @@ export async function aiChat(args: AiChatArgs): Promise<string> {
 // === Streaming ai chat (Super Agent) ===
 export type AiMessage =
   | { role: "system" | "user"; content: string }
-  | { role: "assistant"; content: string | null; tool_calls?: AiToolCall[] }
+  | {
+      role: "assistant";
+      content: string | null;
+      tool_calls?: AiToolCall[];
+      /** Round-tripped on every follow-up call — DeepSeek's hybrid thinking
+       *  mode rejects the request otherwise. */
+      reasoning_content?: string;
+    }
   | { role: "tool"; tool_call_id: string; content: string };
 
 export type AiToolCall = {
@@ -202,6 +209,7 @@ export type ChatStreamArgs = {
 
 export type AiStreamEvent =
   | { type: "delta"; content: string }
+  | { type: "reasoning_delta"; content: string }
   | {
       type: "tool_call_delta";
       index: number;

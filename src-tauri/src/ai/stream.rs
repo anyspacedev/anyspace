@@ -48,6 +48,12 @@ fn default_streaming() -> bool {
 pub enum StreamEvent {
     /// A chunk of plain assistant content. Frontend appends to the in-progress bubble.
     Delta { content: String },
+    /// A chunk of `reasoning_content` (DeepSeek hybrid thinking, Anthropic-via-OpenRouter
+    /// thinking, etc.). DeepSeek REQUIRES this round-tripped to subsequent calls or
+    /// it errors with `reasoning_content ... must be passed back to the API`. The
+    /// frontend accumulates these and stores them on the assistant message so
+    /// future history sends them back.
+    ReasoningDelta { content: String },
     /// A chunk of a tool call. The frontend accumulates by `id` and `index`.
     /// `name` is sent on the first chunk for a given index; `arguments_partial`
     /// arrives in pieces and must be concatenated as plain text (it's a JSON
@@ -179,6 +185,14 @@ async fn run_stream(
         .get("message")
         .ok_or_else(|| format!("response missing choices[0].message: {text}"))?;
 
+    if let Some(reasoning) = message
+        .get("reasoning_content")
+        .and_then(|r| r.as_str())
+    {
+        if !reasoning.is_empty() {
+            let _ = on_event.send(StreamEvent::ReasoningDelta { content: reasoning.to_string() });
+        }
+    }
     if let Some(content) = message.get("content").and_then(|c| c.as_str()) {
         if !content.is_empty() {
             let _ = on_event.send(StreamEvent::Delta { content: content.to_string() });
@@ -282,6 +296,11 @@ fn handle_chunk(v: &Value, on_event: &Channel<StreamEvent>, finish_reason: &mut 
         Some(d) => d,
         None => return,
     };
+    if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
+        if !reasoning.is_empty() {
+            let _ = on_event.send(StreamEvent::ReasoningDelta { content: reasoning.to_string() });
+        }
+    }
     if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
         if !content.is_empty() {
             let _ = on_event.send(StreamEvent::Delta { content: content.to_string() });

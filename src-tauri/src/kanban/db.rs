@@ -32,5 +32,11 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/005_super_agent.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "super_agent_reasoning",
+            sql: include_str!("../../migrations/006_super_agent_reasoning.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

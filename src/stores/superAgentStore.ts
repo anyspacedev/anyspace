@@ -45,6 +45,9 @@ export type Message = {
   createdAt: number;
   /** Set by the runner while a token stream is in flight; not persisted. */
   streaming?: boolean;
+  /** Hybrid-thinking endpoints (DeepSeek, etc.) emit a separate reasoning
+   *  channel and require it round-tripped on follow-up calls. */
+  reasoningContent?: string;
 };
 
 export type Session = {
@@ -74,6 +77,7 @@ const rowToMessage = (r: Row): Message => ({
   toolCalls: r.tool_calls_json ? JSON.parse(String(r.tool_calls_json)) : undefined,
   toolResults: r.tool_results_json ? JSON.parse(String(r.tool_results_json)) : undefined,
   createdAt: Number(r.created_at),
+  reasoningContent: r.reasoning_content ? String(r.reasoning_content) : undefined,
 });
 
 type SuperAgentState = {
@@ -225,7 +229,7 @@ export const useSuperAgentStore = create<SuperAgentState>((set, get) => ({
       ...input,
     };
     await db.execute(
-      "INSERT INTO super_agent_messages (id, session_id, ordinal, role, content, tool_calls_json, tool_results_json, created_at) VALUES (?,?,?,?,?,?,?,?)",
+      "INSERT INTO super_agent_messages (id, session_id, ordinal, role, content, tool_calls_json, tool_results_json, created_at, reasoning_content) VALUES (?,?,?,?,?,?,?,?,?)",
       [
         msg.id,
         msg.sessionId,
@@ -235,6 +239,7 @@ export const useSuperAgentStore = create<SuperAgentState>((set, get) => ({
         msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
         msg.toolResults ? JSON.stringify(msg.toolResults) : null,
         msg.createdAt,
+        msg.reasoningContent ?? null,
       ],
     );
     await db.execute(
@@ -260,11 +265,12 @@ export const useSuperAgentStore = create<SuperAgentState>((set, get) => ({
     const merged: Message = { ...list[idx], ...patch };
     const db = await getDb();
     await db.execute(
-      "UPDATE super_agent_messages SET content=?, tool_calls_json=?, tool_results_json=? WHERE id=?",
+      "UPDATE super_agent_messages SET content=?, tool_calls_json=?, tool_results_json=?, reasoning_content=? WHERE id=?",
       [
         merged.content,
         merged.toolCalls ? JSON.stringify(merged.toolCalls) : null,
         merged.toolResults ? JSON.stringify(merged.toolResults) : null,
+        merged.reasoningContent ?? null,
         messageId,
       ],
     );

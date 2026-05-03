@@ -65,6 +65,10 @@ function buildHistory(sessionId: string, systemPrompt: string): AiMessage[] {
         role: "assistant",
         content: m.content || null,
         tool_calls: tcs && tcs.length ? tcs : undefined,
+        // DeepSeek's hybrid thinking mode rejects follow-up calls that drop
+        // the previous turn's reasoning_content. Always echo it back if we
+        // captured one — non-thinking endpoints ignore the field.
+        reasoning_content: m.reasoningContent || undefined,
       });
     } else if (m.role === "tool") {
       // Each tool result goes back as its own tool-role message keyed by call id.
@@ -240,6 +244,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
 
     const acc = new Map<number, AccToolCall>();
     let assistantText = "";
+    let reasoningText = "";
     let finishReason: string | undefined;
     let handle: AiStreamHandle | null = null;
 
@@ -266,6 +271,18 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] ?? []).map((m) =>
                   m.id === liveAssistant.id ? { ...m, content: assistantText } : m,
+                ),
+              },
+            }));
+          } else if (ev.type === "reasoning_delta") {
+            reasoningText += ev.content;
+            useSuperAgentStore.setState((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] ?? []).map((m) =>
+                  m.id === liveAssistant.id
+                    ? { ...m, reasoningContent: reasoningText }
+                    : m,
                 ),
               },
             }));
@@ -307,6 +324,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
       content: assistantText,
       toolCalls: completedCalls.length ? completedCalls : undefined,
       streaming: false,
+      reasoningContent: reasoningText || undefined,
     });
 
     if (completedCalls.length === 0 || finishReason === "stop") {
