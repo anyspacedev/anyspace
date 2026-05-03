@@ -360,6 +360,7 @@
   position: relative;
   min-width: 0;
   height: 100%;
+  overflow: hidden;
 }
 .workspace:not(.has-team-chat):not(.has-super-agent) .workspace-content {
   position: absolute;
@@ -4182,6 +4183,7 @@ body.screenshot-dragging {
   padding: 8px 6px;
   cursor: pointer;
   color: var(--fg-muted);
+  z-index: 6;
 }
 .sa-collapsed-tab:hover { color: var(--fg); }
 
@@ -4452,6 +4454,7 @@ body.screenshot-dragging {
   padding: 8px 6px;
   cursor: pointer;
   color: var(--fg-muted);
+  z-index: 6;
 }
 .team-chat-tab:hover {
   color: var(--fg);

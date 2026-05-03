@@ -3,6 +3,7 @@ import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { TemplatePickerTrigger } from "./TemplatePicker";
 import { TeamPickerTrigger } from "./TeamPicker";
+import { SuperAgentToggleTrigger } from "../superAgent/SuperAgentToggleTrigger";
 import { Icon } from "../ui/Icon";
 
 function pathBasename(p: string): string {
@@ -118,6 +119,7 @@ export function TabBar() {
         )}
         <TemplatePickerTrigger />
         <TeamPickerTrigger />
+        <SuperAgentToggleTrigger />
       </div>
     </div>
   );
