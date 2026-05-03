@@ -236,8 +236,8 @@
 }
 .tab-close {
   color: var(--fg-dim);
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
@@ -246,7 +246,10 @@
     background var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out);
 }
-.tab-close:hover { background: var(--bg-elev-2); color: var(--fg); }
+.tab-close:hover {
+  background: color-mix(in oklab, var(--danger) 18%, var(--bg-elev-2));
+  color: var(--fg);
+}
 .tabbar-actions { display: flex; gap: 6px; align-items: center; }
 
 .workspace-folder-pill {
@@ -491,8 +494,8 @@
   gap: 1px;
 }
 .icon-btn {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   color: var(--fg-muted);
@@ -858,8 +861,8 @@
 .cmd-block-action-btn {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   background: color-mix(in oklab, var(--bg-elev) 88%, transparent);
   backdrop-filter: blur(6px);
@@ -4626,4 +4629,130 @@ body.screenshot-dragging {
   width: 100%;
   justify-content: center;
 }
+
+/* ===== Review pass: a11y + touch target polish ===== */
+
+/* Modal head row when a title needs a sibling close affordance. */
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pad-md);
+}
+.modal-head .modal-title { flex: 1; min-width: 0; }
+
+/* × close button used by the dialog modals. Two variants:
+   - .modal-close (inline at the head row)
+   - .modal-close-floating (absolute top-right; for modals whose layout
+     would shift if a head row was inserted)
+   Both meet WCAG 2.5.8 target size minimum (24×24). */
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+.modal-close:hover:not(:disabled) {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.modal-close:disabled { opacity: 0.4; cursor: not-allowed; }
+.modal-close-floating {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+}
+.modal { position: relative; }
+
+/* Heading classes carry their own visual weight; reset margin/font is
+   handled by the global h1-h6 reset in globals.css. The rules below only
+   add what wasn't already there for divs with the same class. */
+.welcome-title,
+.sa-title-wrap,
+.team-chat-title,
+.kanban-col-title,
+.settings-section-title,
+.modal-title { margin: 0; }
+
+/* Wrap the SuperAgent rename button in an h2 without changing its layout. */
+.sa-title-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Active pane gets visibly stronger weight than a selected (broadcast)
+   sibling. Active = thicker accent border + outer halo; selected without
+   active = the original border + a subtle inset ring. */
+.pane.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent);
+}
+.pane.active .pane-header {
+  border-bottom-color: color-mix(in oklab, var(--accent) 55%, var(--border));
+}
+
+/* Pause-tool-calls toggle reads as a status pill, not a glyph swap. */
+.sa-header-actions .btn.active {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 14%, transparent);
+  border-color: color-mix(in oklab, var(--danger) 30%, transparent);
+}
+.sa-pause-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.sa-pause-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sa-pause-toggle.active .sa-pause-toggle-dot {
+  animation: sa-pause-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sa-pause-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sa-pause-toggle.active .sa-pause-toggle-dot { animation: none; }
+}
+
+/* Bigger hit area for the search-clear chip on Super Agent + Team chat.
+   Was 16x16, now 20x20 with centred icon. */
+.sa-search-clear,
+.team-chat-search-clear {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+/* sa-input-hint floor at 11px to match other XS chrome. Was 10px. */
+.sa-input-hint { font-size: var(--font-size-xs); }
+
+/* Tighten the per-section cap on the settings page from 980px → 880px so
+   long form rows don't stretch beyond comfortable line length on wide
+   windows. Wrapper paddings/overflow already set above. */
+.settings > * { max-width: 880px; }
+
 

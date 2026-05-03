@@ -37,6 +37,18 @@ button {
   cursor: pointer;
 }
 
+/* Reset heading margins/weight so semantic <h1>/<h2>/<h3> can carry whatever
+   chrome class wraps them without inheriting browser-default styling. The
+   class is responsible for the visual treatment. */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
 button:disabled {
   cursor: not-allowed;
 }

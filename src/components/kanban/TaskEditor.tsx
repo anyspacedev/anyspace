@@ -1,13 +1,16 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import type { Task } from "../../lib/types";
 import { Icon } from "../ui/Icon";
 import { Select } from "../ui/Select";
 
 export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
   useFocusReturn();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef);
   const create = useKanbanStore((s) => s.createTask);
   const update = useKanbanStore((s) => s.updateTask);
   const remove = useKanbanStore((s) => s.deleteTask);
@@ -69,13 +72,24 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
   return (
     <div className="modal-backdrop" onClick={tryClose}>
       <div
+        ref={modalRef}
         className="modal task-editor"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <div id={titleId} className="modal-title">{task ? "Edit task" : "New task"}</div>
+        <div className="modal-head">
+          <h2 id={titleId} className="modal-title">{task ? "Edit task" : "New task"}</h2>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={tryClose}
+            aria-label="Close"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
         <div className="form-row">
           <label className="label-with-icon" htmlFor={titleInputId}>
             <Icon name="file-edit" size={12} />

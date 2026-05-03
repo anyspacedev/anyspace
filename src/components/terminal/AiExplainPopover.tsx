@@ -81,10 +81,15 @@ export function AiExplainPopover({ block, output, onClose }: Props) {
   const cmdPreview = (block.command ?? "").split("\n")[0].slice(0, 60);
 
   return (
-    <div className="ai-explain-popover" ref={popoverRef} role="dialog">
+    <div
+      className="ai-explain-popover"
+      ref={popoverRef}
+      role="dialog"
+      aria-label={cmdPreview ? `Explain: ${cmdPreview}` : "Explain command"}
+    >
       <div className="ai-explain-head">
         <div className="ai-explain-title">
-          <Icon name="sparkles" size={12} />
+          <Icon name="sparkles" size={12} aria-hidden="true" />
           <span>Explain</span>
           {cmdPreview && <code className="ai-explain-cmd">{cmdPreview}</code>}
         </div>

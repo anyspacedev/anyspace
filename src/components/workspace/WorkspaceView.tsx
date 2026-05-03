@@ -54,7 +54,7 @@ export function WorkspaceView() {
             >
               T
             </div>
-            <div className="welcome-title">Welcome aboard</div>
+            <h1 className="welcome-title">Welcome aboard</h1>
             <div className="welcome-sub">
               Open a terminal to get started, or browse your task board.
             </div>

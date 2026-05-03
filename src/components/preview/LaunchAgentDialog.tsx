@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { launchAgent } from "../../lib/agentLauncher";
@@ -8,6 +8,7 @@ import {
   type ElementCapture,
 } from "../../lib/elementContext";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import { Icon } from "../ui/Icon";
 import { Select } from "../ui/Select";
 
@@ -37,6 +38,8 @@ export function LaunchAgentDialog({ capture, tabId, paneId, defaultCwd, onClose 
   const cwdInputId = useId();
 
   useFocusReturn();
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef);
 
   useEffect(() => {
     if (!toast) return;
@@ -157,13 +160,22 @@ export function LaunchAgentDialog({ capture, tabId, paneId, defaultCwd, onClose 
   return (
     <div className="modal-backdrop" onClick={tryClose}>
       <div
+        ref={modalRef}
         className="modal wide launch-agent-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <div id={titleId} className="modal-title">Describe a change for this element</div>
+        <button
+          type="button"
+          className="modal-close modal-close-floating"
+          onClick={tryClose}
+          aria-label="Close"
+        >
+          <Icon name="x" size={14} />
+        </button>
+        <h2 id={titleId} className="modal-title">Describe a change for this element</h2>
 
         <div className="captured-element">
           <div className="captured-selector">

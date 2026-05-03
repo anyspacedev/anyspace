@@ -5,6 +5,7 @@ import { fsListDirRecursive, settingsGet, settingsSet, type FileEntry } from "..
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import { Icon } from "../ui/Icon";
 import { ErrorState } from "../ui/ErrorState";
 import { editorFilesFrom } from "../editor/editorPayload";
@@ -18,6 +19,8 @@ export function QuickOpen() {
   const [highlight, setHighlight] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, open);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
@@ -110,6 +113,7 @@ export function QuickOpen() {
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div
+        ref={modalRef}
         className="modal quickopen"
         role="dialog"
         aria-modal="true"

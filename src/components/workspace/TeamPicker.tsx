@@ -1,7 +1,8 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Icon } from "../ui/Icon";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
@@ -58,7 +59,9 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
   const [decomposeError, setDecomposeError] = useState<string | null>(null);
 
   const titleId = useId();
+  const modalRef = useRef<HTMLDivElement>(null);
   useFocusReturn(open);
+  useFocusTrap(modalRef, open);
 
   const reset = () => {
     setName("");
@@ -181,13 +184,23 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
   return (
     <div className="modal-backdrop" onClick={busy ? undefined : reset}>
       <div
+        ref={modalRef}
         className="modal wide"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <div id={titleId} className="modal-title">New Team workspace</div>
+        <button
+          type="button"
+          className="modal-close modal-close-floating"
+          onClick={busy ? undefined : reset}
+          disabled={busy}
+          aria-label="Close"
+        >
+          <Icon name="x" size={14} />
+        </button>
+        <h2 id={titleId} className="modal-title">New Team workspace</h2>
         <div className="modal-sub">
           Spin up multiple AI agents around a shared goal. Each agent runs in
           its own pane and they coordinate through a markdown message bus.
@@ -596,7 +609,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
               <span>Save as template</span>
             </button>
             {savingTemplate && (
-              <div className="team-tpl-save-pop" role="dialog" aria-label="Save template">
+              <div className="team-tpl-save-pop" role="group" aria-label="Save template">
                 <label className="team-tpl-save-pop-label" htmlFor="tpl-name-input">
                   Template name
                 </label>

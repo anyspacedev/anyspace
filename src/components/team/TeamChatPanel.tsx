@@ -270,7 +270,7 @@ export function TeamChatPanel({ tabId }: { tabId: string }) {
         aria-label="Resize team chat"
       />
       <header className="team-chat-header">
-        <div className="team-chat-title">{team.name}</div>
+        <h2 className="team-chat-title">{team.name}</h2>
         <button
           type="button"
           className="btn btn-ghost"

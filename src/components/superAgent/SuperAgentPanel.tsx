@@ -165,6 +165,7 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
               autoFocus
               defaultValue={session.name}
               className="sa-title-input"
+              aria-label="Session name"
               onBlur={(e) => {
                 if (e.target.value.trim()) void renameSession(session.id, e.target.value);
                 setEditingTitle(false);
@@ -179,14 +180,16 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
               }}
             />
           ) : (
-            <button
-              type="button"
-              className="sa-title"
-              onDoubleClick={() => session && setEditingTitle(true)}
-              title="Double-click to rename"
-            >
-              {session?.name ?? "Super Agent"}
-            </button>
+            <h2 className="sa-title-wrap">
+              <button
+                type="button"
+                className="sa-title"
+                onDoubleClick={() => session && setEditingTitle(true)}
+                title="Double-click to rename"
+              >
+                {session?.name ?? "Super Agent"}
+              </button>
+            </h2>
           )}
           <select
             aria-label="Session"
@@ -203,12 +206,18 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
         <div className="sa-header-actions">
           <button
             type="button"
-            className={"btn btn-ghost" + (pauseToolCalls ? " active" : "")}
+            className={"btn btn-ghost sa-pause-toggle" + (pauseToolCalls ? " active" : "")}
             onClick={() => setPauseToolCalls(!pauseToolCalls)}
-            title={pauseToolCalls ? "Tool calls paused — click to resume" : "Pause tool calls"}
+            title={
+              pauseToolCalls
+                ? "Tool calls paused — Run/Skip each one inline"
+                : "Auto-running tool calls — click to require approval"
+            }
             aria-pressed={pauseToolCalls}
+            aria-label={pauseToolCalls ? "Tool calls paused" : "Tool calls auto-running"}
           >
-            <Icon name={pauseToolCalls ? "circle" : "dot"} size={12} />
+            <span className="sa-pause-toggle-dot" aria-hidden="true" />
+            <span>{pauseToolCalls ? "Paused" : "Auto"}</span>
           </button>
           <button
             type="button"
@@ -346,11 +355,29 @@ export function SuperAgentPanel({ mode = "rail" }: { mode?: "rail" | "full" }) {
             onPointerLeave={(e) => {
               if (e.currentTarget.hasPointerCapture(e.pointerId)) return;
             }}
-            title="Hold to dictate"
+            // Keyboard hold (Space/Enter) mirrors pointer hold so users who
+            // can't reliably hold a pointer button still have access. The
+            // browser would otherwise fire a click on Space/Enter release,
+            // which would do nothing useful here — preventDefault swallows
+            // the synthetic click.
+            onKeyDown={(e) => {
+              if (e.key !== " " && e.key !== "Enter") return;
+              if (e.repeat) return;
+              if (sttPhase !== "idle" && sttPhase !== "error") return;
+              e.preventDefault();
+              textareaRef.current?.focus();
+              void useSttStore.getState().startListening();
+            }}
+            onKeyUp={(e) => {
+              if (e.key !== " " && e.key !== "Enter") return;
+              e.preventDefault();
+              void useSttStore.getState().stopAndTranscribe();
+            }}
+            title="Hold to dictate (Space or pointer)"
             aria-label="Hold to dictate"
             aria-pressed={sttPhase === "listening"}
           >
-            <Icon name="mic" size={12} />
+            <Icon name="mic" size={12} aria-hidden="true" />
           </button>
           {activeStreamId ? (
             <button

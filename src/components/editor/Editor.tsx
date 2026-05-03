@@ -18,6 +18,7 @@ import { editorFilesFrom, basename, parentDir } from "./editorPayload";
 import { EditorTabs } from "./EditorTabs";
 import { gitStatus, type GitStatusLetter } from "../../lib/tauri";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { useFocusTrap } from "../../lib/useFocusTrap";
 
 // Monaco needs a real Worker per language. Without this, JSON/TS modes
 // fall through to the AMD loader path and crash on `moduleIdToUrl.toUrl`.
@@ -411,7 +412,9 @@ function UnsavedConfirm({
   onSave: () => void;
 }) {
   const titleId = useId();
+  const modalRef = useRef<HTMLDivElement>(null);
   useFocusReturn();
+  useFocusTrap(modalRef);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCancel();
@@ -423,13 +426,14 @@ function UnsavedConfirm({
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div
+        ref={modalRef}
         className="modal narrow"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <div id={titleId} className="modal-title">Unsaved changes</div>
+        <h2 id={titleId} className="modal-title">Unsaved changes</h2>
         <div className="modal-body">
           <code>{basename(path)}</code> has unsaved changes. Save them before
           closing?

@@ -1,9 +1,10 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { TEMPLATES, useWorkspaceStore, type PanePreset } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { agentLaunch } from "../../lib/tauri";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { useFocusTrap } from "../../lib/useFocusTrap";
 import { Icon } from "../ui/Icon";
 
 type Step = "template" | "agents";
@@ -20,8 +21,10 @@ export function TemplatePickerTrigger() {
 
   const titleId = useId();
   const projectInputId = useId();
+  const modalRef = useRef<HTMLDivElement>(null);
 
   useFocusReturn(open);
+  useFocusTrap(modalRef, open);
 
   const reset = () => {
     setOpen(false);
@@ -124,15 +127,24 @@ export function TemplatePickerTrigger() {
       {open && (
         <div className="modal-backdrop" onClick={reset}>
           <div
+            ref={modalRef}
             className="modal wide"
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              type="button"
+              className="modal-close modal-close-floating"
+              onClick={reset}
+              aria-label="Close"
+            >
+              <Icon name="x" size={14} />
+            </button>
             {step === "template" && (
               <>
-                <div id={titleId} className="modal-title">New workspace</div>
+                <h2 id={titleId} className="modal-title">New workspace</h2>
                 <div className="modal-sub">
                   Pick a layout. Next you can assign an AI agent to each pane —
                   all panes spawn and fire their agent in parallel.
@@ -166,7 +178,7 @@ export function TemplatePickerTrigger() {
 
             {step === "agents" && chosen && (
               <>
-                <div id={titleId} className="modal-title">Agents — {chosen.label}</div>
+                <h2 id={titleId} className="modal-title">Agents — {chosen.label}</h2>
                 <div className="modal-sub">
                   Pick an agent for each pane (or leave as <em>Plain shell</em>).
                   Optionally point the workspace at a project folder.

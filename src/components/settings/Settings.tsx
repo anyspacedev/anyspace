@@ -35,7 +35,7 @@ export function Settings() {
 
       <div className="settings-section">
         <div className="settings-section-head">
-          <div className="settings-section-title">Appearance</div>
+          <h2 className="settings-section-title">Appearance</h2>
           <div className="settings-section-sub">
             {themes.length} themes — {darkCount} dark, {lightCount} light.
           </div>
@@ -45,7 +45,7 @@ export function Settings() {
 
       <div className="settings-section">
         <div className="settings-section-head">
-          <div className="settings-section-title">Keyboard</div>
+          <h2 className="settings-section-title">Keyboard</h2>
           <div className="settings-section-sub">Built-in shortcuts</div>
         </div>
         <div className="kbd-list">
@@ -69,7 +69,7 @@ export function Settings() {
 
       <div className="settings-section">
         <div className="settings-section-head">
-          <div className="settings-section-title">About</div>
+          <h2 className="settings-section-title">About</h2>
           <div className="settings-section-sub">
             Teamship 0.1.0 — multi-pane terminal multiplexer with command blocks,
             Monaco editor, live preview, and Kanban-driven AI agent launcher.
@@ -389,7 +389,7 @@ function SttSettingsSection() {
   return (
     <div className="settings-section">
       <div className="settings-section-head">
-        <div className="settings-section-title">Speech to text</div>
+        <h2 className="settings-section-title">Speech to text</h2>
         <div className="settings-section-sub">
           Hold <kbd>{formatHotkey(settings.hotkey)}</kbd> to dictate. Transcribed
           text is pasted into the focused input, terminal, or editor.
@@ -528,7 +528,7 @@ function AiSettingsSection() {
   return (
     <div className="settings-section">
       <div className="settings-section-head">
-        <div className="settings-section-title">AI</div>
+        <h2 className="settings-section-title">AI</h2>
         <div className="settings-section-sub">
           Powers the <em>Explain</em> action on terminal command blocks. Uses an
           OpenAI-compatible <code>/chat/completions</code> endpoint.
@@ -632,7 +632,7 @@ function ProxySettingsSection() {
   return (
     <div className="settings-section">
       <div className="settings-section-head">
-        <div className="settings-section-title">Network proxy</div>
+        <h2 className="settings-section-title">Network proxy</h2>
         <div className="settings-section-sub">
           Routes API calls (STT, AI, preview probes) through an HTTP or SOCKS5
           proxy. Loopback addresses are always reached directly. The browser
@@ -727,7 +727,7 @@ function AccountSection() {
     return (
       <div className="settings-section">
         <div className="settings-section-head">
-          <div className="settings-section-title">Account</div>
+          <h2 className="settings-section-title">Account</h2>
           <div className="settings-section-sub">
             Auth not configured. Set <code>VITE_CLERK_PUBLISHABLE_KEY</code>{" "}
             in <code>.env</code> and restart to enable Teamship Cloud.
@@ -739,7 +739,7 @@ function AccountSection() {
   return (
     <div className="settings-section">
       <div className="settings-section-head">
-        <div className="settings-section-title">Account</div>
+        <h2 className="settings-section-title">Account</h2>
         <div className="settings-section-sub">
           Sign in to use Teamship Cloud transcription. Your audio is decoded
           on our server, never stored.
@@ -798,7 +798,7 @@ function SuperAgentSettingsSection() {
   return (
     <div className="settings-section">
       <div className="settings-section-head">
-        <div className="settings-section-title">Super Agent</div>
+        <h2 className="settings-section-title">Super Agent</h2>
         <div className="settings-section-sub">
           The in-app chat agent. Defaults to the AI section's endpoint / API key / model unless
           you override below. Tools run in trust mode — disable any you don't want the model to call.
@@ -888,7 +888,7 @@ function SuperAgentSettingsSection() {
       </div>
 
       <div className="settings-section-head" style={{ marginTop: 16 }}>
-        <div className="settings-section-title" style={{ fontSize: 14 }}>Tools</div>
+        <h3 className="settings-section-title" style={{ fontSize: 14 }}>Tools</h3>
         <div className="settings-section-sub">
           Disabled tools are stripped from the model's tools[] payload and short-circuited at
           execution if the model still names them. Effective endpoint:{" "}

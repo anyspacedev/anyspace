@@ -41,11 +41,11 @@ export function Column({
       style={{ "--col-tone": tone } as React.CSSProperties}
     >
       <div className="kanban-col-head">
-        <span className="kanban-col-title">
-          <span className="kanban-col-dot" />
+        <h2 className="kanban-col-title">
+          <span className="kanban-col-dot" aria-hidden="true" />
           {title}
-        </span>
-        <span className="kanban-col-count">{tasks.length}</span>
+        </h2>
+        <span className="kanban-col-count" aria-label={`${tasks.length} tasks`}>{tasks.length}</span>
       </div>
       <div className="kanban-col-body scrollbar">
         {tasks.map((t) => {
