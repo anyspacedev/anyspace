@@ -7,6 +7,7 @@ export const modKey = isMac ? "metaKey" : "ctrlKey";
 
 export type ShortcutAction =
   | "newTab"
+  | "newTeam"
   | "closeTab"
   | "quickOpen"
   | "search"
@@ -48,6 +49,7 @@ export function attachGlobalShortcuts() {
     const k = e.key.toLowerCase();
     if (e.shiftKey && k === "d") return dispatch("splitPaneVertical"), e.preventDefault();
     if (e.shiftKey && k === "b") return dispatch("runSuperBrain"), e.preventDefault();
+    if (e.shiftKey && k === "t") return dispatch("newTeam"), e.preventDefault();
     switch (k) {
       case "t": dispatch("newTab"); e.preventDefault(); break;
       case "w": dispatch("closeTab"); e.preventDefault(); break;

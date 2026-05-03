@@ -2,6 +2,9 @@
 
 import { ptyWrite } from "../../lib/tauri";
 import { broadcastBytes } from "../../lib/paneBroadcast";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useTeamStore } from "../../stores/teamStore";
+import { getTerminalContext } from "../terminal/terminalRegistry";
 import { getEditor } from "./editorRegistry";
 
 export type InjectTarget =
@@ -38,7 +41,14 @@ export async function inject(text: string, target: InjectTarget): Promise<Inject
       // Mirror to other selected panes so multi-pane broadcast applies to STT
       // dictation, matching the keyboard onData fan-out in Terminal.tsx.
       broadcastBytes(target.paneId, bytes);
-      return { ok: true, fallback: null, message: `Pasted to ${target.label}` };
+      // Voice-to-team: if the source pane belongs to a team tab and no
+      // explicit multi-pane selection is set, fan to every other team pane
+      // so the operator can drive the whole team by voice. With selection
+      // active, broadcastBytes already covered the fan-out — we skip to
+      // avoid double-writes.
+      const fanned = await fanToTeamPanes(target.paneId, target.sessionId, bytes);
+      const suffix = fanned > 0 ? ` (+${fanned} team panes)` : "";
+      return { ok: true, fallback: null, message: `Pasted to ${target.label}${suffix}` };
     } catch (e) {
       console.error("[stt:inject] terminal write failed session=%s:", target.sessionId, e);
       return clipboardFallback(text, `terminal write failed: ${stringifyErr(e)}`);
@@ -133,4 +143,38 @@ async function clipboardFallback(text: string, why: string): Promise<InjectResul
 function stringifyErr(e: unknown): string {
   if (e instanceof Error) return e.message;
   return String(e);
+}
+
+/** When the source pane is in a team tab, write the same bytes (no newline)
+ * into every other terminal pane in that team tab. Returns the count fanned.
+ * Skips when the user already has explicit multi-pane selection — that path
+ * is handled by `broadcastBytes` to avoid double-writes. */
+async function fanToTeamPanes(
+  originPaneId: string,
+  originSessionId: string,
+  bytes: Uint8Array,
+): Promise<number> {
+  const ws = useWorkspaceStore.getState();
+  const tab = ws.tabs.find((t) =>
+    Object.prototype.hasOwnProperty.call(t.panes, originPaneId),
+  );
+  if (!tab) return 0;
+  if ((tab.selectedPaneIds ?? []).length >= 2) return 0; // covered by broadcastBytes
+  const team = useTeamStore.getState().teams.find((t) => t.tabId === tab.id);
+  if (!team) return 0;
+
+  let count = 0;
+  for (const pane of Object.values(tab.panes)) {
+    if (pane.id === originPaneId) continue;
+    if (pane.kind !== "terminal") continue;
+    const ctx = getTerminalContext(pane.id);
+    if (!ctx || ctx.sessionId === originSessionId) continue;
+    try {
+      await ptyWrite(ctx.sessionId, bytes);
+      count++;
+    } catch (e) {
+      console.warn("[stt:inject] team-fan failed pane=%s:", pane.id, e);
+    }
+  }
+  return count;
 }

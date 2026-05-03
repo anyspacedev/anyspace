@@ -137,3 +137,59 @@ export async function runSuperBrain(tabId: string): Promise<void> {
   );
   console.log("[superBrain] done", { results });
 }
+
+/**
+ * Team-mode helpers: write a free-form prompt into one or all team panes
+ * without a trailing newline. The user reviews each draft and presses
+ * Enter once — broadcastBytes() (when multi-select is active) fans Enter
+ * to every selected pane in parallel.
+ *
+ * Unlike runSuperBrain(), no AI completion is involved here; the panel
+ * writes the operator's text directly. Treat this as the human controller
+ * "speaking through" the agents' shells.
+ */
+export async function runSuperBrainTeamBroadcast(
+  tabId: string,
+  prompt: string,
+): Promise<{ written: number; skipped: number }> {
+  const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
+  if (!tab) return { written: 0, skipped: 0 };
+  const text = prompt.trim();
+  if (!text) return { written: 0, skipped: 0 };
+  let written = 0;
+  let skipped = 0;
+  const bytes = new TextEncoder().encode(text);
+  for (const pane of Object.values(tab.panes)) {
+    if (pane.kind !== "terminal") continue;
+    const ctx = getTerminalContext(pane.id);
+    if (!ctx) {
+      skipped++;
+      continue;
+    }
+    try {
+      await ptyWrite(ctx.sessionId, bytes);
+      written++;
+    } catch (e) {
+      console.warn("[superBrain.teamBroadcast] failed for pane", pane.id, e);
+      skipped++;
+    }
+  }
+  return { written, skipped };
+}
+
+export async function runSuperBrainTeamAsk(
+  paneId: string,
+  prompt: string,
+): Promise<boolean> {
+  const text = prompt.trim();
+  if (!text) return false;
+  const ctx = getTerminalContext(paneId);
+  if (!ctx) return false;
+  try {
+    await ptyWrite(ctx.sessionId, new TextEncoder().encode(text));
+    return true;
+  } catch (e) {
+    console.warn("[superBrain.teamAsk] failed", e);
+    return false;
+  }
+}

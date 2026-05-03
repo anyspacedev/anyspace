@@ -188,4 +188,73 @@ export async function screenshotSavePngBytes(bytes: Uint8Array): Promise<string>
   return rawInvoke<string>("screenshot_save_png_bytes", { bytes: Array.from(bytes) });
 }
 
+export type TeamPaths = {
+  teamDir: string;
+  boardPath: string;
+  messagesPath: string;
+  promptsDir: string;
+  rpcDir: string;
+  tmsgPath: string;
+};
+
+export async function teamInit(args: {
+  teamId: string;
+  projectPath: string;
+  boardMarkdown: string;
+}): Promise<TeamPaths> {
+  return rawInvoke<TeamPaths>("team_init", { args });
+}
+
+export async function teamWatchStart(teamId: string, teamDir: string): Promise<void> {
+  return rawInvoke("team_watch_start", { teamId, teamDir });
+}
+
+export async function teamWatchStop(teamId: string): Promise<void> {
+  return rawInvoke("team_watch_stop", { teamId });
+}
+
+export async function teamRpcReply(args: {
+  teamDir: string;
+  requestId: string;
+  response: string;
+}): Promise<void> {
+  return rawInvoke("team_rpc_reply", { args });
+}
+
+export type PendingRpc = {
+  requestId: string;
+  reqPath: string;
+  payload: string;
+};
+
+export async function teamRpcDrain(teamDir: string): Promise<PendingRpc[]> {
+  return rawInvoke<PendingRpc[]>("team_rpc_drain", { teamDir });
+}
+
+export async function teamWritePrompt(args: {
+  teamDir: string;
+  label: string;
+  body: string;
+}): Promise<{ path: string }> {
+  return rawInvoke<{ path: string }>("team_write_prompt", { args });
+}
+
+export type CompactResult = { total: number; archived: number; kept: number };
+
+export async function teamCompactMessages(args: {
+  teamDir: string;
+  maxEntries: number;
+  keepRecent: number;
+}): Promise<CompactResult> {
+  return rawInvoke<CompactResult>("team_compact_messages", { args });
+}
+
+export type TeamMessagesEvent = { teamId: string; messagesPath: string };
+export type TeamRpcEvent = {
+  teamId: string;
+  requestId: string;
+  reqPath: string;
+  payload: string;
+};
+
 export { Channel };

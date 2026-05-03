@@ -35,7 +35,8 @@ export type IconName =
   | "clipboard"
   | "crosshair"
   | "smartphone"
-  | "camera";
+  | "camera"
+  | "users-round";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -234,6 +235,15 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
       <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  // Two overlapping head/torso silhouettes — semantic for "Teams" / multi-agent.
+  "users-round": (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <circle cx="17" cy="8" r="3" />
+      <path d="M16 14a5 5 0 0 1 5 5" />
     </>
   ),
 };

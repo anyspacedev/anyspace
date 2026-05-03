@@ -7,14 +7,20 @@ import { useKanbanStore } from "./stores/kanbanStore";
 import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
+import { useTeamStore } from "./stores/teamStore";
+import { useTeamSettingsStore } from "./stores/teamSettingsStore";
+import { useTeamPickerStore } from "./stores/teamPickerStore";
+import { TeamPickerModal } from "./components/workspace/TeamPicker";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
+import { resumeTeam } from "./lib/teamLauncher";
 import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
 import { AgentManager } from "./components/agents/AgentManager";
+import { TeamsView } from "./components/team/TeamsView";
 import { Settings } from "./components/settings/Settings";
 import { StatusBar } from "./components/workspace/StatusBar";
 import { TemplatePicker } from "./components/workspace/TemplatePicker";
@@ -35,15 +41,35 @@ export default function App() {
   const loadStt = useSttStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
   const loadProxy = useProxyStore((s) => s.load);
+  const loadTeams = useTeamStore((s) => s.load);
+  const loadTeamSettings = useTeamSettingsStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
-    void hydrateWorkspace();
-    void loadKanban().catch((e) => console.warn("[kanban] load failed", e));
+    void (async () => {
+      await hydrateWorkspace();
+      await loadKanban().catch((e) => console.warn("[kanban] load failed", e));
+      await loadTeams().catch((e) => console.warn("[team] load failed", e));
+      await loadTeamSettings().catch((e) => console.warn("[team] settings load failed", e));
+      // After both workspace + team data are in memory, resume any team tab
+      // that survived the restart. resumeTeam re-renders prompt files and
+      // re-injects pendingCommand into the existing panes.
+      const teams = useTeamStore.getState().teams;
+      const tabs = useWorkspaceStore.getState().tabs;
+      for (const team of teams) {
+        if (team.status !== "active" || !team.tabId) continue;
+        if (!tabs.some((t) => t.id === team.tabId)) continue;
+        try {
+          await resumeTeam(team.id);
+        } catch (err) {
+          console.warn("[team] resume failed", team.id, err);
+        }
+      }
+    })();
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams, loadTeamSettings]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
@@ -105,6 +131,27 @@ export default function App() {
     };
   }, []);
 
+  // When a team's tab is closed (manually via the X, or the last tab gone),
+  // archive the team so resume on next launch doesn't try to re-spawn into
+  // a tab that no longer exists. Subscribed once at the workspace-store level
+  // so we don't entangle workspaceStore with team logic directly.
+  useEffect(() => {
+    const unsub = useWorkspaceStore.subscribe((state, prev) => {
+      if (state.tabs === prev.tabs) return;
+      const liveTabIds = new Set(state.tabs.map((t) => t.id));
+      const teams = useTeamStore.getState().teams;
+      for (const team of teams) {
+        if (team.status !== "active" || !team.tabId) continue;
+        if (!liveTabIds.has(team.tabId)) {
+          void useTeamStore.getState().archive(team.id).catch((e) => {
+            console.warn("[team] auto-archive on tab close failed", team.id, e);
+          });
+        }
+      }
+    });
+    return unsub;
+  }, []);
+
   // Tauri's data-tauri-drag-region handles drag, but not double-click maximize.
   // Wire it manually so the titlebar/brand behave like a native title bar.
   useEffect(() => {
@@ -121,6 +168,7 @@ export default function App() {
     const detach = attachGlobalShortcuts();
     const unregisters = [
       registerShortcut("newTab", () => newTab(1)),
+      registerShortcut("newTeam", () => useTeamPickerStore.getState().setOpen(true)),
       registerShortcut("closeTab", () => activeTabId && closeTab(activeTabId)),
       registerShortcut("switchTab1", () => switchToTabIndex(0)),
       registerShortcut("switchTab2", () => switchToTabIndex(1)),
@@ -183,14 +231,22 @@ export default function App() {
           </div>
           {view === "kanban" && <KanbanBoard />}
           {view === "agents" && <AgentManager />}
+          {view === "teams" && <TeamsView />}
           {view === "settings" && <Settings />}
         </div>
         <StatusBar />
       </div>
       <TemplatePicker />
+      <TeamPickerHost />
       <QuickOpen />
       <SttBubble />
       <ScreenshotStack />
     </div>
   );
+}
+
+function TeamPickerHost() {
+  const open = useTeamPickerStore((s) => s.open);
+  const setOpen = useTeamPickerStore((s) => s.setOpen);
+  return <TeamPickerModal open={open} onClose={() => setOpen(false)} />;
 }

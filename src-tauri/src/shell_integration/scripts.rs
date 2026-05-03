@@ -97,6 +97,13 @@ elif [ -n "$BASH_VERSION" ]; then
   trap '__teamship_debug_trap' DEBUG
 fi
 
+# Team mode: when this shell was spawned for a Team workspace, source the
+# tmsg helper so the agent CLI inherits a `tmsg` shell function.
+if [ -n "$TEAMSHIP_TEAM_TMSG" ] && [ -f "$TEAMSHIP_TEAM_TMSG" ]; then
+  # shellcheck disable=SC1090
+  source "$TEAMSHIP_TEAM_TMSG"
+fi
+
 # Initial prompt-start so the very first prompt is also wrapped in a block.
 __teamship_emit "A"
 "##;
