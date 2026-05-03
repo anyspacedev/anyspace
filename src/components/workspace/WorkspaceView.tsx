@@ -3,9 +3,12 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamPickerStore } from "../../stores/teamPickerStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
+import { useSuperAgentStore } from "../../stores/superAgentStore";
+import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { PaneGrid } from "./PaneGrid";
 import { TeamChatPanel } from "../team/TeamChatPanel";
+import { SuperAgentPanel } from "../superAgent/SuperAgentPanel";
 import { useThemeStore } from "../../stores/themeStore";
 import { Icon } from "../ui/Icon";
 
@@ -21,6 +24,9 @@ export function WorkspaceView() {
   const teamForActive = teams.find((t) => t.tabId === activeTabId);
   const setTeamPickerOpen = useTeamPickerStore((s) => s.setOpen);
   const chatPanelWidth = useTeamSettingsStore((s) => s.settings.chatPanelWidth);
+  const superAgentOpen = useSuperAgentStore((s) => s.panelOpen);
+  const setSuperAgentOpen = useSuperAgentStore((s) => s.setPanelOpen);
+  const superAgentWidth = useSuperAgentSettingsStore((s) => s.settings.panelWidth);
 
   useEffect(() => {
     if (!tab) return;
@@ -95,24 +101,39 @@ export function WorkspaceView() {
     );
   }
 
+  const cls = ["workspace"];
+  if (superAgentOpen) cls.push("has-super-agent");
+  if (teamForActive) cls.push("has-team-chat");
+
+  const cssVars: React.CSSProperties = {};
+  if (teamForActive) (cssVars as Record<string, string>)["--team-chat-w"] = `${chatPanelWidth}px`;
+  if (superAgentOpen) (cssVars as Record<string, string>)["--super-agent-w"] = `${superAgentWidth}px`;
+
   return (
-    <div
-      className={"workspace" + (teamForActive ? " has-team-chat" : "")}
-      style={
-        teamForActive
-          ? ({ "--team-chat-w": `${chatPanelWidth}px` } as React.CSSProperties)
-          : undefined
-      }
-    >
-      {tabs.map((t) => (
-        <div
-          key={t.id}
-          className={"workspace-tab" + (t.id === activeTabId ? " active" : "")}
-          aria-hidden={t.id !== activeTabId}
-        >
-          <PaneGrid tab={t} />
-        </div>
-      ))}
+    <div className={cls.join(" ")} style={cssVars}>
+      <div className="workspace-content">
+        {tabs.map((t) => (
+          <div
+            key={t.id}
+            className={"workspace-tab" + (t.id === activeTabId ? " active" : "")}
+            aria-hidden={t.id !== activeTabId}
+          >
+            <PaneGrid tab={t} />
+          </div>
+        ))}
+        {!superAgentOpen && (
+          <button
+            type="button"
+            className="sa-collapsed-tab"
+            onClick={() => setSuperAgentOpen(true)}
+            aria-label="Open Super Agent"
+            title="Open Super Agent"
+          >
+            <Icon name="sparkles" size={14} />
+          </button>
+        )}
+      </div>
+      {superAgentOpen && <SuperAgentPanel mode="rail" />}
       {teamForActive && activeTabId && <TeamChatPanel tabId={activeTabId} />}
     </div>
   );

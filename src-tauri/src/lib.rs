@@ -101,6 +101,7 @@ pub fn run() {
         .manage(preview::PreviewManager::new())
         .manage(mobile::MobileManager::new())
         .manage(team::TeamManager::new())
+        .manage(ai::AiStreamManager::new())
         .invoke_handler(tauri::generate_handler![
             // PTY
             pty::commands::pty_spawn,
@@ -126,6 +127,8 @@ pub fn run() {
             stt::commands::stt_hotkey_set,
             // AI
             ai::commands::ai_chat,
+            ai::stream::ai_chat_stream,
+            ai::stream::abort_ai_chat_stream,
             // Clipboard
             clipboard::commands::clipboard_save_blob,
             // Screenshot (preview / mobile capture, terminal drop attach)
