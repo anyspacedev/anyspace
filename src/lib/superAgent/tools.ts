@@ -20,7 +20,10 @@ import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { getTerminalContext } from "../../components/terminal/terminalRegistry";
+import {
+  getTerminalContext,
+  getTerminalScreen,
+} from "../../components/terminal/terminalRegistry";
 import { launchTeam } from "../teamLauncher";
 import { runQuickSuggest, runSuperBrainTeamBroadcast } from "../superBrain";
 import { parseMessages, type TeamMessage } from "../teamMessages";
@@ -100,7 +103,7 @@ export const TOOLS: Tool[] = [
   {
     name: "read_pane_output",
     description:
-      "Return the most recent finished command + its output for a terminal pane. Returns null if the pane has no completed command yet.",
+      "Return what is currently on a terminal pane's screen — including TUI apps (claude code, vim, top) that never finish a command. Reads the live xterm buffer (alt-screen for TUIs, viewport+scrollback for normal shells) plus metadata about the most recent finished OSC 133 command when one exists.",
     readOnly: true,
     parameters: {
       type: "object",
@@ -108,7 +111,8 @@ export const TOOLS: Tool[] = [
         pane_id: { type: "string", description: "Pane id from list_panes" },
         last_n: {
           type: "integer",
-          description: "Tail this many lines of output (default: full)",
+          description:
+            "Tail this many lines from the active buffer (default: visible viewport size, typically ~24).",
           minimum: 1,
         },
       },
@@ -117,13 +121,22 @@ export const TOOLS: Tool[] = [
     handler: async (args) => {
       const paneId = arg<string>(args, "pane_id");
       if (!paneId) return bad("missing pane_id");
-      const ctx = getTerminalContext(paneId);
-      if (!ctx) return ok(null);
       const lastN = arg<number>(args, "last_n");
-      const output = lastN
-        ? ctx.output.split(/\r?\n/).slice(-lastN).join("\n")
-        : ctx.output;
-      return ok({ command: ctx.command, exitCode: ctx.exitCode ?? null, output });
+      const screen = getTerminalScreen(paneId, lastN);
+      if (!screen) return bad(`pane ${paneId} has no live terminal`);
+      // Surface the latest finished command's output too (when present) so a
+      // model that wanted "the last command result" still gets it without a
+      // second tool call. quick_suggest still uses getTerminalContext for the
+      // OSC-133-only behavior it needs.
+      const ctx = getTerminalContext(paneId);
+      return ok({
+        screen: screen.screen,
+        bufferType: screen.bufferType,
+        lastBlockState: screen.lastBlockState,
+        lastCommand: screen.lastCommand,
+        lastExitCode: screen.lastExitCode,
+        lastFinishedOutput: ctx ? ctx.output : null,
+      });
     },
   },
   {
