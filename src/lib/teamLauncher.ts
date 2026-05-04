@@ -230,6 +230,164 @@ function shellQuote(v: string): string {
   return `'${v.replace(/'/g, `'\\''`)}'`;
 }
 
+export type AddAgentToLiveTeamArgs = {
+  teamId: string;
+  label: string;
+  role: TeamRole;
+  /** Defaults to the team's first agent's program if omitted. */
+  agentId?: string;
+  systemPromptOverride?: string;
+  /** Pane to split off; defaults to the team tab's rightmost leaf, then the
+   *  active pane. Reject if the tab has no terminal panes. */
+  anchorPaneId?: string;
+  splitDirection?: "vertical" | "horizontal";
+  customRoles?: TeamCustomRole[];
+  customSkills?: TeamSkill[];
+};
+
+export type AddAgentToLiveTeamResult = {
+  teamAgentId: string;
+  paneId: string;
+  label: string;
+};
+
+/**
+ * Grow a live team's roster by one agent: persist the team_agents row, render
+ * its prompt file, derive the launch command via agent_launch, split a pane
+ * adjacent to the anchor, then link the new pane back to the agent.
+ *
+ * Used by:
+ *  - tmsg pane new (teamRpc.handleNew) — anchorPaneId is the requesting agent's pane
+ *  - Super Agent's add_team_agent tool — anchorPaneId defaults to rightmost leaf
+ *  - Super Agent's update_team_agent tool with respawn=true (close + re-add in place)
+ */
+export async function addAgentToLiveTeam(
+  args: AddAgentToLiveTeamArgs,
+): Promise<AddAgentToLiveTeamResult> {
+  const teamState = useTeamStore.getState();
+  const team = teamState.teams.find((t) => t.id === args.teamId);
+  if (!team) throw new Error(`team ${args.teamId} not found`);
+  if (!team.tabId) throw new Error(`team ${team.name} has no live tab — call set_team_status active and launch_team`);
+
+  const ws = useWorkspaceStore.getState();
+  const tab = ws.tabs.find((t) => t.id === team.tabId);
+  if (!tab) throw new Error(`team ${team.name} tab ${team.tabId} is gone`);
+
+  const leaves = collectLeafIds(tab.layout);
+  const terminalLeaves = leaves.filter((id) => tab.panes[id]?.kind === "terminal");
+  if (terminalLeaves.length === 0) {
+    throw new Error(`team ${team.name} tab has no terminal panes to anchor against`);
+  }
+
+  const anchorPaneId = args.anchorPaneId ?? terminalLeaves[terminalLeaves.length - 1];
+  if (!leaves.includes(anchorPaneId)) {
+    throw new Error(`anchor_pane_id ${anchorPaneId} is not in this team's tab`);
+  }
+
+  const existingAgents = teamState.agents[args.teamId] ?? [];
+  const agentId = args.agentId ?? existingAgents[0]?.agentId;
+  if (!agentId) throw new Error("no agent_id provided and team has no existing agents to clone from");
+
+  const kanbanAgents = useKanbanStore.getState().agents;
+  const programAgent = kanbanAgents.find((a) => a.id === agentId);
+  if (!programAgent) throw new Error(`AI program ${agentId} not found in agents store`);
+
+  // Persist the new team_agents row first; addAgent enforces label uniqueness.
+  const newTa = await useTeamStore.getState().addAgent(team.id, {
+    label: args.label,
+    role: args.role,
+    agentId,
+    systemPromptOverride: args.systemPromptOverride,
+  });
+
+  const skillIds = teamState.skills[team.id] ?? [];
+  const attachments = teamState.attachments[team.id] ?? [];
+  const customRoles = args.customRoles ?? [];
+  const customSkills = args.customSkills ?? [];
+  const skillsMd = renderSkillsMarkdown(skillIds, customSkills);
+  const attachmentsMd = attachmentsMarkdown(attachments.map((a) => a.path));
+
+  // Re-derive paths via team_init (idempotent, preserves BOARD.md).
+  const teamAgentsAfter = useTeamStore.getState().agents[team.id] ?? [];
+  const rosterMd = rosterMarkdown(team, teamAgentsAfter, customRoles);
+  const paths = await teamInit({
+    teamId: team.id,
+    projectPath: team.projectPath,
+    boardMarkdown: buildBoardMarkdown(team, teamAgentsAfter, skillsMd, attachmentsMd, customRoles),
+  });
+
+  const promptBody =
+    args.systemPromptOverride ??
+    renderRolePrompt({
+      role: args.role,
+      label: args.label,
+      goal: team.goal,
+      teamDir: paths.teamDir,
+      boardPath: paths.boardPath,
+      messagesPath: paths.messagesPath,
+      rosterMarkdown: rosterMd,
+      skillsMarkdown: skillsMd,
+      attachmentsMarkdown: attachmentsMd,
+      customRoles,
+    });
+
+  const promptFile = await teamWritePrompt({
+    teamDir: paths.teamDir,
+    label: args.label,
+    body: promptBody,
+  });
+
+  const plan = await agentLaunch({
+    agentCommand: programAgent.command,
+    taskId: `${team.id}:${newTa.id}`,
+    taskTitle: `${args.label} — ${team.name}`,
+    taskBody: promptBody,
+    taskColumn: "",
+    systemPrompt: programAgent.systemPrompt,
+    envJson: programAgent.envJson,
+  });
+
+  const command = programAgent.command
+    .replace(/\{task_file\}/g, promptFile.path)
+    .replace(/\{task_id\}/g, shellQuote(`${team.id}:${newTa.id}`))
+    .replace(/\{task_title\}/g, shellQuote(`${args.label} — ${team.name}`))
+    .replace(/\{task_column\}/g, shellQuote(""));
+
+  const preset: PanePreset = {
+    kind: "terminal",
+    pendingCommand: command,
+    spawnEnv: {
+      ...plan.env,
+      TEAMSHIP_TASK_FILE: promptFile.path,
+      TEAMSHIP_TEAM_DIR: paths.teamDir,
+      TEAMSHIP_TEAM_ID: team.id,
+      TEAMSHIP_TEAM_NAME: team.name,
+      TEAMSHIP_AGENT_LABEL: args.label,
+      TEAMSHIP_AGENT_ROLE: args.role,
+      TEAMSHIP_AGENT_ID: newTa.id,
+      TEAMSHIP_BOARD_PATH: paths.boardPath,
+      TEAMSHIP_MESSAGES_PATH: paths.messagesPath,
+      TEAMSHIP_TEAM_TMSG: paths.tmsgPath,
+    },
+    spawnCwd: team.projectPath,
+    title: `${args.label} (${roleLabel(args.role, customRoles)})`,
+  };
+
+  // Diff the leaf set before/after to discover the new pane id.
+  const tabBefore = useWorkspaceStore.getState().tabs.find((t) => t.id === team.tabId);
+  const before = tabBefore ? new Set(collectLeafIds(tabBefore.layout)) : new Set<string>();
+  useWorkspaceStore
+    .getState()
+    .splitPane(team.tabId, anchorPaneId, args.splitDirection ?? "vertical", preset);
+  const tabAfter = useWorkspaceStore.getState().tabs.find((t) => t.id === team.tabId);
+  if (!tabAfter) throw new Error("tab disappeared during split");
+  const newPaneId = collectLeafIds(tabAfter.layout).find((id) => !before.has(id));
+  if (!newPaneId) throw new Error("split succeeded but new pane id not found");
+
+  await useTeamStore.getState().setPaneId(newTa.id, newPaneId);
+  return { teamAgentId: newTa.id, paneId: newPaneId, label: args.label };
+}
+
 /**
  * Restore a team's panes after app restart. The workspace store rehydrates
  * tabs (panes survive, but `pendingCommand` is in EPHEMERAL_KEYS and gets

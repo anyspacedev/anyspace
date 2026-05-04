@@ -105,6 +105,10 @@ type TeamState = {
     teamId: string,
     seed: { label: string; role: TeamRole; agentId: string; systemPromptOverride?: string },
   ) => Promise<TeamAgent>;
+  updateAgent: (
+    teamAgentId: string,
+    patch: { role?: TeamRole; agentId?: string; systemPromptOverride?: string | null },
+  ) => Promise<TeamAgent>;
   rename: (teamId: string, name: string) => Promise<void>;
   reactivate: (teamId: string) => Promise<void>;
   archive: (teamId: string) => Promise<void>;
@@ -287,6 +291,39 @@ export const useTeamStore = create<TeamState>((set) => ({
       agents: { ...s.agents, [teamId]: [...(s.agents[teamId] ?? []), ta] },
     }));
     return ta;
+  },
+
+  updateAgent: async (teamAgentId, patch) => {
+    const db = await getDb();
+    const state = useTeamStore.getState();
+    let target: TeamAgent | undefined;
+    for (const list of Object.values(state.agents)) {
+      const m = list.find((a) => a.id === teamAgentId);
+      if (m) { target = m; break; }
+    }
+    if (!target) throw new Error(`team agent ${teamAgentId} not found`);
+    const next: TeamAgent = {
+      ...target,
+      role: patch.role ?? target.role,
+      agentId: patch.agentId ?? target.agentId,
+      // Explicit null clears the override; undefined leaves it untouched.
+      systemPromptOverride:
+        patch.systemPromptOverride === null
+          ? undefined
+          : patch.systemPromptOverride ?? target.systemPromptOverride,
+    };
+    await db.execute(
+      "UPDATE team_agents SET role=?, agent_id=?, system_prompt_override=? WHERE id=?",
+      [next.role, next.agentId, next.systemPromptOverride ?? null, next.id],
+    );
+    set((s) => {
+      const updated: Record<string, TeamAgent[]> = { ...s.agents };
+      for (const [tid, list] of Object.entries(s.agents)) {
+        updated[tid] = list.map((a) => (a.id === teamAgentId ? next : a));
+      }
+      return { agents: updated };
+    });
+    return next;
   },
 
   rename: async (teamId, name) => {
