@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { CommandBlock } from "./osc133";
 import { Icon, type IconName } from "../ui/Icon";
 import { BlockActions, type BlockAction } from "./BlockActions";
@@ -31,6 +32,9 @@ export function CommandBlocks({
   return (
     <div className="cmd-blocks-overlay" style={{ pointerEvents: "none" }}>
       {blocks.map((b) => {
+        // Pure-prompt blocks (A fired but C hasn't) have no command and no
+        // output region yet — skip until they become "running" or "finished".
+        if (b.state === "prompting") return null;
         // absolute pixel y (relative to first row in scrollback).
         const top = b.startRow * rowHeight - scrollTop;
         // height: from start to end (or to bottom).
@@ -64,7 +68,8 @@ export function CommandBlocks({
             style={{
               transform: `translateY(${Math.max(0, top)}px)`,
               height: `${height}px`,
-            }}
+              "--cmd-block-row-h": `${rowHeight}px`,
+            } as CSSProperties}
           >
             <button
               className="cmd-block-tab"
@@ -78,9 +83,7 @@ export function CommandBlocks({
             >
               <Icon name={tabIcon} size={12} />
             </button>
-            {b.state !== "prompting" && !b.collapsed && (
-              <BlockActions block={b} onAction={onAction} />
-            )}
+            {!b.collapsed && <BlockActions block={b} onAction={onAction} />}
           </div>
         );
       })}

@@ -250,6 +250,33 @@ export function Terminal({ pane, tabId }: Props) {
       return true;
     });
 
+    // Reset block overlays when the buffer is cleared. Without this the
+    // stored absolute row indices outlive the rows they referenced and the
+    // overlay floats over fresh prompts at stale positions.
+    //   CSI 2J — erase the visible viewport (also fires from `clear` on
+    //            shells that don't clear scrollback)
+    //   CSI 3J — erase scrollback (fires from `clear` on modern terminals
+    //            and from explicit `printf '\\e[3J'`)
+    //   ESC c  — full reset (`tput reset`, `reset`)
+    // We *don't* return true: xterm still needs to apply the actual clear.
+    const resetBlocks = () => {
+      // Drop everything except a still-running block whose D never arrived.
+      // Re-base its rows to 0 so it lines up with the cleared viewport.
+      blocksRef.current = blocksRef.current
+        .filter((b) => b.state === "running")
+        .map((b) => ({ ...b, startRow: 0, outputStartRow: 0 }));
+      setBlocks(blocksRef.current);
+    };
+    term.parser.registerCsiHandler({ final: "J" }, (params) => {
+      const p = params[0] ?? 0;
+      if (p === 2 || p === 3) resetBlocks();
+      return false;
+    });
+    term.parser.registerEscHandler({ final: "c" }, () => {
+      resetBlocks();
+      return false;
+    });
+
     // Track scroll + size for overlay positioning.
     const updateGeom = () => {
       try {
@@ -457,6 +484,17 @@ export function Terminal({ pane, tabId }: Props) {
     setBlocks(blocksRef.current);
   };
 
+  const clearAllBlocks = () => {
+    // Overlay-only reset. Doesn't touch the shell — useful when the shell
+    // is unreachable (dead SSH, hung agent CLI) or the user wants to dismiss
+    // markers without clearing the terminal canvas itself. Visible blocks
+    // include "running" ones whose D never arrived.
+    blocksRef.current = [];
+    setBlocks([]);
+    setFocusedBlockId(null);
+    focusedBlockIdRef.current = null;
+  };
+
   const handleAction = (action: BlockAction, blockId: string) => {
     const term = termRef.current;
     const block = blocksRef.current.find((b) => b.id === blockId);
@@ -493,6 +531,12 @@ export function Terminal({ pane, tabId }: Props) {
     }
   };
 
+  // Count blocks the user can actually see (prompting blocks render nothing).
+  const visibleBlockCount = blocks.reduce(
+    (n, b) => (b.state === "prompting" ? n : n + 1),
+    0,
+  );
+
   return (
     <div className="terminal-wrap" ref={containerRef} tabIndex={0}>
       <CommandBlocks
@@ -504,6 +548,17 @@ export function Terminal({ pane, tabId }: Props) {
         onAction={handleAction}
         focusedBlockId={focusedBlockId}
       />
+      {visibleBlockCount > 0 && (
+        <button
+          className="cmd-blocks-clear-pill"
+          onClick={clearAllBlocks}
+          title="Clear command-block overlay (overlay only — doesn't run shell `clear`)"
+          aria-label={`Clear ${visibleBlockCount} command blocks`}
+        >
+          <Icon name="x" size={11} />
+          <span>{visibleBlockCount}</span>
+        </button>
+      )}
       {explain && (
         <AiExplainPopover
           key={explain.block.id}

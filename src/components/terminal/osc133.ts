@@ -72,13 +72,18 @@ export function applyEvent(
     case "outputStart": {
       const last = blocks[blocks.length - 1];
       if (!last) return blocks;
+      const cmd = (capturedCommand ?? last.command ?? "").trim();
+      // Empty command (user just hit Enter on a blank prompt). Drop the
+      // prompting block instead of promoting it to a 1-row "running" block
+      // that immediately becomes a stub finished block on the next D.
+      if (!cmd) return blocks.slice(0, -1);
       return [
         ...blocks.slice(0, -1),
         {
           ...last,
           outputStartRow: absRow,
           state: "running",
-          command: capturedCommand ?? last.command,
+          command: cmd,
         },
       ];
     }
