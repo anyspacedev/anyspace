@@ -228,6 +228,43 @@ Custom role ids must be unique against `BUILTIN_ROLES` — the picker prefixes t
 
 **Resume logging.** `[team.resume] start/skip/done` in `teamLauncher.ts` and `[terminal] pendingCommand armed/firing` in `Terminal.tsx` are the two log lines to grep when verifying a restart-resume — together they tell you whether (a) the team data hydrated, (b) per-agent prompts re-rendered, (c) the 600ms-delayed effect re-fired after sessionId already settled.
 
+### Super Agent
+
+Multi-turn AI chat that lives **inside the app** and can call tools to inspect/manipulate the workspace. Distinct from Team mode (external CLIs in PTYs) and from Super Brain v1 (one-shot ⌘⇧B draft writer — preserved unchanged).
+
+**Two surfaces, one runtime:**
+- **Side rail** in the workspace (`SuperAgentPanel mode="rail"`, mounted in `WorkspaceView` when `useSuperAgentStore.panelOpen`). Coexists with the team-chat rail; CSS grid extends to 3 columns when both are open. Pointer-drag resize handle on the left edge persists `settings.superAgent.panelWidth` (clamped 240–720).
+- **Full-page view** at `selectedView === "superagent"`, sidebar nav between Teams and Agents (`SuperAgentPanel mode="full"`).
+- **Collapsed pill** (`.sa-collapsed-tab`) renders inside `.workspace-content` when `panelOpen` is false; click expands the rail.
+
+**Data model** (migration `005_super_agent.sql`):
+- `super_agent_sessions` — one row per conversation. `system_prompt_override` lets per-session prompts override the Settings default.
+- `super_agent_messages` — per-turn rows keyed by `(session_id, ordinal)`. `role` is `user|assistant|tool|system`. `tool_calls_json` and `tool_results_json` are JSON-encoded arrays — tool messages can hold multiple results (one per tool call from the previous assistant turn).
+
+**Streaming AI** (`src-tauri/src/ai/stream.rs`):
+- `ai_chat_stream(args, on_event)` POSTs to `/chat/completions` with `stream: true`, parses SSE `data: {…}` lines via `reqwest::Response::bytes_stream()` (requires the `stream` feature on the reqwest dep), and emits typed events through a `Channel<StreamEvent>`: `delta { content }` / `tool_call_delta { index, id?, name?, arguments_partial? }` / `done { finish_reason? }` / `error`.
+- **Aborts** are tracked in `ai::AiStreamManager` (DashMap of oneshot senders). `abort_ai_chat_stream(stream_id)` resolves the cancel signal mid-stream.
+- **Fallback**: if streaming returns 4xx, the same module retries one-shot and synthesizes a single `delta` then `done` so the runner code path doesn't branch.
+
+**ReAct loop** (`src/lib/superAgent/runner.ts`):
+1. Append the user message; persist.
+2. Build history (system prompt + last `memoryWindow` messages + `tools[]` for enabled tools).
+3. `aiChatStream` → tokens stream into a live assistant bubble; tool_call_deltas accumulate by index.
+4. On `done`, parse completed tool calls; for each: short-circuit if disabled, queue if `pauseToolCalls` is on, else execute immediately.
+5. Persist a `tool` role message with all results; loop back to step 2 until the assistant returns plain content with no tool_calls or `maxToolCallsPerTurn` is hit.
+
+**Trust mode** — there's no approval modal. Write tools execute immediately. The audit surface is the inline `ToolCallCard` in the chat. The panel header has a global **pause-tool-calls** toggle (red dot icon when active) that flips queue mode on; queued cards expose Run/Skip buttons that the runner observes via a Zustand subscription. Per-tool **disable** lives in Settings → Super Agent → Tools — disabled tools are stripped from the model's `tools[]` payload AND short-circuit at execution time as `disabled` cards.
+
+**Tool registry** (`src/lib/superAgent/tools.ts`): typed `Tool[]` with JSON-schema parameters. Read tools wrap `getTerminalContext` / `fsListDirRecursive` / `gitStatus` / `previewDetect` / store accessors; write tools wrap `ptyWrite` / `useWorkspaceStore.newTab+closePane` / `useKanbanStore.createTask` / direct MESSAGES.md append / `useTeamStore.create + launchTeam`. The `quick_suggest` tool wraps `runQuickSuggest` (the renamed Super Brain v1 helper) so the chat can suggest "next command" for any pane.
+
+**⌘⇧B is unchanged.** `runSuperBrain(tabId)` keeps the legacy keyboard pipeline (single round-trip via `aiChat`, no chat history, draft into PTY without `\n`). Internally it now delegates to `runQuickSuggest({ paneId, write: true })`. The shortcut wiring in `App.tsx` and `shortcuts.ts` doesn't change.
+
+**Voice-in.** The Super Agent textarea registers itself in `inputRegistry.ts` (mirrors `editorRegistry`). STT inject's last-resort fallback (`inject.ts`) — after the focused-input / focused-pane checks fail — checks `useSuperAgentStore.panelOpen || selectedView === "superagent"` and writes into the registered textarea via `setRangeText` + dispatched input events (so the controlled React state updates).
+
+**Settings** are persisted under JSON key `"superAgent"` via `useSuperAgentSettingsStore` (mirrors `aiStore`). Endpoint / API key / model are *optional overrides* — empty strings fall back to the AI section's values, so most operators only configure once. Per-tool toggles default to enabled; flipping off removes from the `tools[]` payload.
+
+**Streaming caveat for Anthropic-compatible endpoints.** OpenAI's tool-calling JSON shape is what the runner emits in history (`assistant.tool_calls[]` and `tool` role replies keyed by `tool_call_id`). Most OpenAI-compat shims (Groq, OpenRouter, Together) accept this verbatim. Anthropic's native API doesn't — set the endpoint to an OpenAI-compat proxy (e.g. OpenRouter's `anthropic/claude-3.5-sonnet`) rather than `api.anthropic.com/v1` directly.
+
 ### Build artifacts
 
 `src-tauri/gen/` (gitignored) is regenerated by Tauri from `tauri.conf.json` on every build — do not edit. `src-tauri/icons/` are placeholder purple PNGs; replace before any release bundle.

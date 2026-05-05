@@ -1,6 +1,7 @@
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
+import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { useThemeStore } from "../../stores/themeStore";
 import { useSttStore } from "../../stores/sttStore";
 import { Icon, type IconName } from "../ui/Icon";
@@ -20,14 +21,15 @@ function displayHotkey(code: string): string {
 }
 
 const NAV_ITEMS: Array<{
-  id: "workspace" | "kanban" | "teams" | "agents" | "settings";
+  id: "workspace" | "kanban" | "teams" | "superagent" | "agents" | "settings";
   label: string;
   icon: IconName;
 }> = [
   { id: "workspace", label: "Workspaces", icon: "layers" },
   { id: "kanban", label: "Tasks", icon: "list-checks" },
   { id: "teams", label: "Teams", icon: "users-round" },
-  { id: "agents", label: "Agents", icon: "sparkles" },
+  { id: "superagent", label: "Super Agent", icon: "sparkles" },
+  { id: "agents", label: "Agents", icon: "play" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -39,6 +41,7 @@ export function Sidebar() {
     s.tasks.filter((t) => t.column !== "complete").length,
   );
   const teamCount = useTeamStore((s) => s.teams.filter((t) => t.status === "active").length);
+  const sessionCount = useSuperAgentStore((s) => s.sessions.length);
   const theme = useThemeStore((s) => s.current);
   const sttHotkey = useSttStore((s) => s.settings.hotkey);
 
@@ -80,6 +83,9 @@ export function Sidebar() {
             )}
             {item.id === "teams" && teamCount > 0 && (
               <span className="nav-badge">{teamCount}</span>
+            )}
+            {item.id === "superagent" && sessionCount > 0 && (
+              <span className="nav-badge">{sessionCount}</span>
             )}
           </button>
         ))}
