@@ -1,47 +1,34 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { TEMPLATES, useWorkspaceStore, type PanePreset } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { agentLaunch } from "../../lib/tauri";
-import { useFocusReturn } from "../../lib/useFocusReturn";
-import { useFocusTrap } from "../../lib/useFocusTrap";
 import { Icon } from "../ui/Icon";
 
 type Step = "template" | "agents";
 
-export function TemplatePickerTrigger() {
-  const [open, setOpen] = useState(false);
+/**
+ * Body of the "Quick start (template)" flow inside the unified
+ * NewWorkspacePicker modal. Renders only the content; the modal shell
+ * (backdrop, focus trap, close button) is provided by the parent picker.
+ */
+export function TemplatePickerForm({ onClose, titleId }: { onClose: () => void; titleId: string }) {
   const [step, setStep] = useState<Step>("template");
   const [chosen, setChosen] = useState<typeof TEMPLATES[number] | null>(null);
   const [projectPath, setProjectPath] = useState<string>("");
-  // Pane assignment: either "agent:<id>", "preview", "editor", "files", or "" (plain shell).
   const [paneAssign, setPaneAssign] = useState<Record<number, string>>({});
   const newTab = useWorkspaceStore((s) => s.newTab);
   const agents = useKanbanStore((s) => s.agents);
 
-  const titleId = useId();
   const projectInputId = useId();
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  useFocusReturn(open);
-  useFocusTrap(modalRef, open);
-
-  const reset = () => {
-    setOpen(false);
-    setStep("template");
-    setChosen(null);
-    setProjectPath("");
-    setPaneAssign({});
-  };
 
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") reset();
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [onClose]);
 
   const launch = async () => {
     if (!chosen) return;
@@ -95,8 +82,6 @@ export function TemplatePickerTrigger() {
 
     const tabId = newTab(chosen.panes, chosen.label, finalPresets, projectPath);
 
-    // Preview panes still need projectPath in their own payload for the dev-server
-    // detector / watcher. The Files pane reads from tab.projectPath directly.
     if (projectPath) {
       const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
       if (tab) {
@@ -106,7 +91,7 @@ export function TemplatePickerTrigger() {
         });
       }
     }
-    reset();
+    onClose();
   };
 
   const pickProject = async () => {
@@ -114,147 +99,112 @@ export function TemplatePickerTrigger() {
     if (typeof selected === "string") setProjectPath(selected);
   };
 
+  if (step === "template") {
+    return (
+      <>
+        <h2 id={titleId} className="modal-title">Quick start — pick a layout</h2>
+        <div className="modal-sub">
+          Pick a layout. Next you can assign an AI agent to each pane —
+          all panes spawn and fire their agent in parallel.
+        </div>
+        <div className="template-grid">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              className="template-card"
+              onClick={() => {
+                setChosen(t);
+                setStep("agents");
+              }}
+            >
+              <TemplatePreview panes={t.panes} />
+              <div className="template-label">{t.label}</div>
+              <div className="template-sub">{t.panes} pane{t.panes === 1 ? "" : "s"}</div>
+            </button>
+          ))}
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </>
+    );
+  }
+
+  if (!chosen) return null;
+
   return (
     <>
-      <button
-        className="btn btn-ghost btn-with-icon"
-        onClick={() => setOpen(true)}
-        title="New workspace (Cmd+T)"
-      >
-        <Icon name="plus" size={14} />
-        <span>Workspace</span>
-      </button>
-      {open && (
-        <div className="modal-backdrop" onClick={reset}>
-          <div
-            ref={modalRef}
-            className="modal wide"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="modal-close modal-close-floating"
-              onClick={reset}
-              aria-label="Close"
-            >
-              <Icon name="x" size={14} />
-            </button>
-            {step === "template" && (
-              <>
-                <h2 id={titleId} className="modal-title">New workspace</h2>
-                <div className="modal-sub">
-                  Pick a layout. Next you can assign an AI agent to each pane —
-                  all panes spawn and fire their agent in parallel.
-                </div>
-                <div className="template-grid">
-                  {TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      className="template-card"
-                      onClick={() => {
-                        setChosen(t);
-                        if (t.panes === 1) {
-                          // Skip agent step for single-pane templates and go straight in.
-                          setStep("agents");
-                        } else {
-                          setStep("agents");
-                        }
-                      }}
-                    >
-                      <TemplatePreview panes={t.panes} />
-                      <div className="template-label">{t.label}</div>
-                      <div className="template-sub">{t.panes} pane{t.panes === 1 ? "" : "s"}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="modal-actions">
-                  <button className="btn btn-ghost" onClick={reset}>Cancel</button>
-                </div>
-              </>
-            )}
+      <h2 id={titleId} className="modal-title">Agents — {chosen.label}</h2>
+      <div className="modal-sub">
+        Pick an agent for each pane (or leave as <em>Plain shell</em>).
+        Optionally point the workspace at a project folder.
+      </div>
 
-            {step === "agents" && chosen && (
-              <>
-                <h2 id={titleId} className="modal-title">Agents — {chosen.label}</h2>
-                <div className="modal-sub">
-                  Pick an agent for each pane (or leave as <em>Plain shell</em>).
-                  Optionally point the workspace at a project folder.
-                </div>
-
-                <div className="form-row">
-                  <label htmlFor={projectInputId}>Project folder (optional)</label>
-                  <div className="form-row-inline">
-                    <input
-                      id={projectInputId}
-                      value={projectPath}
-                      onChange={(e) => setProjectPath(e.target.value)}
-                      placeholder="defaults to current shell cwd"
-                    />
-                    <button className="btn btn-ghost" onClick={pickProject}>Pick…</button>
-                  </div>
-                </div>
-
-                <div className="agent-slot-grid">
-                  {Array.from({ length: chosen.panes }, (_, i) => (
-                    <div key={i} className="agent-slot">
-                      <div className="agent-slot-num">Pane {i + 1}</div>
-                      <select
-                        value={paneAssign[i] ?? ""}
-                        onChange={(e) =>
-                          setPaneAssign((m) => ({ ...m, [i]: e.target.value }))
-                        }
-                      >
-                        <option value="">— Plain shell —</option>
-                        <optgroup label="Other pane kinds">
-                          <option value="preview">Live preview</option>
-                          <option value="editor">Editor</option>
-                          <option value="files">File browser</option>
-                        </optgroup>
-                        {agents.length > 0 && (
-                          <optgroup label="Agents">
-                            {agents.map((a) => (
-                              <option key={a.id} value={`agent:${a.id}`}>{a.name}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="modal-actions">
-                  <button className="btn btn-ghost btn-with-icon" onClick={() => setStep("template")}>
-                    <Icon name="chevron-left" size={14} />
-                    <span>Back</span>
-                  </button>
-                  <div style={{ flex: 1 }} />
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => {
-                      // skip agents
-                      newTab(
-                        chosen.panes,
-                        chosen.label,
-                        projectPath
-                          ? Array.from({ length: chosen.panes }, () => ({ spawnCwd: projectPath }))
-                          : undefined,
-                        projectPath || undefined,
-                      );
-                      reset();
-                    }}
-                  >
-                    Skip agents
-                  </button>
-                  <button className="btn btn-primary" onClick={launch}>Launch</button>
-                </div>
-              </>
-            )}
-          </div>
+      <div className="form-row">
+        <label htmlFor={projectInputId}>Project folder (optional)</label>
+        <div className="form-row-inline">
+          <input
+            id={projectInputId}
+            value={projectPath}
+            onChange={(e) => setProjectPath(e.target.value)}
+            placeholder="defaults to current shell cwd"
+          />
+          <button className="btn btn-ghost" onClick={pickProject}>Pick…</button>
         </div>
-      )}
+      </div>
+
+      <div className="agent-slot-grid">
+        {Array.from({ length: chosen.panes }, (_, i) => (
+          <div key={i} className="agent-slot">
+            <div className="agent-slot-num">Pane {i + 1}</div>
+            <select
+              value={paneAssign[i] ?? ""}
+              onChange={(e) =>
+                setPaneAssign((m) => ({ ...m, [i]: e.target.value }))
+              }
+            >
+              <option value="">— Plain shell —</option>
+              <optgroup label="Other pane kinds">
+                <option value="preview">Live preview</option>
+                <option value="editor">Editor</option>
+                <option value="files">File browser</option>
+              </optgroup>
+              {agents.length > 0 && (
+                <optgroup label="Agents">
+                  {agents.map((a) => (
+                    <option key={a.id} value={`agent:${a.id}`}>{a.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div className="modal-actions">
+        <button className="btn btn-ghost btn-with-icon" onClick={() => setStep("template")}>
+          <Icon name="chevron-left" size={14} />
+          <span>Layouts</span>
+        </button>
+        <div style={{ flex: 1 }} />
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            newTab(
+              chosen.panes,
+              chosen.label,
+              projectPath
+                ? Array.from({ length: chosen.panes }, () => ({ spawnCwd: projectPath }))
+                : undefined,
+              projectPath || undefined,
+            );
+            onClose();
+          }}
+        >
+          Skip agents
+        </button>
+        <button className="btn btn-primary" onClick={launch}>Launch</button>
+      </div>
     </>
   );
 }
@@ -283,9 +233,4 @@ function TemplatePreview({ panes }: { panes: number }) {
       ))}
     </div>
   );
-}
-
-// Empty marker export so Vite tree-shakes the trigger when unused.
-export function TemplatePicker() {
-  return null;
 }

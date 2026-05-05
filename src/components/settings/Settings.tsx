@@ -991,7 +991,7 @@ function TeamSettingsSection() {
   return (
     <div className="settings-section">
       <div className="settings-section-head">
-        <h2 className="settings-section-title">Team</h2>
+        <h2 className="settings-section-title">Multi-agent teams</h2>
         <div className="settings-section-sub">
           Roles, skills, and saved templates used when launching multi-agent
           teams from <kbd>⌘⇧T</kbd>.

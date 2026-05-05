@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useTeamPickerStore } from "../../stores/teamPickerStore";
+import { useNewWorkspacePickerStore } from "../../stores/newWorkspacePickerStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
 import { registerShortcut } from "../../lib/shortcuts";
@@ -17,7 +17,7 @@ export function WorkspaceView() {
   const newTab = useWorkspaceStore((s) => s.newTab);
   const setView = useWorkspaceStore((s) => s.setView);
   const theme = useThemeStore((s) => s.current);
-  const setTeamPickerOpen = useTeamPickerStore((s) => s.setOpen);
+  const openPickerWith = useNewWorkspacePickerStore((s) => s.openWith);
   const superAgentOpen = useSuperAgentStore((s) => s.panelOpen);
   const setSuperAgentOpen = useSuperAgentStore((s) => s.setPanelOpen);
   const superAgentWidth = useSuperAgentSettingsStore((s) => s.settings.panelWidth);
@@ -62,7 +62,7 @@ export function WorkspaceView() {
               </button>
               <button
                 className="btn btn-with-icon"
-                onClick={() => setTeamPickerOpen(true)}
+                onClick={() => openPickerWith("team")}
               >
                 <Icon name="users-round" size={14} />
                 <span>Start team</span>

@@ -1,8 +1,8 @@
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useState } from "react";
+import { useTeamStore } from "../../stores/teamStore";
+import { useState, useMemo } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { TemplatePickerTrigger } from "./TemplatePicker";
-import { TeamPickerTrigger } from "./TeamPicker";
+import { NewWorkspacePickerTrigger } from "./NewWorkspacePicker";
 import { Icon } from "../ui/Icon";
 
 function pathBasename(p: string): string {
@@ -20,7 +20,14 @@ export function TabBar() {
   const view = useWorkspaceStore((s) => s.selectedView);
   const renameTab = useWorkspaceStore((s) => s.renameTab);
   const setTabProjectPath = useWorkspaceStore((s) => s.setTabProjectPath);
+  const teams = useTeamStore((s) => s.teams);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const teamTabIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of teams) if (t.tabId) set.add(t.tabId);
+    return set;
+  }, [teams]);
 
   const pickWorkspaceFolder = async () => {
     if (!activeTab) return;
@@ -39,7 +46,6 @@ export function TabBar() {
         <div className="tabbar-title">
           {view === "kanban" && "Task Board"}
           {view === "agents" && "Agents"}
-          {view === "teams" && "Teams"}
           {view === "settings" && "Settings"}
         </div>
       </div>
@@ -49,48 +55,56 @@ export function TabBar() {
   return (
     <div className="tabbar">
       <div className="tabbar-tabs scrollbar">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className={"tab" + (tab.id === activeTabId ? " active" : "")}
-            aria-current={tab.id === activeTabId ? "page" : undefined}
-            onClick={() => setActiveTab(tab.id)}
-            onDoubleClick={() => setEditingId(tab.id)}
-          >
-            <span className="tab-color" style={{ background: tab.color }} />
-            {editingId === tab.id ? (
-              <input
-                autoFocus
-                aria-label="Rename tab"
-                className="tab-name-input"
-                defaultValue={tab.name}
-                onBlur={(e) => {
-                  renameTab(tab.id, e.target.value || tab.name);
-                  setEditingId(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    renameTab(tab.id, (e.target as HTMLInputElement).value || tab.name);
-                    setEditingId(null);
-                  }
-                  if (e.key === "Escape") setEditingId(null);
-                }}
-              />
-            ) : (
-              <span className="tab-name">{tab.name}</span>
-            )}
-            <button
-              className="tab-close"
-              aria-label="Close tab"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeTab(tab.id);
-              }}
+        {tabs.map((tab) => {
+          const isTeam = teamTabIds.has(tab.id);
+          return (
+            <div
+              key={tab.id}
+              className={"tab" + (tab.id === activeTabId ? " active" : "")}
+              aria-current={tab.id === activeTabId ? "page" : undefined}
+              onClick={() => setActiveTab(tab.id)}
+              onDoubleClick={() => setEditingId(tab.id)}
             >
-              <Icon name="x" size={12} />
-            </button>
-          </div>
-        ))}
+              <span className="tab-color" style={{ background: tab.color }} />
+              {isTeam && (
+                <span className="tab-team-badge" aria-label="Team workspace" title="Team workspace">
+                  <Icon name="users-round" size={12} />
+                </span>
+              )}
+              {editingId === tab.id ? (
+                <input
+                  autoFocus
+                  aria-label="Rename tab"
+                  className="tab-name-input"
+                  defaultValue={tab.name}
+                  onBlur={(e) => {
+                    renameTab(tab.id, e.target.value || tab.name);
+                    setEditingId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      renameTab(tab.id, (e.target as HTMLInputElement).value || tab.name);
+                      setEditingId(null);
+                    }
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                />
+              ) : (
+                <span className="tab-name">{tab.name}</span>
+              )}
+              <button
+                className="tab-close"
+                aria-label="Close tab"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(tab.id);
+                }}
+              >
+                <Icon name="x" size={12} />
+              </button>
+            </div>
+          );
+        })}
       </div>
       <div className="tabbar-actions">
         {activeTab && (
@@ -115,8 +129,7 @@ export function TabBar() {
             </span>
           </button>
         )}
-        <TemplatePickerTrigger />
-        <TeamPickerTrigger />
+        <NewWorkspacePickerTrigger />
       </div>
     </div>
   );

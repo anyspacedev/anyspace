@@ -226,6 +226,18 @@
   flex-shrink: 0;
   box-shadow: 0 0 0 2px color-mix(in oklab, currentColor 12%, transparent);
 }
+.tab-team-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+  margin-left: -2px;
+  margin-right: 2px;
+  opacity: 0.85;
+}
+.tab.active .tab-team-badge { color: var(--accent); opacity: 1; }
 .tab-name { font-weight: 500; }
 .tab-name-input {
   background: var(--bg-elev-2);
@@ -5086,7 +5098,103 @@ body.screenshot-dragging {
   right: 12px;
   z-index: 1;
 }
+.modal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px 0 6px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+.modal-back:hover {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.modal-back-floating {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+}
 .modal { position: relative; }
+
+/* New-workspace picker: intent cards on the menu mode. */
+.nws-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 4px;
+}
+.nws-intent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px;
+  text-align: left;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+.nws-intent-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 6%, var(--bg-elev-1));
+  transform: translateY(-1px);
+}
+.nws-intent-card:active { transform: translateY(0); }
+.nws-intent-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-elev-2));
+  color: var(--accent);
+}
+.nws-intent-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--fg);
+}
+.nws-intent-sub {
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  line-height: 1.45;
+}
+.nws-saved-link-row {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+.nws-saved-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.nws-saved-link:hover { color: var(--fg); }
 
 /* Heading classes carry their own visual weight; reset margin/font is
    handled by the global h1-h6 reset in globals.css. The rules below only

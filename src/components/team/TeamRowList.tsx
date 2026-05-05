@@ -12,7 +12,15 @@ function fmtDate(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
-export function TeamsView() {
+/**
+ * Read + manage the saved-teams list (active and archived).
+ * Rendered standalone in the dedicated Workspaces management view, and
+ * also embedded inside the unified NewWorkspacePicker's "saved" mode.
+ *
+ * `onActivated` fires after Open / Launch / Reactivate so the parent
+ * (e.g. the picker modal) can close itself once a team is focused.
+ */
+export function TeamRowList({ onActivated }: { onActivated?: () => void } = {}) {
   const teams = useTeamStore((s) => s.teams);
   const teamAgents = useTeamStore((s) => s.agents);
   const archive = useTeamStore((s) => s.archive);
@@ -35,21 +43,22 @@ export function TeamsView() {
     try {
       const team = useTeamStore.getState().teams.find((t) => t.id === teamId);
       if (!team) return;
-      // If a live tab matches the team's tabId, just focus it.
       if (team.status === "active" && team.tabId && tabs.some((t) => t.id === team.tabId)) {
         setActiveTab(team.tabId);
+        onActivated?.();
         return;
       }
-      // Otherwise, reactivate (clears stale tabId) and launch a fresh tab.
       if (team.status === "archived") {
         await reactivate(teamId);
       } else if (team.tabId) {
-        // Active but tab is gone — clear the stale id before relaunching so
-        // launchTeam's tab assignment writes a fresh tab_id.
         await reactivate(teamId);
       }
       const result = await launchTeam(teamId);
-      if (!result) setError("Launch returned null — agent program may be missing.");
+      if (!result) {
+        setError("Launch returned null — agent program may be missing.");
+        return;
+      }
+      onActivated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -65,25 +74,18 @@ export function TeamsView() {
 
   if (teams.length === 0) {
     return (
-      <div className="teams-view">
-        <div className="teams-empty">
-          <div className="teams-empty-title">No teams yet</div>
-          <div className="teams-empty-sub">
-            Spin up your first multi-agent workspace from the welcome card or the "+ Team" button in the tab bar.
-          </div>
+      <div className="teams-empty">
+        <div className="teams-empty-title">No saved workspaces yet</div>
+        <div className="teams-empty-sub">
+          Multi-agent team workspaces persist across restarts. Spin one up
+          from the "Multi-agent team" card.
         </div>
       </div>
     );
   }
 
   return (
-    <div className="teams-view">
-      <header className="teams-header">
-        <div className="teams-title">Teams</div>
-        <div className="teams-sub">
-          {teams.filter((t) => t.status === "active").length} active · {teams.filter((t) => t.status === "archived").length} archived
-        </div>
-      </header>
+    <>
       {error && <div className="teams-error">{error}</div>}
       <div className="teams-list">
         {teams.map((team) => {
@@ -177,6 +179,6 @@ export function TeamsView() {
           );
         })}
       </div>
-    </div>
+    </>
   );
 }

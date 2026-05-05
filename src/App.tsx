@@ -9,8 +9,8 @@ import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
 import { useTeamStore } from "./stores/teamStore";
 import { useTeamSettingsStore } from "./stores/teamSettingsStore";
-import { useTeamPickerStore } from "./stores/teamPickerStore";
-import { TeamPickerModal } from "./components/workspace/TeamPicker";
+import { useNewWorkspacePickerStore } from "./stores/newWorkspacePickerStore";
+import { NewWorkspacePickerHost } from "./components/workspace/NewWorkspacePicker";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
 import { resumeTeam } from "./lib/teamLauncher";
@@ -21,12 +21,10 @@ import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
 import { AgentManager } from "./components/agents/AgentManager";
-import { TeamsView } from "./components/team/TeamsView";
 import { Settings } from "./components/settings/Settings";
 import { useSuperAgentStore } from "./stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "./stores/superAgentSettingsStore";
 import { StatusBar } from "./components/workspace/StatusBar";
-import { TemplatePicker } from "./components/workspace/TemplatePicker";
 import { QuickOpen } from "./components/sidebar/QuickOpen";
 import { SttBubble } from "./components/stt/SttBubble";
 import { ScreenshotStack } from "./components/screenshot/ScreenshotStack";
@@ -195,7 +193,7 @@ export default function App() {
     const detach = attachGlobalShortcuts();
     const unregisters = [
       registerShortcut("newTab", () => newTab(1)),
-      registerShortcut("newTeam", () => useTeamPickerStore.getState().setOpen(true)),
+      registerShortcut("newTeam", () => useNewWorkspacePickerStore.getState().openWith("team")),
       registerShortcut("closeTab", () => activeTabId && closeTab(activeTabId)),
       registerShortcut("switchTab1", () => switchToTabIndex(0)),
       registerShortcut("switchTab2", () => switchToTabIndex(1)),
@@ -258,13 +256,11 @@ export default function App() {
           </div>
           {view === "kanban" && <KanbanBoard />}
           {view === "agents" && <AgentManager />}
-          {view === "teams" && <TeamsView />}
           {view === "settings" && <Settings />}
         </div>
         <StatusBar />
       </div>
-      <TemplatePicker />
-      <TeamPickerHost />
+      <NewWorkspacePickerHost />
       <QuickOpen />
       <SttBubble />
       <ScreenshotStack />
@@ -272,8 +268,3 @@ export default function App() {
   );
 }
 
-function TeamPickerHost() {
-  const open = useTeamPickerStore((s) => s.open);
-  const setOpen = useTeamPickerStore((s) => s.setOpen);
-  return <TeamPickerModal open={open} onClose={() => setOpen(false)} />;
-}

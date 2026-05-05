@@ -1,12 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Icon } from "../ui/Icon";
-import { useFocusReturn } from "../../lib/useFocusReturn";
-import { useFocusTrap } from "../../lib/useFocusTrap";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
-import { useTeamPickerStore } from "../../stores/teamPickerStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import {
   BUILTIN_ROLES,
@@ -32,7 +29,12 @@ function pathBasename(p: string): string {
   return trimmed.split(/[/\\]/).pop() ?? trimmed;
 }
 
-export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * Body of the "Multi-agent team" flow inside the unified
+ * NewWorkspacePicker modal. Renders only the content; the modal shell
+ * (backdrop, focus trap, close button) is provided by the parent picker.
+ */
+export function TeamPickerForm({ onClose, titleId }: { onClose: () => void; titleId: string }) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
   const [projectPath, setProjectPath] = useState("");
@@ -62,12 +64,8 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
   const [decomposeNote, setDecomposeNote] = useState<string | null>(null);
   const [decomposeError, setDecomposeError] = useState<string | null>(null);
 
-  const titleId = useId();
-  const modalRef = useRef<HTMLDivElement>(null);
   const templatesPopRef = useRef<HTMLDivElement>(null);
   const savePopRef = useRef<HTMLDivElement>(null);
-  useFocusReturn(open);
-  useFocusTrap(modalRef, open);
 
   // Close footer popovers on outside click. Both popovers anchor to the
   // footer side-by-side; we also keep them mutually exclusive so opening
@@ -87,27 +85,8 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
     return () => document.removeEventListener("mousedown", onDown);
   }, [templatesOpen, savingTemplate]);
 
-  const reset = () => {
-    setName("");
-    setGoal("");
-    setProjectPath("");
-    setRoster([]);
-    setSkills(["test-driven", "keep-ci-green"]);
-    setAttachments([]);
-    setError(null);
-    setBusy(false);
-    setExpanded({ roster: false, skills: false, attachments: false });
-    setSavingTemplate(false);
-    setDraftTemplateName("");
-    setTemplatesOpen(false);
-    setDecomposeNote(null);
-    setDecomposeError(null);
-    onClose();
-  };
-
-  // Seed default roster on first open of a session.
+  // Seed default roster on mount.
   useEffect(() => {
-    if (!open) return;
     if (roster.length === 0) {
       const fallback = agents[0]?.id ?? "";
       setRoster(
@@ -115,7 +94,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, []);
 
   const validRoster = roster.filter((r) => r.label.trim() && r.agentId);
   const labelsUnique =
@@ -140,10 +119,9 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
 
   // Keyboard: Esc closes, Cmd/Ctrl+Enter launches.
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busy) {
-        reset();
+        onClose();
       } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canLaunch) {
         e.preventDefault();
         void launch();
@@ -152,7 +130,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy, canLaunch]);
+  }, [busy, canLaunch, onClose]);
 
   const pickProject = async () => {
     const selected = await openDialog({ directory: true, multiple: false });
@@ -211,7 +189,7 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
         setBusy(false);
         return;
       }
-      reset();
+      onClose();
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : String(err));
@@ -247,7 +225,6 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
       );
       if (out.skillIds.length > 0) setSkills(out.skillIds);
       if (out.notes) setDecomposeNote(out.notes);
-      // Auto-reveal what the AI proposed.
       setExpanded((e) => ({ ...e, roster: true }));
     } catch (err) {
       setDecomposeError(err instanceof Error ? err.message : String(err));
@@ -281,10 +258,8 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
 
   const openManageInSettings = () => {
     setView("settings");
-    reset();
+    onClose();
   };
-
-  if (!open) return null;
 
   // Selected skill labels (for collapsed Skills summary).
   const selectedSkills = skills
@@ -292,496 +267,464 @@ export function TeamPickerModal({ open, onClose }: { open: boolean; onClose: () 
     .filter(Boolean);
 
   return (
-    <div className="modal-backdrop" onClick={busy ? undefined : reset}>
-      <div
-        ref={modalRef}
-        className="modal wide pinned"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          className="modal-close modal-close-floating"
-          onClick={busy ? undefined : reset}
-          disabled={busy}
-          aria-label="Close"
-        >
-          <Icon name="x" size={14} />
-        </button>
+    <>
+      <div className="modal-pinned-head">
+        <h2 id={titleId} className="modal-title">Multi-agent team</h2>
+        <div className="modal-sub">
+          Spin up multiple AI agents around a shared goal.
+        </div>
+      </div>
 
-        <div className="modal-pinned-head">
-          <h2 id={titleId} className="modal-title">New team</h2>
-          <div className="modal-sub">
-            Spin up multiple AI agents around a shared goal.
+      <div className="modal-pinned-body">
+        {/* Goal — primary field, autofocus */}
+        <div className="form-row">
+          <label htmlFor="team-goal">What should the team accomplish?</label>
+          <textarea
+            id="team-goal"
+            autoFocus
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            placeholder="e.g. Refactor the settings module to use the new config schema, with tests."
+            rows={4}
+          />
+          <div
+            className="form-row-inline"
+            style={{ justifyContent: "flex-end", marginTop: 6 }}
+          >
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={runDecompose}
+              disabled={decomposing || !goal.trim()}
+              title="Ask the configured AI to propose a roster + skills"
+            >
+              <Icon name="sparkles" size={12} />
+              <span>{decomposing ? "Thinking…" : "Suggest with AI"}</span>
+            </button>
+          </div>
+          {decomposeError && (
+            <div className="form-hint form-hint-error">AI: {decomposeError}</div>
+          )}
+          {decomposeNote && <div className="form-hint">AI: {decomposeNote}</div>}
+        </div>
+
+        {/* Project folder */}
+        <div className="form-row">
+          <label>Project folder</label>
+          <div className="form-row-inline">
+            <input
+              value={projectPath}
+              onChange={(e) => setProjectPath(e.target.value)}
+              placeholder="Pick the working directory"
+            />
+            <button className="btn btn-ghost" type="button" onClick={pickProject}>Pick…</button>
           </div>
         </div>
 
-        <div className="modal-pinned-body">
-          {/* Goal — primary field, autofocus */}
-          <div className="form-row">
-            <label htmlFor="team-goal">What should the team accomplish?</label>
-            <textarea
-              id="team-goal"
-              autoFocus
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="e.g. Refactor the settings module to use the new config schema, with tests."
-              rows={4}
-            />
+        {agents.length === 0 && (
+          <div className="form-hint form-hint-error">
+            No AI agents configured. Open the Agents panel to add Claude / Codex / etc. before launching a team.
+          </div>
+        )}
+
+        {/* Roster — collapsed summary by default */}
+        {!expanded.roster ? (
+          <button
+            type="button"
+            className="team-summary"
+            aria-expanded={false}
+            onClick={() => setExpanded((e) => ({ ...e, roster: true }))}
+          >
+            <span className="team-summary-caret" aria-hidden="true">
+              <Icon name="chevron-right" size={14} />
+            </span>
+            <span className="team-summary-title">Roster</span>
+            <span className="team-summary-content">
+              {roster.length === 0 ? (
+                <span style={{ color: "var(--fg-muted)" }}>No agents</span>
+              ) : (
+                roster.map((r, i) => (
+                  <span key={i} className="team-summary-chip">
+                    <span
+                      className="team-summary-chip-dot"
+                      style={{ background: roleAccent(r.role, customRoles) }}
+                    />
+                    {r.label}
+                  </span>
+                ))
+              )}
+            </span>
+            <span className="team-summary-edit">edit</span>
+          </button>
+        ) : (
+          <div className="team-section-expanded">
             <div
               className="form-row-inline"
-              style={{ justifyContent: "flex-end", marginTop: 6 }}
+              style={{ justifyContent: "space-between", alignItems: "center" }}
             >
+              <strong style={{ fontSize: "var(--font-size-sm)" }}>Roster</strong>
               <button
                 type="button"
-                className="btn btn-ghost btn-with-icon"
-                onClick={runDecompose}
-                disabled={decomposing || !goal.trim()}
-                title="Ask the configured AI to propose a roster + skills"
+                className="btn btn-ghost"
+                onClick={() => setExpanded((e) => ({ ...e, roster: false }))}
+                aria-label="Collapse roster"
               >
-                <Icon name="sparkles" size={12} />
-                <span>{decomposing ? "Thinking…" : "Suggest with AI"}</span>
+                <Icon name="chevron-up" size={14} />
               </button>
             </div>
-            {decomposeError && (
-              <div className="form-hint form-hint-error">AI: {decomposeError}</div>
-            )}
-            {decomposeNote && <div className="form-hint">AI: {decomposeNote}</div>}
-          </div>
 
-          {/* Project folder */}
-          <div className="form-row">
-            <label>Project folder</label>
-            <div className="form-row-inline">
+            {/* Team name (only revealed when roster is open) */}
+            <div className="form-row">
+              <label htmlFor="team-name">Team name</label>
               <input
-                value={projectPath}
-                onChange={(e) => setProjectPath(e.target.value)}
-                placeholder="Pick the working directory"
+                id="team-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Auto-filled from project folder"
               />
-              <button className="btn btn-ghost" type="button" onClick={pickProject}>Pick…</button>
             </div>
-          </div>
 
-          {agents.length === 0 && (
-            <div className="form-hint form-hint-error">
-              No AI agents configured. Open the Agents panel to add Claude / Codex / etc. before launching a team.
-            </div>
-          )}
-
-          {/* Roster — collapsed summary by default */}
-          {!expanded.roster ? (
-            <button
-              type="button"
-              className="team-summary"
-              aria-expanded={false}
-              onClick={() => setExpanded((e) => ({ ...e, roster: true }))}
-            >
-              <span className="team-summary-caret" aria-hidden="true">
-                <Icon name="chevron-right" size={14} />
-              </span>
-              <span className="team-summary-title">Roster</span>
-              <span className="team-summary-content">
-                {roster.length === 0 ? (
-                  <span style={{ color: "var(--fg-muted)" }}>No agents</span>
-                ) : (
-                  roster.map((r, i) => (
-                    <span key={i} className="team-summary-chip">
-                      <span
-                        className="team-summary-chip-dot"
-                        style={{ background: roleAccent(r.role, customRoles) }}
-                      />
-                      {r.label}
-                    </span>
-                  ))
-                )}
-              </span>
-              <span className="team-summary-edit">edit</span>
-            </button>
-          ) : (
-            <div className="team-section-expanded">
-              <div
-                className="form-row-inline"
-                style={{ justifyContent: "space-between", alignItems: "center" }}
-              >
-                <strong style={{ fontSize: "var(--font-size-sm)" }}>Roster</strong>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setExpanded((e) => ({ ...e, roster: false }))}
-                  aria-label="Collapse roster"
-                >
-                  <Icon name="chevron-up" size={14} />
-                </button>
-              </div>
-
-              {/* Team name (only revealed when roster is open) */}
-              <div className="form-row">
-                <label htmlFor="team-name">Team name</label>
-                <input
-                  id="team-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Auto-filled from project folder"
-                />
-              </div>
-
-              <div className="team-roster">
-                {roster.map((r, i) => (
-                  <div key={i} className="team-roster-row">
-                    <select
-                      aria-label="Role"
-                      value={r.role}
-                      onChange={(e) => updateRow(i, { role: e.target.value as TeamRole })}
-                    >
-                      {BUILTIN_ROLES.map((role) => (
-                        <option key={role} value={role}>{roleLabel(role, [])}</option>
-                      ))}
-                      {customRoles.length > 0 && (
-                        <optgroup label="Custom roles">
-                          {customRoles.map((role) => (
-                            <option key={role.id} value={role.id}>{role.label}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                    <input
-                      aria-label="Label"
-                      value={r.label}
-                      onChange={(e) => updateRow(i, { label: e.target.value })}
-                      placeholder="Builder 1"
-                      aria-invalid={isDuplicateRow(r.label) || undefined}
-                    />
-                    <select
-                      aria-label="AI program"
-                      value={r.agentId}
-                      onChange={(e) => updateRow(i, { agentId: e.target.value })}
-                    >
-                      <option value="">— pick agent —</option>
-                      {agents.map((a) => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => removeRow(i)}
-                      aria-label="Remove row"
-                      title="Remove"
-                    >
-                      <Icon name="x" size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className="btn btn-ghost btn-with-icon" onClick={addRow}>
-                  <Icon name="plus" size={14} />
-                  <span>Add agent</span>
-                </button>
-              </div>
-              {!labelsUnique && (
-                <div className="form-hint form-hint-error">Labels must be unique within a team.</div>
-              )}
-              <button
-                type="button"
-                className="team-section-link"
-                onClick={openManageInSettings}
-              >
-                Manage custom roles in Settings →
-              </button>
-            </div>
-          )}
-
-          {/* Skills — collapsed summary by default */}
-          {!expanded.skills ? (
-            <button
-              type="button"
-              className="team-summary"
-              aria-expanded={false}
-              onClick={() => setExpanded((e) => ({ ...e, skills: true }))}
-            >
-              <span className="team-summary-caret" aria-hidden="true">
-                <Icon name="chevron-right" size={14} />
-              </span>
-              <span className="team-summary-title">Skills</span>
-              <span className="team-summary-content">
-                {selectedSkills.length === 0 ? (
-                  <span style={{ color: "var(--fg-muted)" }}>None selected</span>
-                ) : (
-                  selectedSkills.map((label, i) => (
-                    <span key={i} className="team-summary-chip">{label}</span>
-                  ))
-                )}
-              </span>
-              <span className="team-summary-edit">edit</span>
-            </button>
-          ) : (
-            <div className="team-section-expanded">
-              <div
-                className="form-row-inline"
-                style={{ justifyContent: "space-between", alignItems: "center" }}
-              >
-                <strong style={{ fontSize: "var(--font-size-sm)" }}>Skills</strong>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setExpanded((e) => ({ ...e, skills: false }))}
-                  aria-label="Collapse skills"
-                >
-                  <Icon name="chevron-up" size={14} />
-                </button>
-              </div>
-              <div className="team-skill-grid">
-                {[...BUILTIN_SKILLS, ...customSkills].map((s) => {
-                  const checked = skills.includes(s.id);
-                  return (
-                    <label key={s.id} className={"team-skill" + (checked ? " active" : "")}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          setSkills((prev) =>
-                            prev.includes(s.id)
-                              ? prev.filter((x) => x !== s.id)
-                              : [...prev, s.id],
-                          );
-                        }}
-                      />
-                      <span className="team-skill-label">{s.label}</span>
-                      <span className="team-skill-body">{s.body}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className="team-section-link"
-                onClick={openManageInSettings}
-              >
-                Manage custom skills in Settings →
-              </button>
-            </div>
-          )}
-
-          {/* Attachments — collapsed summary by default */}
-          {!expanded.attachments ? (
-            <button
-              type="button"
-              className="team-summary"
-              aria-expanded={false}
-              onClick={() => setExpanded((e) => ({ ...e, attachments: true }))}
-            >
-              <span className="team-summary-caret" aria-hidden="true">
-                <Icon name="chevron-right" size={14} />
-              </span>
-              <span className="team-summary-title">Attachments</span>
-              <span className="team-summary-content">
-                <span style={{ color: "var(--fg-muted)" }}>
-                  {attachments.length === 0
-                    ? "No files"
-                    : `${attachments.length} file${attachments.length === 1 ? "" : "s"}`}
-                </span>
-              </span>
-              <span className="team-summary-edit">add</span>
-            </button>
-          ) : (
-            <div className="team-section-expanded">
-              <div
-                className="form-row-inline"
-                style={{ justifyContent: "space-between", alignItems: "center" }}
-              >
-                <strong style={{ fontSize: "var(--font-size-sm)" }}>Attachments</strong>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setExpanded((e) => ({ ...e, attachments: false }))}
-                  aria-label="Collapse attachments"
-                >
-                  <Icon name="chevron-up" size={14} />
-                </button>
-              </div>
-              <div className="team-attachments">
-                {attachments.length === 0 && (
-                  <div className="form-hint">No files attached. Pick design docs, briefs, etc.</div>
-                )}
-                {attachments.map((p, i) => (
-                  <div key={`${p}-${i}`} className="team-attachment-row">
-                    <span className="team-attachment-path">{p}</span>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() =>
-                        setAttachments((prev) => prev.filter((_, idx) => idx !== i))
-                      }
-                      aria-label="Remove attachment"
-                    >
-                      <Icon name="x" size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className="btn btn-ghost btn-with-icon" onClick={pickAttachments}>
-                  <Icon name="plus" size={14} />
-                  <span>Add files…</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {error && <div className="form-hint form-hint-error">{error}</div>}
-        </div>
-
-        <div className="modal-pinned-foot">
-          <div className="team-tpl-save-wrap" ref={templatesPopRef}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-with-icon"
-              onClick={() => {
-                setTemplatesOpen((v) => !v);
-                setSavingTemplate(false);
-              }}
-              title="Apply a saved template"
-              aria-expanded={templatesOpen}
-            >
-              <Icon name="layers" size={12} />
-              <span>Templates</span>
-              <Icon name={templatesOpen ? "chevron-up" : "chevron-down"} size={12} />
-            </button>
-            {templatesOpen && (
-              <div className="team-templates-pop" role="menu" aria-label="Templates">
-                {templates.length === 0 ? (
-                  <div className="team-templates-pop-empty">
-                    No saved templates yet — save one after launch.
-                  </div>
-                ) : (
-                  templates.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="team-templates-pop-item"
-                      role="menuitem"
-                      onClick={() => applyTemplate(t.id)}
-                    >
-                      <span className="team-templates-pop-name">{t.name}</span>
-                      <span className="team-templates-pop-meta">
-                        {t.roster.length} {t.roster.length === 1 ? "agent" : "agents"} ·{" "}
-                        {t.skillIds.length} {t.skillIds.length === 1 ? "skill" : "skills"}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="team-tpl-save-wrap" ref={savePopRef}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-with-icon"
-              onClick={() => {
-                if (!savingTemplate) {
-                  setDraftTemplateName(name.trim());
-                  setSavingTemplate(true);
-                  setTemplatesOpen(false);
-                } else {
-                  setSavingTemplate(false);
-                }
-              }}
-              disabled={busy || roster.filter((r) => r.label.trim()).length === 0}
-              title="Save current roster + skills as a reusable template"
-              aria-expanded={savingTemplate}
-            >
-              <Icon name="layers" size={12} />
-              <span>Save as…</span>
-            </button>
-            {savingTemplate && (
-              <div className="team-tpl-save-pop" role="group" aria-label="Save template">
-                <label className="team-tpl-save-pop-label" htmlFor="tpl-name-input">
-                  Template name
-                </label>
-                <input
-                  id="tpl-name-input"
-                  autoFocus
-                  value={draftTemplateName}
-                  onChange={(e) => setDraftTemplateName(e.target.value)}
-                  placeholder="e.g. Refactor squad"
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      setSavingTemplate(false);
-                      setDraftTemplateName("");
-                    }
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      const btn = e.currentTarget.parentElement?.querySelector(
-                        "button.btn-primary",
-                      ) as HTMLButtonElement | null;
-                      btn?.click();
-                    }
-                  }}
-                />
-                <div className="team-tpl-save-pop-actions">
+            <div className="team-roster">
+              {roster.map((r, i) => (
+                <div key={i} className="team-roster-row">
+                  <select
+                    aria-label="Role"
+                    value={r.role}
+                    onChange={(e) => updateRow(i, { role: e.target.value as TeamRole })}
+                  >
+                    {BUILTIN_ROLES.map((role) => (
+                      <option key={role} value={role}>{roleLabel(role, [])}</option>
+                    ))}
+                    {customRoles.length > 0 && (
+                      <optgroup label="Custom roles">
+                        {customRoles.map((role) => (
+                          <option key={role.id} value={role.id}>{role.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <input
+                    aria-label="Label"
+                    value={r.label}
+                    onChange={(e) => updateRow(i, { label: e.target.value })}
+                    placeholder="Builder 1"
+                    aria-invalid={isDuplicateRow(r.label) || undefined}
+                  />
+                  <select
+                    aria-label="AI program"
+                    value={r.agentId}
+                    onChange={(e) => updateRow(i, { agentId: e.target.value })}
+                  >
+                    <option value="">— pick agent —</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    onClick={() => {
-                      setSavingTemplate(false);
-                      setDraftTemplateName("");
-                    }}
+                    onClick={() => removeRow(i)}
+                    aria-label="Remove row"
+                    title="Remove"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      const tplName =
-                        draftTemplateName.trim() || name.trim() || "Team template";
-                      const tpl = {
-                        id: `tpl-${Math.random().toString(36).slice(2, 8)}`,
-                        name: tplName,
-                        goalSeed: goal.trim() || undefined,
-                        roster: roster
-                          .filter((r) => r.label.trim())
-                          .map((r) => ({
-                            role: r.role,
-                            label: r.label.trim(),
-                            agentId: r.agentId,
-                          })),
-                        skillIds: [...skills],
-                      };
-                      void saveTemplates([...templates, tpl]);
-                      setSavingTemplate(false);
-                      setDraftTemplateName("");
-                    }}
-                    disabled={roster.filter((r) => r.label.trim()).length === 0}
-                  >
-                    Save
+                    <Icon name="x" size={14} />
                   </button>
                 </div>
-              </div>
+              ))}
+              <button type="button" className="btn btn-ghost btn-with-icon" onClick={addRow}>
+                <Icon name="plus" size={14} />
+                <span>Add agent</span>
+              </button>
+            </div>
+            {!labelsUnique && (
+              <div className="form-hint form-hint-error">Labels must be unique within a team.</div>
             )}
+            <button
+              type="button"
+              className="team-section-link"
+              onClick={openManageInSettings}
+            >
+              Manage custom roles in Settings →
+            </button>
           </div>
+        )}
 
-          <div style={{ flex: 1 }} />
-
-          <button className="btn btn-primary" onClick={launch} disabled={!canLaunch}>
-            {busy ? "Launching…" : "Launch team"}
+        {/* Skills — collapsed summary by default */}
+        {!expanded.skills ? (
+          <button
+            type="button"
+            className="team-summary"
+            aria-expanded={false}
+            onClick={() => setExpanded((e) => ({ ...e, skills: true }))}
+          >
+            <span className="team-summary-caret" aria-hidden="true">
+              <Icon name="chevron-right" size={14} />
+            </span>
+            <span className="team-summary-title">Skills</span>
+            <span className="team-summary-content">
+              {selectedSkills.length === 0 ? (
+                <span style={{ color: "var(--fg-muted)" }}>None selected</span>
+              ) : (
+                selectedSkills.map((label, i) => (
+                  <span key={i} className="team-summary-chip">{label}</span>
+                ))
+              )}
+            </span>
+            <span className="team-summary-edit">edit</span>
           </button>
-        </div>
+        ) : (
+          <div className="team-section-expanded">
+            <div
+              className="form-row-inline"
+              style={{ justifyContent: "space-between", alignItems: "center" }}
+            >
+              <strong style={{ fontSize: "var(--font-size-sm)" }}>Skills</strong>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setExpanded((e) => ({ ...e, skills: false }))}
+                aria-label="Collapse skills"
+              >
+                <Icon name="chevron-up" size={14} />
+              </button>
+            </div>
+            <div className="team-skill-grid">
+              {[...BUILTIN_SKILLS, ...customSkills].map((s) => {
+                const checked = skills.includes(s.id);
+                return (
+                  <label key={s.id} className={"team-skill" + (checked ? " active" : "")}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSkills((prev) =>
+                          prev.includes(s.id)
+                            ? prev.filter((x) => x !== s.id)
+                            : [...prev, s.id],
+                        );
+                      }}
+                    />
+                    <span className="team-skill-label">{s.label}</span>
+                    <span className="team-skill-body">{s.body}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              className="team-section-link"
+              onClick={openManageInSettings}
+            >
+              Manage custom skills in Settings →
+            </button>
+          </div>
+        )}
+
+        {/* Attachments — collapsed summary by default */}
+        {!expanded.attachments ? (
+          <button
+            type="button"
+            className="team-summary"
+            aria-expanded={false}
+            onClick={() => setExpanded((e) => ({ ...e, attachments: true }))}
+          >
+            <span className="team-summary-caret" aria-hidden="true">
+              <Icon name="chevron-right" size={14} />
+            </span>
+            <span className="team-summary-title">Attachments</span>
+            <span className="team-summary-content">
+              <span style={{ color: "var(--fg-muted)" }}>
+                {attachments.length === 0
+                  ? "No files"
+                  : `${attachments.length} file${attachments.length === 1 ? "" : "s"}`}
+              </span>
+            </span>
+            <span className="team-summary-edit">add</span>
+          </button>
+        ) : (
+          <div className="team-section-expanded">
+            <div
+              className="form-row-inline"
+              style={{ justifyContent: "space-between", alignItems: "center" }}
+            >
+              <strong style={{ fontSize: "var(--font-size-sm)" }}>Attachments</strong>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setExpanded((e) => ({ ...e, attachments: false }))}
+                aria-label="Collapse attachments"
+              >
+                <Icon name="chevron-up" size={14} />
+              </button>
+            </div>
+            <div className="team-attachments">
+              {attachments.length === 0 && (
+                <div className="form-hint">No files attached. Pick design docs, briefs, etc.</div>
+              )}
+              {attachments.map((p, i) => (
+                <div key={`${p}-${i}`} className="team-attachment-row">
+                  <span className="team-attachment-path">{p}</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                    }
+                    aria-label="Remove attachment"
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
+                </div>
+              ))}
+              <button type="button" className="btn btn-ghost btn-with-icon" onClick={pickAttachments}>
+                <Icon name="plus" size={14} />
+                <span>Add files…</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && <div className="form-hint form-hint-error">{error}</div>}
       </div>
-    </div>
+
+      <div className="modal-pinned-foot">
+        <div className="team-tpl-save-wrap" ref={templatesPopRef}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-with-icon"
+            onClick={() => {
+              setTemplatesOpen((v) => !v);
+              setSavingTemplate(false);
+            }}
+            title="Apply a saved template"
+            aria-expanded={templatesOpen}
+          >
+            <Icon name="layers" size={12} />
+            <span>Templates</span>
+            <Icon name={templatesOpen ? "chevron-up" : "chevron-down"} size={12} />
+          </button>
+          {templatesOpen && (
+            <div className="team-templates-pop" role="menu" aria-label="Templates">
+              {templates.length === 0 ? (
+                <div className="team-templates-pop-empty">
+                  No saved templates yet — save one after launch.
+                </div>
+              ) : (
+                templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="team-templates-pop-item"
+                    role="menuitem"
+                    onClick={() => applyTemplate(t.id)}
+                  >
+                    <span className="team-templates-pop-name">{t.name}</span>
+                    <span className="team-templates-pop-meta">
+                      {t.roster.length} {t.roster.length === 1 ? "agent" : "agents"} ·{" "}
+                      {t.skillIds.length} {t.skillIds.length === 1 ? "skill" : "skills"}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="team-tpl-save-wrap" ref={savePopRef}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-with-icon"
+            onClick={() => {
+              if (!savingTemplate) {
+                setDraftTemplateName(name.trim());
+                setSavingTemplate(true);
+                setTemplatesOpen(false);
+              } else {
+                setSavingTemplate(false);
+              }
+            }}
+            disabled={busy || roster.filter((r) => r.label.trim()).length === 0}
+            title="Save current roster + skills as a reusable template"
+            aria-expanded={savingTemplate}
+          >
+            <Icon name="layers" size={12} />
+            <span>Save as…</span>
+          </button>
+          {savingTemplate && (
+            <div className="team-tpl-save-pop" role="group" aria-label="Save template">
+              <label className="team-tpl-save-pop-label" htmlFor="tpl-name-input">
+                Template name
+              </label>
+              <input
+                id="tpl-name-input"
+                autoFocus
+                value={draftTemplateName}
+                onChange={(e) => setDraftTemplateName(e.target.value)}
+                placeholder="e.g. Refactor squad"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSavingTemplate(false);
+                    setDraftTemplateName("");
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const btn = e.currentTarget.parentElement?.querySelector(
+                      "button.btn-primary",
+                    ) as HTMLButtonElement | null;
+                    btn?.click();
+                  }
+                }}
+              />
+              <div className="team-tpl-save-pop-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setSavingTemplate(false);
+                    setDraftTemplateName("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const tplName =
+                      draftTemplateName.trim() || name.trim() || "Team template";
+                    const tpl = {
+                      id: `tpl-${Math.random().toString(36).slice(2, 8)}`,
+                      name: tplName,
+                      goalSeed: goal.trim() || undefined,
+                      roster: roster
+                        .filter((r) => r.label.trim())
+                        .map((r) => ({
+                          role: r.role,
+                          label: r.label.trim(),
+                          agentId: r.agentId,
+                        })),
+                      skillIds: [...skills],
+                    };
+                    void saveTemplates([...templates, tpl]);
+                    setSavingTemplate(false);
+                    setDraftTemplateName("");
+                  }}
+                  disabled={roster.filter((r) => r.label.trim()).length === 0}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        <button className="btn btn-primary" onClick={launch} disabled={!canLaunch}>
+          {busy ? "Launching…" : "Launch team"}
+        </button>
+      </div>
+    </>
   );
 }
 
-export function TeamPickerTrigger() {
-  const setOpen = useTeamPickerStore((s) => s.setOpen);
-  return (
-    <button
-      className="btn btn-ghost btn-with-icon"
-      onClick={() => setOpen(true)}
-      title="New Team workspace (⌘⇧T)"
-    >
-      <Icon name="users-round" size={14} />
-      <span>Team</span>
-    </button>
-  );
-}
