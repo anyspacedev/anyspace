@@ -3874,6 +3874,273 @@ body.screenshot-dragging {
   justify-content: flex-end;
 }
 
+/* === Modal "pinned" variant — pinned header + footer with internally
+   scrolling body. Used by collapsible modals (e.g. TeamPicker) so the
+   modal can grow its body without re-centering on the backdrop. === */
+.modal.pinned {
+  overflow: hidden;
+  padding: 0;
+  max-height: min(720px, 84vh);
+}
+.modal.pinned .modal-pinned-head {
+  flex: 0 0 auto;
+  padding: var(--pad-lg) var(--pad-lg) 0 var(--pad-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-sm);
+}
+.modal.pinned .modal-pinned-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--pad-md) var(--pad-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-md);
+}
+.modal.pinned .modal-pinned-foot {
+  flex: 0 0 auto;
+  padding: var(--pad-md) var(--pad-lg);
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pad-sm);
+  align-items: center;
+}
+/* Don't re-center while the body grows — pin to top of viewport with
+   breathing room. Only applies when the backdrop hosts a pinned modal. */
+.modal-backdrop:has(.modal.pinned) {
+  place-items: start center;
+  padding-top: 8vh;
+}
+
+/* === Collapsible summary rows for TeamPicker === */
+.team-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: var(--fg);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+.team-summary:hover {
+  border-color: color-mix(in oklab, var(--accent, var(--fg)) 40%, var(--border));
+  background: var(--bg-elev-2, var(--bg-elev));
+}
+.team-summary-caret {
+  display: inline-flex;
+  align-items: center;
+  color: var(--fg-muted);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.team-summary[aria-expanded="true"] .team-summary-caret {
+  transform: rotate(90deg);
+}
+.team-summary-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+.team-summary-content {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  min-width: 0;
+}
+.team-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+.team-summary-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, var(--fg-muted));
+}
+.team-summary-edit {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.team-section-expanded {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.team-section-link {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: flex-start;
+}
+.team-section-link:hover { color: var(--fg); }
+
+/* === Templates dropdown popover (footer button) === */
+.team-templates-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  min-width: 260px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--bg-elev-2, var(--bg-elev));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  animation: modal-in var(--duration-fast) var(--ease-out);
+}
+.team-templates-pop-empty {
+  padding: 10px 12px;
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+}
+.team-templates-pop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  font: inherit;
+}
+.team-templates-pop-item:hover {
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+.team-templates-pop-name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+.team-templates-pop-meta {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+
+/* Settings cards are display-only (delete is a child button), so suppress
+   the pointer cursor that .team-skill defaults to for the picker grid. */
+.team-settings-block .team-skill { cursor: default; }
+.team-skill-delete:disabled,
+.team-skill-delete:disabled:hover {
+  color: var(--fg-muted);
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* === Settings → Team section === */
+.team-settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.team-settings-block-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.team-settings-block-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--fg);
+}
+.team-settings-block-sub {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+.team-settings-builtin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  margin-bottom: 4px;
+}
+.team-settings-builtin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--fg) 5%, transparent);
+}
+.team-settings-builtin-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+}
+.team-settings-template-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.team-settings-template-name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+.team-settings-template-name-input {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  background: var(--bg-elev);
+  border: 1px solid var(--accent, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  color: var(--fg);
+  width: 100%;
+}
+.team-settings-template-meta {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+}
+.team-settings-empty {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  padding: 8px 0;
+}
+
 /* ===== Super Agent panel ===== */
 .workspace.has-super-agent {
   display: grid;

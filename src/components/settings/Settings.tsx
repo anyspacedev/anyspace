@@ -19,6 +19,16 @@ import {
 } from "../../stores/superAgentSettingsStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { TOOLS } from "../../lib/superAgent/tools";
+import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
+import { useTeamStore } from "../../stores/teamStore";
+import {
+  BUILTIN_ROLES,
+  isBuiltinRole,
+  roleAccent,
+  roleLabel,
+  type TeamCustomRole,
+} from "../../lib/teamRoles";
+import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 
 const CLERK_CONFIGURED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -64,6 +74,8 @@ export function Settings() {
       <AiSettingsSection />
 
       <SuperAgentSettingsSection />
+
+      <TeamSettingsSection />
 
       <ProxySettingsSection />
 
@@ -935,6 +947,456 @@ function SuperAgentSettingsSection() {
           Reset session memory
         </button>
       </div>
+    </div>
+  );
+}
+
+function TeamSettingsSection() {
+  const customRoles = useTeamSettingsStore((s) => s.settings.customRoles);
+  const customSkills = useTeamSettingsStore((s) => s.settings.customSkills);
+  const templates = useTeamSettingsStore((s) => s.settings.templates);
+  const saveCustomRoles = useTeamSettingsStore((s) => s.saveCustomRoles);
+  const saveCustomSkills = useTeamSettingsStore((s) => s.saveCustomSkills);
+  const saveTemplates = useTeamSettingsStore((s) => s.saveTemplates);
+
+  const teams = useTeamStore((s) => s.teams);
+  const teamAgents = useTeamStore((s) => s.agents);
+  const teamSkills = useTeamStore((s) => s.skills);
+
+  const activeTeamIds = useMemo(
+    () => new Set(teams.filter((t) => t.status === "active").map((t) => t.id)),
+    [teams],
+  );
+
+  const roleUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [tid, agents] of Object.entries(teamAgents)) {
+      if (!activeTeamIds.has(tid)) continue;
+      for (const a of agents) {
+        counts.set(a.role, (counts.get(a.role) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [teamAgents, activeTeamIds]);
+
+  const skillUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [tid, ids] of Object.entries(teamSkills)) {
+      if (!activeTeamIds.has(tid)) continue;
+      for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    return counts;
+  }, [teamSkills, activeTeamIds]);
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <h2 className="settings-section-title">Team</h2>
+        <div className="settings-section-sub">
+          Roles, skills, and saved templates used when launching multi-agent
+          teams from <kbd>⌘⇧T</kbd>.
+        </div>
+      </div>
+
+      <TeamRolesBlock
+        customRoles={customRoles}
+        save={saveCustomRoles}
+        usage={roleUsage}
+      />
+
+      <TeamSkillsBlock
+        customSkills={customSkills}
+        save={saveCustomSkills}
+        usage={skillUsage}
+      />
+
+      <TeamTemplatesBlock templates={templates} save={saveTemplates} />
+    </div>
+  );
+}
+
+function TeamRolesBlock({
+  customRoles,
+  save,
+  usage,
+}: {
+  customRoles: TeamCustomRole[];
+  save: (next: TeamCustomRole[]) => Promise<void>;
+  usage: Map<string, number>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+
+  const submit = () => {
+    const label = draftLabel.trim();
+    const body = draftBody.trim();
+    if (!label || !body) return;
+    const slug = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const id = `custom:${slug}-${Math.random().toString(36).slice(2, 6)}`;
+    if (isBuiltinRole(id)) return;
+    void save([...customRoles, { id, label, body }]);
+    setDraftLabel("");
+    setDraftBody("");
+    setAdding(false);
+  };
+
+  return (
+    <div className="team-settings-block">
+      <div className="team-settings-block-head">
+        <span className="team-settings-block-title">Custom roles</span>
+        <span className="team-settings-block-sub">
+          Built-in roles cover most cases — only add when you need behavior the
+          existing five don't capture.
+        </span>
+      </div>
+
+      <div className="team-settings-builtin-row">
+        Built-in:
+        {BUILTIN_ROLES.map((r) => (
+          <span key={r} className="team-settings-builtin-chip">
+            <span
+              className="team-settings-builtin-dot"
+              style={{ background: roleAccent(r, []) }}
+            />
+            {roleLabel(r, [])}
+          </span>
+        ))}
+      </div>
+
+      {customRoles.length === 0 ? (
+        <div className="team-settings-empty">No custom roles yet.</div>
+      ) : (
+        <div className="team-custom-roles">
+          {customRoles.map((role) => {
+            const inUse = usage.get(role.id) ?? 0;
+            return (
+              <div key={role.id} className="team-custom-role">
+                <div>
+                  <div className="team-custom-role-head">
+                    <strong>{role.label}</strong>
+                    <span className="team-skill-tag">{role.id}</span>
+                    {inUse > 0 && (
+                      <span className="team-skill-tag" title="Active teams using this role">
+                        {inUse} in use
+                      </span>
+                    )}
+                  </div>
+                  <div className="team-custom-role-body">{role.body}</div>
+                </div>
+                <div className="team-custom-role-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      if (inUse > 0) return;
+                      void save(customRoles.filter((c) => c.id !== role.id));
+                    }}
+                    disabled={inUse > 0}
+                    title={
+                      inUse > 0
+                        ? `Used by ${inUse} active team${inUse === 1 ? "" : "s"} — archive or change those teams first`
+                        : "Delete"
+                    }
+                  >
+                    <Icon name="x" size={12} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {adding ? (
+        <div className="team-custom-role-add">
+          <input
+            aria-label="New role label"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            placeholder="Role label (e.g. Architect)"
+            autoFocus
+          />
+          <textarea
+            aria-label="System prompt body"
+            value={draftBody}
+            onChange={(e) => setDraftBody(e.target.value)}
+            placeholder='Behavioral / role instructions. Use ${BOARD_PATH} and ${MESSAGES_PATH} placeholders.'
+            rows={3}
+          />
+          <div className="team-custom-role-add-actions" style={{ gap: 6 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setAdding(false);
+                setDraftLabel("");
+                setDraftBody("");
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={submit}
+              disabled={!draftLabel.trim() || !draftBody.trim()}
+            >
+              Add role
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-ghost btn-with-icon"
+          onClick={() => setAdding(true)}
+          style={{ alignSelf: "flex-start" }}
+        >
+          <Icon name="plus" size={12} />
+          <span>Add custom role</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TeamSkillsBlock({
+  customSkills,
+  save,
+  usage,
+}: {
+  customSkills: TeamSkill[];
+  save: (next: TeamSkill[]) => Promise<void>;
+  usage: Map<string, number>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+
+  const submit = () => {
+    const label = draftLabel.trim();
+    const body = draftBody.trim();
+    if (!label || !body) return;
+    const id = `custom-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Math.random().toString(36).slice(2, 6)}`;
+    void save([...customSkills, { id, label, body }]);
+    setDraftLabel("");
+    setDraftBody("");
+    setAdding(false);
+  };
+
+  return (
+    <div className="team-settings-block">
+      <div className="team-settings-block-head">
+        <span className="team-settings-block-title">Custom skills</span>
+        <span className="team-settings-block-sub">
+          Each skill is a one- or two-sentence behavioral directive added to
+          every agent's system prompt.
+        </span>
+      </div>
+
+      <div className="team-settings-builtin-row">
+        Built-in:
+        {BUILTIN_SKILLS.map((s) => (
+          <span key={s.id} className="team-settings-builtin-chip" title={s.body}>
+            {s.label}
+          </span>
+        ))}
+      </div>
+
+      {customSkills.length === 0 ? (
+        <div className="team-settings-empty">No custom skills yet.</div>
+      ) : (
+        <div className="team-skill-grid">
+          {customSkills.map((s) => {
+            const inUse = usage.get(s.id) ?? 0;
+            return (
+              <div key={s.id} className="team-skill" style={{ gridTemplateColumns: "1fr" }}>
+                <span className="team-skill-label">
+                  {s.label}
+                  {inUse > 0 && (
+                    <span className="team-skill-tag" title="Active teams using this skill">
+                      {inUse} in use
+                    </span>
+                  )}
+                </span>
+                <span className="team-skill-body">{s.body}</span>
+                <button
+                  type="button"
+                  className="team-skill-delete"
+                  onClick={() => {
+                    if (inUse > 0) return;
+                    void save(customSkills.filter((c) => c.id !== s.id));
+                  }}
+                  disabled={inUse > 0}
+                  aria-label={`Delete custom skill ${s.label}`}
+                  title={
+                    inUse > 0
+                      ? `Used by ${inUse} active team${inUse === 1 ? "" : "s"} — archive or change those teams first`
+                      : "Delete"
+                  }
+                >
+                  <Icon name="x" size={11} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {adding ? (
+        <div className="team-skill-add">
+          <input
+            aria-label="New skill label"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            placeholder="Skill label (e.g. Conventional Commits)"
+            autoFocus
+          />
+          <input
+            aria-label="New skill body"
+            value={draftBody}
+            onChange={(e) => setDraftBody(e.target.value)}
+            placeholder="Behavioral directive — one or two sentences"
+          />
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setAdding(false);
+                setDraftLabel("");
+                setDraftBody("");
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={submit}
+              disabled={!draftLabel.trim() || !draftBody.trim()}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-ghost btn-with-icon"
+          onClick={() => setAdding(true)}
+          style={{ alignSelf: "flex-start" }}
+        >
+          <Icon name="plus" size={12} />
+          <span>Add custom skill</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TeamTemplatesBlock({
+  templates,
+  save,
+}: {
+  templates: ReturnType<typeof useTeamSettingsStore.getState>["settings"]["templates"];
+  save: (next: typeof templates) => Promise<void>;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+
+  const startRename = (id: string, name: string) => {
+    setEditingId(id);
+    setDraftName(name);
+  };
+  const commitRename = () => {
+    if (!editingId) return;
+    const trimmed = draftName.trim();
+    if (trimmed) {
+      void save(
+        templates.map((t) => (t.id === editingId ? { ...t, name: trimmed } : t)),
+      );
+    }
+    setEditingId(null);
+    setDraftName("");
+  };
+
+  return (
+    <div className="team-settings-block">
+      <div className="team-settings-block-head">
+        <span className="team-settings-block-title">Saved templates</span>
+        <span className="team-settings-block-sub">
+          Created from the New Team modal's "Save as…" button.
+        </span>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="team-settings-empty">
+          No saved templates yet.
+        </div>
+      ) : (
+        <div className="team-roster">
+          {templates.map((t) => (
+            <div key={t.id} className="team-settings-template-row">
+              {editingId === t.id ? (
+                <input
+                  className="team-settings-template-name-input"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename();
+                    } else if (e.key === "Escape") {
+                      setEditingId(null);
+                      setDraftName("");
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="team-settings-template-name"
+                  onClick={() => startRename(t.id, t.name)}
+                  title="Click to rename"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "inherit",
+                    font: "inherit",
+                    cursor: "text",
+                    textAlign: "left",
+                  }}
+                >
+                  {t.name}
+                </button>
+              )}
+              <span className="team-settings-template-meta">
+                {t.roster.length} {t.roster.length === 1 ? "agent" : "agents"} ·{" "}
+                {t.skillIds.length} {t.skillIds.length === 1 ? "skill" : "skills"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() =>
+                  void save(templates.filter((x) => x.id !== t.id))
+                }
+                title="Delete"
+                aria-label={`Delete template ${t.name}`}
+              >
+                <Icon name="x" size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
