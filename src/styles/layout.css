@@ -4448,50 +4448,355 @@ body.screenshot-dragging {
   margin-top: 2px;
 }
 
-/* === Input === */
-.sa-input {
+/* === Voice-first composer ===
+   The composer is the focal surface of the SA panel. The textarea and the
+   voice lane share the same vertical slot so switching modes never causes
+   a layout jump — the lane absolutely overlays the textarea while listening
+   or transcribing. Mic is the visually dominant action; Send is secondary. */
+.sa-composer {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 10px 12px 12px;
   border-top: 1px solid var(--border);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--accent, var(--fg)) 3%, var(--bg-elev)),
+    var(--bg-elev)
+  );
+  transition: background 200ms ease, box-shadow 200ms ease;
 }
-.sa-input textarea {
+.sa-composer-listening {
+  background: color-mix(in oklab, var(--accent, var(--fg)) 10%, var(--bg-elev));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--accent, var(--fg)) 35%, transparent);
+}
+.sa-composer-transcribing {
+  background: color-mix(in oklab, var(--accent, var(--fg)) 6%, var(--bg-elev));
+}
+.sa-composer-error {
+  background: color-mix(in oklab, var(--danger) 6%, var(--bg-elev));
+}
+
+.sa-composer textarea {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 7px 10px;
+  padding: 8px 10px;
   color: var(--fg);
   font-family: inherit;
   font-size: var(--font-size-sm);
+  line-height: 1.5;
   resize: vertical;
-  min-height: 64px;
+  min-height: 72px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
 }
-.sa-input-actions {
+.sa-composer textarea:focus {
+  outline: none;
+  border-color: color-mix(in oklab, var(--accent, var(--fg)) 60%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent, var(--fg)) 22%, transparent);
+}
+.sa-composer textarea[aria-hidden="true"] {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* Voice lane sits over the textarea so the waveform commands the same slot
+   the user was just typing into. Anchored absolutely to avoid layout shift. */
+.sa-voice-lane {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 10px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: var(--bg);
+  border: 1px solid color-mix(in oklab, var(--accent, var(--fg)) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  z-index: 1;
+}
+.sa-composer-listening .sa-voice-lane {
+  border-color: color-mix(in oklab, var(--accent, var(--fg)) 55%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent, var(--fg)) 18%, transparent);
+}
+.sa-voice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, var(--fg));
+  flex: 0 0 auto;
+  animation: sa-voice-dot-pulse 1.1s ease-in-out infinite;
+}
+.sa-composer-transcribing .sa-voice-dot {
+  animation: none;
+  background: var(--fg-muted);
+}
+@keyframes sa-voice-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.55; }
+}
+.sa-voice-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent, var(--fg));
+}
+.sa-composer-transcribing .sa-voice-label { color: var(--fg-muted); }
+/* Waveform inherits its size from the canvas in Waveform.tsx; we just give
+   it room to breathe and let it stretch to consume the remaining lane. */
+.sa-voice-lane .stt-waveform {
+  flex: 1;
+  min-width: 0;
+}
+.sa-voice-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--accent, var(--fg)) 18%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  animation: sa-voice-shimmer 1.4s linear infinite;
+}
+@keyframes sa-voice-shimmer {
+  0%   { background-position: -60% 0; }
+  100% { background-position: 160% 0; }
+}
+.sa-voice-countdown {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.sa-voice-cancel {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.sa-voice-cancel:hover {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 50%, var(--border));
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+}
+
+/* Inline flash strip — error/success banners for the most recent STT result.
+   Stays brief: error sticks until dismissed; success auto-fades via store. */
+.sa-voice-flash {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  animation: sa-voice-flash-in 180ms ease-out;
 }
-.sa-input-hint {
+.sa-voice-flash-error {
+  background: color-mix(in oklab, var(--danger) 14%, var(--bg));
+  border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--border));
+  color: var(--danger);
+}
+.sa-voice-flash-success {
+  background: color-mix(in oklab, var(--success, #34d399) 14%, var(--bg));
+  border: 1px solid color-mix(in oklab, var(--success, #34d399) 35%, var(--border));
+  color: var(--success, #34d399);
+}
+.sa-voice-flash span:first-of-type ~ span { flex: 1; }
+.sa-voice-flash-dismiss {
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.sa-voice-flash-dismiss:hover { opacity: 1; }
+@keyframes sa-voice-flash-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.sa-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sa-composer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.sa-hotkey-hint {
+  font-size: var(--font-size-xs);
+  color: var(--fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sa-hotkey-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.4;
+}
+.sa-hotkey-hint-warn { color: var(--warning, #f59e0b); }
+.sa-composer-model {
   font-size: 10px;
   color: var(--fg-muted);
   font-family: var(--font-mono);
-  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.sa-mic.recording {
-  color: var(--danger);
-  background: color-mix(in oklab, var(--danger) 14%, transparent);
+.sa-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
 }
-.sa-mic.recording svg {
-  animation: sa-mic-pulse 1.2s ease-in-out infinite;
+
+/* Big mic button — the primary affordance. 40x40 idle, 44x44 while
+   recording, with an animated rim that tracks remaining recording time
+   so users see the hard cap approaching without cognitive load. */
+.sa-mic-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--accent, var(--fg)) 45%, var(--border));
+  background: color-mix(in oklab, var(--accent, var(--fg)) 8%, var(--bg));
+  color: var(--accent, var(--fg));
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    width 180ms cubic-bezier(.2,.8,.2,1),
+    height 180ms cubic-bezier(.2,.8,.2,1),
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 120ms ease;
+  flex: 0 0 auto;
+}
+.sa-mic-btn:hover {
+  background: color-mix(in oklab, var(--accent, var(--fg)) 16%, var(--bg));
+  transform: translateY(-1px);
+}
+.sa-mic-btn:active { transform: translateY(0); }
+.sa-mic-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent, var(--fg)) 35%, transparent);
+}
+.sa-mic-btn.recording {
+  width: 44px;
+  height: 44px;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  animation: sa-mic-pulse 1.4s ease-in-out infinite;
+}
+.sa-mic-btn.transcribing {
+  background: color-mix(in oklab, var(--accent, var(--fg)) 16%, var(--bg));
+  border-color: color-mix(in oklab, var(--accent, var(--fg)) 60%, var(--border));
+}
+.sa-mic-btn.disabled,
+.sa-mic-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--bg);
 }
 @keyframes sa-mic-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--danger) 45%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in oklab, var(--danger) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sa-mic-btn.recording { animation: none; }
+  .sa-voice-dot { animation: none; }
+  .sa-voice-shimmer { animation: none; opacity: 0.6; }
+}
+
+/* Square in the center of the mic button while recording — clearly reads
+   as a "stop" affordance, no glyph swap needed. */
+.sa-mic-stop {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  border-radius: 2px;
+}
+.sa-mic-spin {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: sa-mic-spin 0.9s linear infinite;
+}
+@keyframes sa-mic-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sa-mic-spin { animation-duration: 2.5s; }
+}
+
+/* Rim ring tracks recording-window progress (0 → MAX_RECORDING_MS).
+   pathLength=1 normalises the dasharray math so the offset is just 1 - p. */
+.sa-mic-rim {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  pointer-events: none;
+  transform: rotate(-90deg);
+}
+.sa-mic-rim circle {
+  stroke: rgba(255, 255, 255, 0.85);
+  transition: stroke-dashoffset 100ms linear;
+}
+
+.sa-send-btn,
+.sa-stop-btn {
+  height: 32px;
+  padding: 0 14px;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+.sa-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Collapsed pill (when panel is hidden) */
@@ -4852,8 +5157,19 @@ body.screenshot-dragging {
   padding: 0;
 }
 
-/* sa-input-hint floor at 11px to match other XS chrome. Was 10px. */
-.sa-input-hint { font-size: var(--font-size-xs); }
+/* Header icon buttons keep a uniform 24×24 hit slot so the row feels
+   intentional even when only a couple are present. */
+.sa-icon-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.sa-icon-btn.active {
+  color: var(--accent, var(--fg));
+  background: color-mix(in oklab, var(--accent, var(--fg)) 14%, transparent);
+}
 
 /* Tighten the per-section cap on the settings page from 980px → 880px so
    long form rows don't stretch beyond comfortable line length on wide
