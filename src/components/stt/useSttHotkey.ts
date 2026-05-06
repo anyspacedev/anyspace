@@ -12,7 +12,7 @@
 
 import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useSttStore } from "../../stores/sttStore";
+import { MAX_RECORDING_MS, useSttStore } from "../../stores/sttStore";
 
 // WebKitGTK on Linux fires *spurious* keyup events for modifier keys at 2–7 s
 // intervals while the key is still held — and on real release, the keyup
@@ -26,8 +26,15 @@ import { useSttStore } from "../../stores/sttStore";
 //      modifier reported released also short-circuit this — most users
 //      reach for the mouse soon after release, which fires the cleanup
 //      well before the watchdog timeout.
+//
+// The watchdog must be longer than `MAX_RECORDING_MS`: in some WebKitGTK
+// builds (notably under remote/cloud desktop sessions) the spurious keyups
+// don't fire at all during a held hotkey, so a short watchdog would truncate
+// the recording even though the user is still holding. The recording cap in
+// `sttStore.ts` is the real ceiling; the watchdog only catches the edge case
+// where the hotkey listener is truly stuck after a missed release.
 const AUTOREPEAT_DEBOUNCE_MS = 200;
-const WATCHDOG_MS = 8000;
+const WATCHDOG_MS = MAX_RECORDING_MS + 5000;
 
 // Maps a hotkey `KeyboardEvent.code` to the modifier-state name accepted by
 // `KeyboardEvent.getModifierState` ("Control" / "Alt" / etc). On a real keyup
