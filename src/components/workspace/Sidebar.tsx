@@ -44,6 +44,7 @@ export function Sidebar() {
       <div className="sidebar-brand" data-tauri-drag-region="deep">
         <div
           className="brand-mark"
+          data-tauri-drag-region=""
           style={{
             background: `linear-gradient(135deg, ${theme.ui.accent}, ${theme.ui.info})`,
             color: theme.ui.accentFg,
@@ -51,9 +52,9 @@ export function Sidebar() {
         >
           T
         </div>
-        <div className="brand-text">
-          <div className="brand-name">Teamship</div>
-          <div className="brand-sub">{theme.name}</div>
+        <div className="brand-text" data-tauri-drag-region="">
+          <div className="brand-name" data-tauri-drag-region="">Teamship</div>
+          <div className="brand-sub" data-tauri-drag-region="">{theme.name}</div>
         </div>
       </div>
 

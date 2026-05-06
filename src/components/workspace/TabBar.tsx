@@ -42,8 +42,8 @@ export function TabBar() {
 
   if (view !== "workspace") {
     return (
-      <div className="tabbar">
-        <div className="tabbar-title">
+      <div className="tabbar" data-tauri-drag-region="">
+        <div className="tabbar-title" data-tauri-drag-region="">
           {view === "kanban" && "Task Board"}
           {view === "agents" && "Agents"}
           {view === "settings" && "Settings"}
@@ -53,8 +53,8 @@ export function TabBar() {
   }
 
   return (
-    <div className="tabbar">
-      <div className="tabbar-tabs scrollbar">
+    <div className="tabbar" data-tauri-drag-region="">
+      <div className="tabbar-tabs scrollbar" data-tauri-drag-region="">
         {tabs.map((tab) => {
           const isTeam = teamTabIds.has(tab.id);
           return (
@@ -106,7 +106,7 @@ export function TabBar() {
           );
         })}
       </div>
-      <div className="tabbar-actions">
+      <div className="tabbar-actions" data-tauri-drag-region="">
         {activeTab && (
           <button
             type="button"
