@@ -3091,6 +3091,23 @@
   color: var(--accent);
   background: color-mix(in oklab, var(--accent) 14%, var(--bg-elev));
 }
+.stt-tc-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pad-sm);
+  min-height: 32px;
+  padding: 8px var(--pad-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+}
+.stt-tc-account-muted {
+  color: var(--fg-muted);
+  justify-content: flex-start;
+}
 
 /* ===== Preview element picker ===== */
 

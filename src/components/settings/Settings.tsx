@@ -24,6 +24,9 @@ import {
   type TeamCustomRole,
 } from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
+import { useAuthStore } from "../../stores/authStore";
+import { TEAMSHIP_CLOUD_URL } from "../../lib/auth";
+import { SignInButton, SignOutButton } from "@clerk/clerk-react";
 
 const SECTION_GROUPS = [
   {
@@ -512,10 +515,58 @@ function HotkeyField({
   );
 }
 
+function TeamshipCloudAccount() {
+  const ready = useAuthStore((s) => s.ready);
+  const signedIn = useAuthStore((s) => s.signedIn);
+  const email = useAuthStore((s) => s.email);
+  const clerkConfigured = useAuthStore((s) => s.clerkConfigured);
+
+  if (!clerkConfigured) {
+    return (
+      <div className="stt-tc-account stt-tc-account-muted">
+        This build wasn't compiled with a Clerk key — Teamship Cloud is
+        unavailable. Pick another provider.
+      </div>
+    );
+  }
+  if (!ready) {
+    return (
+      <div className="stt-tc-account stt-tc-account-muted">
+        Checking sign-in…
+      </div>
+    );
+  }
+  if (signedIn) {
+    return (
+      <div className="stt-tc-account">
+        <span>
+          Signed in as <strong>{email ?? "your account"}</strong>
+        </span>
+        <SignOutButton>
+          <button type="button" className="btn btn-ghost">
+            Sign out
+          </button>
+        </SignOutButton>
+      </div>
+    );
+  }
+  return (
+    <div className="stt-tc-account">
+      <span>Sign in to use Teamship Cloud — no API key required.</span>
+      <SignInButton mode="modal">
+        <button type="button" className="btn btn-primary">
+          Sign in
+        </button>
+      </SignInButton>
+    </div>
+  );
+}
+
 function SttSettingsSection() {
   const settings = useSttStore((s) => s.settings);
   const update = useSttStore((s) => s.updateSettings);
   const [revealKey, setRevealKey] = useState(false);
+  const isTeamshipCloud = settings.presetId === "teamship-cloud";
 
   return (
     <div className="settings-section">
@@ -562,45 +613,68 @@ function SttSettingsSection() {
           </select>
         </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">Endpoint</span>
-          <input
-            type="url"
-            value={settings.endpoint}
-            placeholder="https://api.groq.com/openai/v1"
-            onChange={(e) => void update({ endpoint: e.target.value })}
-            spellCheck={false}
-          />
-        </label>
+        {isTeamshipCloud ? (
+          <>
+            <div className="stt-field">
+              <span className="stt-field-label">Account</span>
+              <TeamshipCloudAccount />
+            </div>
+            <div className="stt-field">
+              <span className="stt-field-label">
+                Endpoint
+                <span className="stt-field-hint"> — managed</span>
+              </span>
+              <input
+                type="url"
+                value={TEAMSHIP_CLOUD_URL || "(not configured for this build)"}
+                readOnly
+                spellCheck={false}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="stt-field">
+              <span className="stt-field-label">Endpoint</span>
+              <input
+                type="url"
+                value={settings.endpoint}
+                placeholder="https://api.groq.com/openai/v1"
+                onChange={(e) => void update({ endpoint: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">
-            API key
-            {settings.presetId === "elevenlabs" && (
-              <span className="stt-field-hint"> — sent as xi-api-key</span>
-            )}
-          </span>
-          <div className="stt-field-inline">
-            <input
-              type={revealKey ? "text" : "password"}
-              value={settings.apiKey}
-              placeholder={
-                settings.presetId === "elevenlabs" ? "xi-…" : "sk-…"
-              }
-              onChange={(e) => void update({ apiKey: e.target.value })}
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={revealKey ? "Hide API key" : "Show API key"}
-              onClick={() => setRevealKey((v) => !v)}
-            >
-              <Icon name={revealKey ? "x" : "dot"} size={14} />
-            </button>
-          </div>
-        </label>
+            <label className="stt-field">
+              <span className="stt-field-label">
+                API key
+                {settings.presetId === "elevenlabs" && (
+                  <span className="stt-field-hint"> — sent as xi-api-key</span>
+                )}
+              </span>
+              <div className="stt-field-inline">
+                <input
+                  type={revealKey ? "text" : "password"}
+                  value={settings.apiKey}
+                  placeholder={
+                    settings.presetId === "elevenlabs" ? "xi-…" : "sk-…"
+                  }
+                  onChange={(e) => void update({ apiKey: e.target.value })}
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={revealKey ? "Hide API key" : "Show API key"}
+                  onClick={() => setRevealKey((v) => !v)}
+                >
+                  <Icon name={revealKey ? "x" : "dot"} size={14} />
+                </button>
+              </div>
+            </label>
+          </>
+        )}
 
         <label className="stt-field">
           <span className="stt-field-label">Model</span>

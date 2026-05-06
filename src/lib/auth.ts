@@ -7,27 +7,34 @@
  * holding a React ref. main.tsx mounts a tiny <ClerkTokenBridge/> that
  * registers the getter into this module; everything else calls
  * `getAuthToken()` synchronously when it needs a Bearer for the backend.
+ *
+ * The same bridge mirrors signed-in state into `useAuthStore` so React
+ * components can subscribe and re-render. This module is the single
+ * imperative surface; the store is the reactive surface — both stay in sync.
  */
 
+import { useAuthStore } from "../stores/authStore";
+
 let _getToken: ((opts?: { skipCache?: boolean }) => Promise<string | null>) | null = null;
-let _userEmail: string | null = null;
-let _signedIn = false;
 
 export function setTokenGetter(fn: typeof _getToken): void {
   _getToken = fn;
 }
 
 export function setSignedInState(signedIn: boolean, email: string | null): void {
-  _signedIn = signedIn;
-  _userEmail = email;
+  useAuthStore.setState({ signedIn, email });
+}
+
+export function setAuthReady(ready: boolean): void {
+  useAuthStore.setState({ ready });
 }
 
 export function isSignedIn(): boolean {
-  return _signedIn;
+  return useAuthStore.getState().signedIn;
 }
 
 export function currentEmail(): string | null {
-  return _userEmail;
+  return useAuthStore.getState().email;
 }
 
 /** Returns a fresh Clerk JWT or null if signed out / Clerk not mounted. */

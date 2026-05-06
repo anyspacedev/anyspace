@@ -261,7 +261,19 @@ export const useSttStore = create<SttState>((set, get) => ({
     }
     clearDismissTimer();
 
-    if (!get().settings.apiKey) {
+    const presetId = get().settings.presetId;
+    if (presetId === "teamship-cloud") {
+      if (!isSignedIn()) {
+        console.warn("[stt] startListening blocked — Teamship Cloud requires sign-in");
+        set({
+          phase: "error",
+          message: "Sign in to use Teamship Cloud — Settings → Speech to text",
+          analyser: null,
+        });
+        scheduleDismiss(set, 4000);
+        return;
+      }
+    } else if (!get().settings.apiKey) {
       console.warn("[stt] startListening blocked — no API key configured");
       set({
         phase: "error",

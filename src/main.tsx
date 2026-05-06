@@ -8,7 +8,7 @@ import "./styles/clerk.css";
 import "@xterm/xterm/css/xterm.css";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";
-import { setSignedInState, setTokenGetter } from "./lib/auth";
+import { setAuthReady, setSignedInState, setTokenGetter } from "./lib/auth";
 import { useThemeStore } from "./stores/themeStore";
 
 const ua = navigator.userAgent;
@@ -23,9 +23,10 @@ const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as
   | undefined;
 
 /** Mirrors Clerk auth state into the non-React lib/auth singleton so the
- * Zustand STT store can fetch a fresh JWT at transcribe time. */
+ * Zustand STT store can fetch a fresh JWT at transcribe time, and writes
+ * the same state into useAuthStore so React components re-render. */
 function ClerkTokenBridge() {
-  const { isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
 
   useEffect(() => {
@@ -40,6 +41,19 @@ function ClerkTokenBridge() {
     setSignedInState(!!isSignedIn, email);
   }, [isSignedIn, user]);
 
+  useEffect(() => {
+    setAuthReady(!!isLoaded);
+  }, [isLoaded]);
+
+  return null;
+}
+
+/** When the build has no Clerk key, mark auth as "ready, never signed in"
+ * once on mount so UI gates stop showing a loading state. */
+function NoClerkBridge() {
+  useEffect(() => {
+    setAuthReady(true);
+  }, []);
   return null;
 }
 
@@ -71,6 +85,7 @@ if (!PUBLISHABLE_KEY) {
   // other feature is unaffected.
   root.render(
     <React.StrictMode>
+      <NoClerkBridge />
       <App />
     </React.StrictMode>,
   );
