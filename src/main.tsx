@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles/tokens.css";
 import "./styles/globals.css";
 import "./styles/layout.css";
+import "./styles/clerk.css";
 import "@xterm/xterm/css/xterm.css";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-react";
 import { setSignedInState, setTokenGetter } from "./lib/auth";
@@ -42,8 +43,12 @@ function ClerkTokenBridge() {
 }
 
 /** Wraps ClerkProvider so the app's current theme accent flows into Clerk's
- * appearance variables. Surfaces are pinned to a light palette so the modal
- * stays legible regardless of OS/theme. */
+ * appearance variables. Surfaces are pinned to a light palette so modals and
+ * the UserButton popover stay legible regardless of the host theme.
+ *
+ * `elements.*` overrides are required for the popover specifically: Clerk's
+ * UserButton dropdown is the one surface that doesn't fully respect
+ * `variables.colorBackground` and falls back to system color-scheme. */
 function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
   const accent = useThemeStore((s) => s.current.ui.accent);
   return (
@@ -58,7 +63,26 @@ function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
           colorTextSecondary: "#475569",
           colorInputBackground: "#ffffff",
           colorInputText: "#0f172a",
-          colorNeutral: "#0f172a",
+        },
+        elements: {
+          rootBox: { colorScheme: "light" },
+          card: { colorScheme: "light", backgroundColor: "#ffffff" },
+          modalContent: { colorScheme: "light" },
+          userButtonPopoverCard: {
+            colorScheme: "light",
+            backgroundColor: "#ffffff",
+            color: "#0f172a",
+            border: "1px solid #e2e8f0",
+          },
+          userButtonPopoverMain: { backgroundColor: "#ffffff" },
+          userButtonPopoverFooter: { backgroundColor: "#f8fafc" },
+          userButtonPopoverActionButton: { color: "#0f172a" },
+          userButtonPopoverActionButtonText: { color: "#0f172a" },
+          userButtonPopoverActionButtonIcon: { color: "#475569" },
+          userButtonPopoverUserPreviewMainIdentifier: { color: "#0f172a" },
+          userButtonPopoverUserPreviewSecondaryIdentifier: { color: "#475569" },
+          userPreviewMainIdentifier: { color: "#0f172a" },
+          userPreviewSecondaryIdentifier: { color: "#475569" },
         },
       }}
     >
