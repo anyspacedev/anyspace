@@ -31,18 +31,26 @@ pub struct ScreenshotResult {
     pub data_url: String,
 }
 
-/// Capture a screen-pixel rectangle and persist it as PNG.
+/// Capture a window-local pixel rectangle from THIS process's main window
+/// and persist it as PNG. Works even when Teamship is occluded, behind
+/// another app, or on a different desktop/Space — xcap pulls from the
+/// window's compositor surface, not the screen.
 ///
-/// The frontend computes the rect by combining `iframe.getBoundingClientRect()`
-/// (CSS px) with the Tauri window's `outerPosition()` (physical px) and the
-/// `scaleFactor()`. We pick the monitor that contains `(x, y)` so multi-monitor
-/// setups capture from the correct display.
+/// The frontend computes the rect by combining
+/// `iframe.getBoundingClientRect()` (CSS px) with `scaleFactor()` and the
+/// chrome offset (`innerPosition - outerPosition`) so the rect is relative
+/// to the OS window's top-left corner — same coordinate system xcap returns
+/// from `Window::capture_image()`.
+///
+/// Replaces the old `screenshot_capture_region` (monitor-based) which was
+/// only correct when Teamship was the foreground app. The agent-driven
+/// preview-screenshot path can fire at any time, including while the
+/// operator is in another app, so monitor-based capture is no longer safe.
 ///
 /// Returns both the file path (for terminal drop) and a base64 data URL (for
-/// the floating thumbnail) so the frontend never has to re-read the file —
-/// which would otherwise need an asset-protocol or fs-binary-read capability.
+/// the floating thumbnail) so the frontend never has to re-read the file.
 #[tauri::command]
-pub async fn screenshot_capture_region(
+pub async fn screenshot_capture_window_region(
     x: i32,
     y: i32,
     width: u32,
@@ -52,24 +60,34 @@ pub async fn screenshot_capture_region(
         return Err("invalid-region".into());
     }
 
-    let monitor = xcap::Monitor::from_point(x, y).map_err(|e| format!("monitor lookup: {e}"))?;
+    let pid = std::process::id();
+    let mut candidates: Vec<xcap::Window> = xcap::Window::all()
+        .map_err(|e| format!("window enumerate: {e}"))?
+        .into_iter()
+        .filter(|w| w.pid() == pid && !w.is_minimized())
+        .collect();
+    // Prefer the largest window matching our PID (Tauri's main, not any
+    // hidden helper / inspector window the OS may report).
+    candidates.sort_by_key(|w| std::cmp::Reverse(w.width() as u64 * w.height() as u64));
+    let win = candidates
+        .into_iter()
+        .next()
+        .ok_or_else(|| "no Teamship window found (minimised or no compositor surface)".to_string())?;
 
-    // xcap 0.3 has no capture_region — grab the full monitor and crop.
-    let full: RgbaImage = monitor.capture_image().map_err(|e| format!("capture: {e}"))?;
+    let full: RgbaImage = win.capture_image().map_err(|e| format!("capture: {e}"))?;
 
-    // Translate to monitor-local pixels and clamp to the captured frame so a
-    // request that bleeds off-screen returns the visible slice rather than
-    // erroring.
-    let local_x = (x - monitor.x()).max(0) as u32;
-    let local_y = (y - monitor.y()).max(0) as u32;
-    let max_w = full.width().saturating_sub(local_x);
-    let max_h = full.height().saturating_sub(local_y);
+    // Window-local crop. Clamp so a request that bleeds outside the captured
+    // surface returns the visible slice rather than erroring.
+    let lx = x.max(0) as u32;
+    let ly = y.max(0) as u32;
+    let max_w = full.width().saturating_sub(lx);
+    let max_h = full.height().saturating_sub(ly);
     let cw = width.min(max_w);
     let ch = height.min(max_h);
     if cw == 0 || ch == 0 {
         return Err("region-out-of-bounds".into());
     }
-    let img: RgbaImage = imageops::crop_imm(&full, local_x, local_y, cw, ch).to_image();
+    let img: RgbaImage = imageops::crop_imm(&full, lx, ly, cw, ch).to_image();
 
     // macOS without Screen Recording permission silently returns a black image
     // rather than erroring. Sample a strided grid; if every sample is opaque

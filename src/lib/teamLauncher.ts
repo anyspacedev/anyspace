@@ -11,6 +11,7 @@ import {
 } from "./teamRoles";
 import { renderSkillsMarkdown, type TeamSkill } from "./teamSkills";
 import { subscribeTeamRpc } from "./teamRpc";
+import { agentApiEnv, ensureAgentApi } from "./agentApi";
 
 export type LaunchTeamOptions = {
   customSkills?: TeamSkill[];
@@ -99,6 +100,9 @@ export async function launchTeam(
     boardMarkdown: buildBoardMarkdown(team, teamAgents, skillsMd, attachmentsMd, customRoles),
   });
 
+  await ensureAgentApi().catch(() => null);
+  const apiEnv = agentApiEnv();
+
   const roster = rosterMarkdown(team, teamAgents, customRoles);
   const presets: PanePreset[] = [];
   const labelOrder: string[] = [];
@@ -154,6 +158,7 @@ export async function launchTeam(
 
     const env: Record<string, string> = {
       ...plan.env,
+      ...apiEnv,
       TEAMSHIP_TASK_FILE: promptFile.path,
       TEAMSHIP_TEAM_DIR: paths.teamDir,
       TEAMSHIP_TEAM_ID: team.id,
@@ -192,6 +197,20 @@ export async function launchTeam(
       const ta = teamAgents.find((a) => a.label === label);
       if (ta) {
         await useTeamStore.getState().setPaneId(ta.id, paneId);
+      }
+      // Stamp pane+tab ids into the agent's spawnEnv so curl from inside the
+      // agent's terminal can authenticate as that pane without env discovery.
+      const pane = tab.panes[paneId];
+      if (pane && pane.kind === "terminal") {
+        const existingEnv = (pane.payload?.spawnEnv as Record<string, string> | undefined) ?? {};
+        ws.setPanePayload(tabId, paneId, {
+          ...(pane.payload ?? {}),
+          spawnEnv: {
+            ...existingEnv,
+            TEAMSHIP_PANE_ID: paneId,
+            TEAMSHIP_TAB_ID: tabId,
+          },
+        });
       }
     }
     // Tag the tab so it survives reload as a Team workspace.
@@ -353,11 +372,13 @@ export async function addAgentToLiveTeam(
     .replace(/\{task_title\}/g, shellQuote(`${args.label} — ${team.name}`))
     .replace(/\{task_column\}/g, shellQuote(""));
 
+  await ensureAgentApi().catch(() => null);
   const preset: PanePreset = {
     kind: "terminal",
     pendingCommand: command,
     spawnEnv: {
       ...plan.env,
+      ...agentApiEnv(),
       TEAMSHIP_TASK_FILE: promptFile.path,
       TEAMSHIP_TEAM_DIR: paths.teamDir,
       TEAMSHIP_TEAM_ID: team.id,
@@ -385,6 +406,20 @@ export async function addAgentToLiveTeam(
   if (!newPaneId) throw new Error("split succeeded but new pane id not found");
 
   await useTeamStore.getState().setPaneId(newTa.id, newPaneId);
+  // Stamp the new pane id into spawnEnv so the agent can curl as itself.
+  const tabFinal = useWorkspaceStore.getState().tabs.find((t) => t.id === team.tabId);
+  const newPane = tabFinal?.panes[newPaneId];
+  if (newPane && newPane.kind === "terminal") {
+    const existingEnv = (newPane.payload?.spawnEnv as Record<string, string> | undefined) ?? {};
+    useWorkspaceStore.getState().setPanePayload(team.tabId, newPaneId, {
+      ...(newPane.payload ?? {}),
+      spawnEnv: {
+        ...existingEnv,
+        TEAMSHIP_PANE_ID: newPaneId,
+        TEAMSHIP_TAB_ID: team.tabId,
+      },
+    });
+  }
   return { teamAgentId: newTa.id, paneId: newPaneId, label: args.label };
 }
 
@@ -424,6 +459,9 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
     projectPath: team.projectPath,
     boardMarkdown: buildBoardMarkdown(team, teamAgents, skillsMd, attachmentsMd, customRoles),
   });
+
+  await ensureAgentApi().catch(() => null);
+  const apiEnv = agentApiEnv();
 
   const ws = useWorkspaceStore.getState();
   const tab = ws.tabs.find((t) => t.id === team.tabId);
@@ -488,6 +526,7 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
 
     const env: Record<string, string> = {
       ...(programAgent.envJson ? safeParseJson(programAgent.envJson) : {}),
+      ...apiEnv,
       TEAMSHIP_TASK_FILE: promptFile.path,
       TEAMSHIP_TEAM_DIR: paths.teamDir,
       TEAMSHIP_TEAM_ID: team.id,
@@ -498,6 +537,8 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
       TEAMSHIP_BOARD_PATH: paths.boardPath,
       TEAMSHIP_MESSAGES_PATH: paths.messagesPath,
       TEAMSHIP_TEAM_TMSG: paths.tmsgPath,
+      TEAMSHIP_PANE_ID: ta.paneId,
+      TEAMSHIP_TAB_ID: team.tabId,
     };
 
     ws.setPanePayload(team.tabId, ta.paneId, {

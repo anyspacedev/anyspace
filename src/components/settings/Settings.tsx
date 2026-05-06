@@ -19,6 +19,8 @@ import {
 } from "../../stores/superAgentSettingsStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { TOOLS } from "../../lib/superAgent/tools";
+import { ensureAgentApi, getCachedAgentApi } from "../../lib/agentApi";
+import { agentApiRotateToken, type AgentApiInfo } from "../../lib/tauri";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { useTeamStore } from "../../stores/teamStore";
 import {
@@ -74,6 +76,8 @@ export function Settings() {
       <AiSettingsSection />
 
       <SuperAgentSettingsSection />
+
+      <CodeAgentApiSettingsSection />
 
       <TeamSettingsSection />
 
@@ -897,6 +901,23 @@ function SuperAgentSettingsSection() {
             Stream tokens (falls back to one-shot if endpoint rejects stream:true)
           </span>
         </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">
+            <input
+              type="checkbox"
+              checked={settings.enableVision !== false}
+              onChange={(e) => void update({ enableVision: e.target.checked })}
+              style={{ marginRight: 6 }}
+            />
+            Send screenshot images to vision-capable models
+          </span>
+          <span className="stt-field-hint">
+            When the <code>capture_preview_screenshot</code> tool runs, the runner attaches the PNG to
+            the next user turn as an <code>image_url</code> block. Disable for endpoints that reject
+            multimodal content (some OpenAI-compatible proxies).
+          </span>
+        </label>
       </div>
 
       <div className="settings-section-head" style={{ marginTop: 16 }}>
@@ -946,6 +967,132 @@ function SuperAgentSettingsSection() {
         >
           Reset session memory
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CodeAgentApiSettingsSection() {
+  const [info, setInfo] = useState<AgentApiInfo | null>(getCachedAgentApi());
+  const [copied, setCopied] = useState<string | null>(null);
+  const [rotated, setRotated] = useState(false);
+
+  useEffect(() => {
+    if (info) return;
+    let cancelled = false;
+    void ensureAgentApi()
+      .then((next) => {
+        if (!cancelled) setInfo(next);
+      })
+      .catch(() => {
+        /* server is optional */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [info]);
+
+  const mcpAddCmd = info?.mcpBinaryPath
+    ? `claude mcp add teamship -- "${info.mcpBinaryPath}"`
+    : "";
+
+  const copy = async (label: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      window.setTimeout(() => setCopied((c) => (c === label ? null : c)), 1500);
+    } catch {
+      /* clipboard may be denied — silent */
+    }
+  };
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <h2 className="settings-section-title">Code Agent API</h2>
+        <div className="settings-section-sub">
+          Loopback HTTP server that lets Code Agents in terminal panes (Claude Code, Codex, Aider…)
+          drive the live preview and capture screenshots without operator clicks. Each Code-Agent
+          terminal gets <code>$TEAMSHIP_API_URL</code>, <code>$TEAMSHIP_API_TOKEN</code>, and{" "}
+          <code>$TEAMSHIP_PANE_ID</code> in its env.
+        </div>
+      </div>
+      <div className="stt-fields">
+        <label className="stt-field">
+          <span className="stt-field-label">Server URL</span>
+          <input
+            type="text"
+            value={info?.url ?? "(starting…)"}
+            readOnly
+            spellCheck={false}
+          />
+        </label>
+        <label className="stt-field">
+          <span className="stt-field-label">Bearer token</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="password"
+              value={info?.token ?? ""}
+              readOnly
+              spellCheck={false}
+              autoComplete="off"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={!info?.token}
+              onClick={() => info?.token && copy("token", info.token)}
+            >
+              {copied === "token" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <span className="stt-field-hint">
+            Persisted to <code>app_config_dir/agent_api.json</code> (mode 0600 on Unix). Rotation
+            invalidates long-lived agent shells — they will need to re-import{" "}
+            <code>$TEAMSHIP_API_TOKEN</code> after the next app restart.
+          </span>
+          <div style={{ marginTop: 6 }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                void agentApiRotateToken().then(() => setRotated(true));
+              }}
+            >
+              Rotate token
+            </button>
+            {rotated && (
+              <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.8 }}>
+                New token written. Restart Teamship to apply.
+              </span>
+            )}
+          </div>
+        </label>
+        <label className="stt-field">
+          <span className="stt-field-label">MCP server (Claude Code / Codex)</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="text"
+              value={info?.mcpBinaryPath ?? "(building…)"}
+              readOnly
+              spellCheck={false}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={!mcpAddCmd}
+              onClick={() => mcpAddCmd && copy("mcp", mcpAddCmd)}
+            >
+              {copied === "mcp" ? "Copied" : "Copy add cmd"}
+            </button>
+          </div>
+          <span className="stt-field-hint">
+            One-line registration:{" "}
+            <code>{mcpAddCmd || "claude mcp add teamship -- <path>"}</code>
+          </span>
+        </label>
       </div>
     </div>
   );

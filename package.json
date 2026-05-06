@@ -9,8 +9,10 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "build:mcp": "cargo build --manifest-path src-tauri/Cargo.toml --bin teamship-mcp",
+    "build:mcp:release": "cargo build --release --manifest-path src-tauri/Cargo.toml --bin teamship-mcp",
+    "tauri:dev": "npm run build:mcp && tauri dev",
+    "tauri:build": "npm run build:mcp:release && tauri build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -14,6 +14,8 @@ import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
 import { runSuperBrain } from "./lib/superBrain";
 import { resumeTeam } from "./lib/teamLauncher";
 import { syncOperatorInboxSubscriptions } from "./lib/operatorInbox";
+import { ensureAgentApi } from "./lib/agentApi";
+import { startAgentApiBridge } from "./lib/agentApiBridge";
 import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
 import { Sidebar } from "./components/workspace/Sidebar";
@@ -80,6 +82,11 @@ export default function App() {
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
+    // Boot the agent_api bridge before any Code Agent terminal can spawn —
+    // launchers read the cached URL+token to inject TEAMSHIP_API_URL/TOKEN
+    // into the child env.
+    void ensureAgentApi().catch((e) => console.warn("[agent_api] info load failed", e));
+    void startAgentApiBridge().catch((e) => console.warn("[agent_api] bridge start failed", e));
   }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the

@@ -23,6 +23,13 @@ export type ToolCall = {
 
 export type ToolResultStatus = "queued" | "running" | "ok" | "error" | "disabled" | "skipped";
 
+export type ToolResultImage = {
+  /** On-disk path. The runner re-reads at history-build time so the model
+   *  sees a fresh data URL — keeps the persisted message size small. */
+  path: string;
+  mediaType: string;
+};
+
 export type ToolResult = {
   callId: string;
   status: ToolResultStatus;
@@ -32,6 +39,10 @@ export type ToolResult = {
   durationMs?: number;
   /** Error message when status === "error" */
   errorMessage?: string;
+  /** Multimodal results (e.g. screenshot tools). The runner injects a
+   *  synthetic user turn after the tool reply with these as image_url
+   *  blocks so vision-capable models can reason about them. */
+  images?: ToolResultImage[];
 };
 
 export type Message = {

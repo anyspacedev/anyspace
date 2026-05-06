@@ -17,6 +17,8 @@ import {
   teamWritePrompt,
   type AiToolDef,
 } from "../tauri";
+import { capturePreviewIframeRaw } from "../previewCapture";
+import { getPreviewIframe } from "../previewDrive";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
@@ -46,6 +48,7 @@ export type ToolName =
   | "read_file"
   | "git_status"
   | "preview_detect"
+  | "capture_preview_screenshot"
   | "list_kanban_tasks"
   | "list_agents"
   | "list_teams"
@@ -74,6 +77,10 @@ export type ToolName =
 export type ToolHandlerResult = {
   /** JSON-stringified content the model sees as the tool result. */
   resultText: string;
+  /** Multimodal output (e.g. screenshot tools). The runner persists these on
+   *  the ToolResult and, when vision is enabled, injects a synthetic user
+   *  turn after the tool reply with each as an image_url block. */
+  images?: { path: string; mediaType: string }[];
 };
 
 export type Tool = {
@@ -250,6 +257,64 @@ export const TOOLS: Tool[] = [
       try {
         const detected = await previewDetect(path);
         return ok(detected);
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "capture_preview_screenshot",
+    description:
+      "Screenshot the live preview pane and return the on-disk PNG path. When vision is enabled and the active model supports images, the runner also feeds the image to your next turn so you can reason about it directly. Targets pane_id when supplied; otherwise falls back to a preview pane in the active tab.",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: {
+        pane_id: {
+          type: "string",
+          description: "Specific preview pane to capture; defaults to one in the active tab.",
+        },
+      },
+      required: [],
+    },
+    handler: async (args) => {
+      const wantPaneId = arg<string>(args, "pane_id");
+      const ws = useWorkspaceStore.getState();
+      let target: { tabId: string; paneId: string } | null = null;
+      if (wantPaneId) {
+        for (const t of ws.tabs) {
+          const p = t.panes[wantPaneId];
+          if (p && p.kind === "preview") {
+            target = { tabId: t.id, paneId: p.id };
+            break;
+          }
+        }
+      }
+      if (!target) {
+        const active = ws.tabs.find((t) => t.id === ws.activeTabId);
+        if (active) {
+          const p = Object.values(active.panes).find((p) => p.kind === "preview");
+          if (p) target = { tabId: active.id, paneId: p.id };
+        }
+      }
+      if (!target) {
+        for (const t of ws.tabs) {
+          const p = Object.values(t.panes).find((p) => p.kind === "preview");
+          if (p) {
+            target = { tabId: t.id, paneId: p.id };
+            break;
+          }
+        }
+      }
+      if (!target) return bad("no preview pane available");
+      const iframe = getPreviewIframe(target.paneId);
+      if (!iframe) return bad(`preview pane ${target.paneId} has no iframe ref yet`);
+      try {
+        const result = await capturePreviewIframeRaw(iframe);
+        return {
+          resultText: JSON.stringify({ ok: true, paneId: target.paneId, path: result.path }),
+          images: [{ path: result.path, mediaType: "image/png" }],
+        };
       } catch (e) {
         return bad(e instanceof Error ? e.message : String(e));
       }

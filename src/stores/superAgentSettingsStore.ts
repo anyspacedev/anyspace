@@ -31,6 +31,10 @@ export type SuperAgentSettings = {
   panelWidth: number;
   panelOpen: boolean;
   activeSessionId: string | null;
+  /** When true (default), the runner injects screenshot images returned by
+   *  multimodal tools (capture_preview_screenshot) into the next user turn.
+   *  Disable for models or proxies that reject `image_url` content blocks. */
+  enableVision: boolean;
 };
 
 const DEFAULT_SETTINGS: SuperAgentSettings = {
@@ -45,6 +49,7 @@ const DEFAULT_SETTINGS: SuperAgentSettings = {
   panelWidth: 360,
   panelOpen: false,
   activeSessionId: null,
+  enableVision: true,
 };
 
 type SuperAgentSettingsState = {

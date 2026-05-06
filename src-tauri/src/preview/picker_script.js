@@ -142,6 +142,62 @@
     if (!msg || msg.src !== SRC) return;
     if (msg.type === "picker:start") activate();
     else if (msg.type === "picker:stop") deactivate();
+    else if (msg.type === "drive:click") handleDrive("click", msg);
+    else if (msg.type === "drive:fill") handleDrive("fill", msg);
+  }
+
+  // ---- programmatic drive (Code-Agent preview API) ----------------------
+  // Same envelope as the picker — postMessage in, postMessage out — but
+  // request/response style: every drive carries a reqId and the script
+  // replies with `{type:"drive:result", reqId, ok, …}`. The parent matches
+  // reqId in `previewDrive.ts` to resolve the awaiting HTTP request.
+  function handleDrive(kind, msg) {
+    const reqId = msg && msg.reqId;
+    const payload = (msg && msg.payload) || {};
+    const reply = (extras) => {
+      try {
+        window.parent.postMessage(
+          Object.assign({ src: SRC, type: "drive:result", reqId }, extras),
+          "*",
+        );
+      } catch {}
+    };
+    try {
+      if (kind === "click") {
+        const sel = String(payload.selector || "");
+        const el = sel ? document.querySelector(sel) : null;
+        if (!el) return reply({ ok: false, matched: 0, error: "no match" });
+        if (typeof el.click === "function") el.click();
+        else el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        return reply({ ok: true, matched: 1 });
+      }
+      if (kind === "fill") {
+        const sel = String(payload.selector || "");
+        const value = payload.value == null ? "" : String(payload.value);
+        const submit = !!payload.submit;
+        const el = sel ? document.querySelector(sel) : null;
+        if (!el) return reply({ ok: false, matched: 0, error: "no match" });
+        // Use the native value setter so React's onChange listeners pick it up.
+        const proto =
+          el.tagName === "TEXTAREA"
+            ? window.HTMLTextAreaElement && window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement && window.HTMLInputElement.prototype;
+        const desc = proto && Object.getOwnPropertyDescriptor(proto, "value");
+        if (desc && desc.set) desc.set.call(el, value);
+        else el.value = value;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        if (submit) {
+          const form = el.form || (el.closest && el.closest("form"));
+          if (form && typeof form.requestSubmit === "function") form.requestSubmit();
+          else if (form && typeof form.submit === "function") form.submit();
+        }
+        return reply({ ok: true, matched: 1 });
+      }
+      reply({ ok: false, error: `unknown drive kind: ${kind}` });
+    } catch (err) {
+      reply({ ok: false, error: (err && err.message) || String(err) });
+    }
   }
 
   // ---- serialization -----------------------------------------------------

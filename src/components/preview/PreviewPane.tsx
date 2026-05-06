@@ -18,6 +18,7 @@ import { Icon } from "../ui/Icon";
 import { LaunchAgentDialog } from "./LaunchAgentDialog";
 import type { ElementCapture, PickerMessage } from "../../lib/elementContext";
 import { capturePreviewIframe } from "../screenshot/capturePreview";
+import { registerPreviewIframe, unregisterPreviewIframe } from "../../lib/previewDrive";
 
 type Props = { pane: Pane; tabId: string };
 
@@ -171,6 +172,11 @@ export function PreviewPane({ pane, tabId }: Props) {
 
   const onIframeLoad = () => {
     setLoad((cur) => (cur.kind === "loading" ? { kind: "loaded", at: Date.now() } : cur));
+    if (iframeRef.current) {
+      // Re-register on every (re)load so the latest contentWindow is used by
+      // drive: postMessages — old content windows are detached on reload.
+      registerPreviewIframe(pane.id, iframeRef.current);
+    }
     if (pickerActive) {
       // The iframe just (re)loaded — re-send the start message so the freshly
       // injected picker script wakes up in the new document.
@@ -180,6 +186,11 @@ export function PreviewPane({ pane, tabId }: Props) {
       );
     }
   };
+
+  // Unregister on unmount so the drive bridge doesn't try to use a dead ref.
+  useEffect(() => {
+    return () => unregisterPreviewIframe(pane.id);
+  }, [pane.id]);
 
   // Bridge picker messages from the iframe. We filter by source window so
   // multiple preview panes don't cross-talk.

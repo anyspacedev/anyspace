@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod agent;
+mod agent_api;
 mod ai;
 mod clipboard;
 mod fs_ops;
@@ -132,7 +133,7 @@ pub fn run() {
             // Clipboard
             clipboard::commands::clipboard_save_blob,
             // Screenshot (preview / mobile capture, terminal drop attach)
-            screenshot::commands::screenshot_capture_region,
+            screenshot::commands::screenshot_capture_window_region,
             screenshot::commands::screenshot_save_png_bytes,
             // Mobile (Android / iOS pane)
             mobile::commands::mobile_list_devices,
@@ -152,6 +153,10 @@ pub fn run() {
             team::commands::team_rpc_drain,
             team::commands::team_write_prompt,
             team::commands::team_compact_messages,
+            // Agent API (drives Preview from terminal-spawned Code Agents)
+            agent_api::commands::agent_api_info,
+            agent_api::commands::agent_api_reply,
+            agent_api::commands::agent_api_rotate_token,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -163,6 +168,35 @@ pub fn run() {
             stt::hotkey_monitor::install(app.handle().clone());
             #[cfg(target_os = "linux")]
             stt::hotkey_monitor_linux::install(app.handle().clone());
+
+            // Bind synchronously so the assigned port is available to anything
+            // that reads agent_api_info before the async serve task starts.
+            match agent_api::server::bind_local() {
+                Ok((std_listener, port)) => {
+                    let token = agent_api::auth::load_or_mint(app.handle());
+                    let mcp_binary_path = match agent_api::resolve_mcp_binary() {
+                        Ok(p) => Some(p.to_string_lossy().into_owned()),
+                        Err(e) => {
+                            eprintln!("[agent_api] resolve_mcp_binary: {e:#}");
+                            None
+                        }
+                    };
+                    let api_state =
+                        agent_api::AgentApiState::new(port, token, mcp_binary_path.clone());
+                    app.manage(api_state.clone());
+                    let app_handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        agent_api::server::serve(api_state, app_handle, std_listener).await;
+                    });
+                    println!("[agent_api] server listening on 127.0.0.1:{port}");
+                    if let Some(p) = &mcp_binary_path {
+                        println!("[agent_api] MCP binary at {p}");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[agent_api] bind failed: {e:?} — Code Agent preview API disabled");
+                }
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

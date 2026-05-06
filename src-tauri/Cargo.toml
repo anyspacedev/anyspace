@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "Teamship — orchestrate AI agents across multi-pane workspaces"
 edition = "2021"
 rust-version = "1.77"
+# Now that the package ships two binaries (the main app and `teamship-mcp`),
+# `cargo run` and `tauri dev` need an explicit default — otherwise cargo
+# refuses to pick between them.
+default-run = "teamship"
 
 [lib]
 name = "teamship_lib"
@@ -49,6 +53,15 @@ libc = "0.2"
 # http probe for preview port detection
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks", "stream"] }
 
+# in-process HTTP server that backs $TEAMSHIP_API_URL for terminal-spawned
+# Code Agents (drives Preview, returns screenshot paths). Loopback-only,
+# bearer-token authed. axum 0.7 pairs cleanly with the tokio 1 runtime
+# Tauri 2 already runs.
+axum = "0.7"
+tower-http = { version = "0.5", features = ["limit"] }
+rand = "0.8"
+hex = "0.4"
+
 # screen-region capture for the preview pane screenshot button. xcap gives us
 # pixel-perfect captures across cross-origin iframes, WebGL canvases, and
 # embedded media — which DOM-serialisation libs can't reproduce. macOS prompts
@@ -56,6 +69,12 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 xcap = "0.3"
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
+
+# Official MCP Rust SDK. Powers the `teamship-mcp` stdio binary that Claude Code
+# (and any MCP-aware client) spawns to talk to the loopback agent_api. Only the
+# bin target actually uses it, but it sits in the shared [dependencies] block
+# because we share a Cargo.toml with the main lib.
+rmcp = { version = "1.6.0", features = ["server", "macros", "transport-io"] }
 
 # WebKitGTK isn't shown navigator.mediaDevices unless we toggle enable-media-stream
 # on the WebView at startup and answer the permission-request signal — needed by
@@ -85,3 +104,11 @@ block2 = "0.6"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Stdio MCP bridge that Claude Code spawns. Calls the loopback REST API at
+# $TEAMSHIP_API_URL using $TEAMSHIP_API_TOKEN / $TEAMSHIP_PANE_ID. Built as a
+# sibling of the main `teamship` binary; located by current_exe()'s parent dir
+# at runtime.
+[[bin]]
+name = "teamship-mcp"
+path = "src/bin/teamship-mcp.rs"

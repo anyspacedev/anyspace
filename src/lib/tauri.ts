@@ -170,8 +170,22 @@ export async function aiChat(args: AiChatArgs): Promise<string> {
 }
 
 // === Streaming ai chat (Super Agent) ===
+
+/**
+ * OpenAI-style multimodal content blocks. Used in user-role messages when a
+ * vision-capable model needs to see images alongside text. Tool messages
+ * remain text-only (per the OpenAI spec — images go through user turns).
+ */
+export type AiContentBlock =
+  | { type: "text"; text: string }
+  | {
+      type: "image_url";
+      image_url: { url: string; detail?: "low" | "high" | "auto" };
+    };
+
 export type AiMessage =
-  | { role: "system" | "user"; content: string }
+  | { role: "system"; content: string }
+  | { role: "user"; content: string | AiContentBlock[] }
   | {
       role: "assistant";
       content: string | null;
@@ -244,13 +258,17 @@ export async function clipboardSaveBlob(bytes: Uint8Array, ext: string): Promise
 
 export type ScreenshotResult = { path: string; dataUrl: string };
 
-export async function screenshotCaptureRegion(args: {
+/** Capture a rectangle in window-local physical pixels (origin = OS window's
+ *  top-left, including chrome). Works while Teamship is occluded / behind
+ *  another app — the capture comes from the window's compositor surface,
+ *  not the screen. Replaces the old monitor-based screenshotCaptureRegion. */
+export async function screenshotCaptureWindowRegion(args: {
   x: number;
   y: number;
   width: number;
   height: number;
 }): Promise<ScreenshotResult> {
-  return rawInvoke<ScreenshotResult>("screenshot_capture_region", args);
+  return rawInvoke<ScreenshotResult>("screenshot_capture_window_region", args);
 }
 
 export async function screenshotSavePngBytes(bytes: Uint8Array): Promise<string> {
@@ -324,6 +342,37 @@ export type TeamRpcEvent = {
   requestId: string;
   reqPath: string;
   payload: string;
+};
+
+// === Agent API (loopback HTTP server backing $TEAMSHIP_API_URL) ===
+export type AgentApiInfo = {
+  url: string;
+  token: string;
+  port: number;
+  mcpBinaryPath: string | null;
+};
+
+export async function agentApiInfo(): Promise<AgentApiInfo> {
+  return rawInvoke<AgentApiInfo>("agent_api_info");
+}
+
+export async function agentApiReply(args: {
+  requestId: string;
+  response: unknown;
+}): Promise<void> {
+  return rawInvoke("agent_api_reply", { args });
+}
+
+export type RotateResult = { token: string; requiresRestart: boolean };
+
+export async function agentApiRotateToken(): Promise<RotateResult> {
+  return rawInvoke<RotateResult>("agent_api_rotate_token");
+}
+
+export type AgentApiRequestEvent = {
+  reqId: string;
+  action: string;
+  payload: Record<string, unknown>;
 };
 
 export { Channel };

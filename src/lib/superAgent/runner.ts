@@ -10,8 +10,10 @@
 //   5. Stop when the assistant returns plain content with no tool_calls,
 //      or when maxToolCallsPerTurn is reached.
 
+import { readFile } from "@tauri-apps/plugin-fs";
 import {
   aiChatStream,
+  type AiContentBlock,
   type AiMessage,
   type AiStreamHandle,
   type AiToolCall,
@@ -46,8 +48,24 @@ function endpointArgs() {
   };
 }
 
-function buildHistory(sessionId: string, systemPrompt: string): AiMessage[] {
+async function pathToDataUrl(path: string, mediaType: string): Promise<string | null> {
+  try {
+    const bytes = await readFile(path);
+    // Avoid String.fromCharCode(...big-array) stack overflow.
+    const CHUNK = 0x8000;
+    let str = "";
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      str += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+    }
+    return `data:${mediaType};base64,${btoa(str)}`;
+  } catch {
+    return null;
+  }
+}
+
+async function buildHistory(sessionId: string, systemPrompt: string): Promise<AiMessage[]> {
   const sa = useSuperAgentSettingsStore.getState().settings;
+  const visionEnabled = sa.enableVision !== false;
   const messages = useSuperAgentStore.getState().messagesBySession[sessionId] ?? [];
   const window = sa.memoryWindow > 0 ? sa.memoryWindow : 30;
 
@@ -100,6 +118,7 @@ function buildHistory(sessionId: string, systemPrompt: string): AiMessage[] {
       pending = m.toolCalls?.map((c) => c.id) ?? [];
     } else if (m.role === "tool") {
       // Each tool result goes back as its own tool-role message keyed by call id.
+      const imageBlocks: AiContentBlock[] = [];
       for (const result of m.toolResults ?? []) {
         const idx = pending.indexOf(result.callId);
         if (idx === -1) continue; // orphan result — skip
@@ -109,6 +128,33 @@ function buildHistory(sessionId: string, systemPrompt: string): AiMessage[] {
           content: result.resultText,
         });
         pending.splice(idx, 1);
+        if (visionEnabled && result.images && result.images.length > 0) {
+          for (const img of result.images) {
+            const dataUrl = await pathToDataUrl(img.path, img.mediaType);
+            if (dataUrl) {
+              imageBlocks.push({
+                type: "image_url",
+                image_url: { url: dataUrl, detail: "high" },
+              });
+            }
+          }
+        }
+      }
+      // OpenAI's vision spec puts images in user messages, not tool messages.
+      // Inject a synthetic user turn after the tool replies so vision-capable
+      // models can see the screenshots without us mutating the tool message
+      // shape (which DeepSeek and others reject).
+      if (imageBlocks.length > 0) {
+        out.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `[tool returned ${imageBlocks.length} image${imageBlocks.length === 1 ? "" : "s"} — attached]`,
+            },
+            ...imageBlocks,
+          ],
+        });
       }
     }
     // 'system' messages are skipped — we always inject the current system prompt fresh.
@@ -199,6 +245,7 @@ async function runOneToolCall(
             status: "ok",
             resultText: out.resultText,
             durationMs: Math.round(performance.now() - started),
+            images: out.images,
           });
         } catch (e) {
           resolve({
@@ -222,6 +269,7 @@ async function runOneToolCall(
       status: "ok",
       resultText: out.resultText,
       durationMs: Math.round(performance.now() - started),
+      images: out.images,
     };
   } catch (e) {
     return {
@@ -258,7 +306,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
   // Multi-turn loop — keep going until the assistant returns a plain message
   // or we hit the configured cap (so a runaway model can't burn tokens forever).
   for (let i = 0; i < (sa.maxToolCallsPerTurn || 6) + 1; i++) {
-    const messages = buildHistory(sessionId, systemPrompt);
+    const messages = await buildHistory(sessionId, systemPrompt);
     const tools = enabled.size > 0 ? buildToolsPayload(enabled) : undefined;
 
     // Open an in-progress assistant bubble; tokens stream into it.
