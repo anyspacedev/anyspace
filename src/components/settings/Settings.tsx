@@ -34,6 +34,70 @@ import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 
 const CLERK_CONFIGURED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
+const SECTION_GROUPS = [
+  {
+    label: "General",
+    items: [
+      { id: "account", label: "Account" },
+      { id: "appearance", label: "Appearance" },
+      { id: "keyboard", label: "Keyboard" },
+    ],
+  },
+  {
+    label: "AI",
+    items: [
+      { id: "stt", label: "Speech to text" },
+      { id: "ai", label: "AI" },
+      { id: "super-agent", label: "Super Agent" },
+      { id: "code-agent-api", label: "Code Agent API" },
+    ],
+  },
+  {
+    label: "Collaboration",
+    items: [{ id: "teams", label: "Multi-agent teams" }],
+  },
+  {
+    label: "System",
+    items: [
+      { id: "proxy", label: "Network proxy" },
+      { id: "about", label: "About" },
+    ],
+  },
+] as const;
+
+const SECTION_IDS = SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+
+function SettingsNav({
+  active,
+  onJump,
+}: {
+  active: string;
+  onJump: (id: string) => void;
+}) {
+  return (
+    <aside className="settings-nav" aria-label="Settings sections">
+      {SECTION_GROUPS.map((group) => (
+        <div key={group.label} className="settings-nav-group">
+          <div className="settings-nav-group-label">{group.label}</div>
+          {group.items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={
+                "settings-nav-item" + (active === item.id ? " active" : "")
+              }
+              aria-current={active === item.id ? "true" : undefined}
+              onClick={() => onJump(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ))}
+    </aside>
+  );
+}
+
 export function Settings() {
   const theme = useThemeStore((s) => s.current);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -41,56 +105,121 @@ export function Settings() {
   const darkCount = themes.filter((t) => t.kind === "dark").length;
   const lightCount = themes.length - darkCount;
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [activeId, setActiveId] = useState<string>(SECTION_IDS[0]);
+
+  const jumpTo = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  };
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          );
+        const first = visible[0];
+        if (first) setActiveId(first.target.id);
+      },
+      { root, rootMargin: "-80px 0px -60% 0px", threshold: 0 },
+    );
+    SECTION_IDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    const onScroll = () => {
+      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 4) {
+        setActiveId(SECTION_IDS[SECTION_IDS.length - 1]);
+      }
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      observer.disconnect();
+      root.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
   return (
     <div className="settings">
-      <AccountSection />
+      <SettingsNav active={activeId} onJump={jumpTo} />
+      <div className="settings-content" ref={scrollRef}>
+        <section id="account" aria-label="Account">
+          <AccountSection />
+        </section>
 
-      <div className="settings-section">
-        <div className="settings-section-head">
-          <h2 className="settings-section-title">Appearance</h2>
-          <div className="settings-section-sub">
-            {themes.length} themes — {darkCount} dark, {lightCount} light.
+        <section id="appearance" aria-label="Appearance">
+          <div className="settings-section">
+            <div className="settings-section-head">
+              <h2 className="settings-section-title">Appearance</h2>
+              <div className="settings-section-sub">
+                {themes.length} themes — {darkCount} dark, {lightCount} light.
+              </div>
+            </div>
+            <ThemeSelect value={theme} onChange={setTheme} />
           </div>
-        </div>
-        <ThemeSelect value={theme} onChange={setTheme} />
-      </div>
+        </section>
 
-      <div className="settings-section">
-        <div className="settings-section-head">
-          <h2 className="settings-section-title">Keyboard</h2>
-          <div className="settings-section-sub">Built-in shortcuts</div>
-        </div>
-        <div className="kbd-list">
-          <Row k="⌘T" v="New workspace" />
-          <Row k="⌘W" v="Close tab" />
-          <Row k="⌘P" v="Quick Open" />
-          <Row k="⌘D" v="Split pane horizontal" />
-          <Row k="⌘⇧D" v="Split pane vertical" />
-          <Row k="⌘1–9" v="Switch to tab N" />
-          <Row k="⌘S" v="Save file (in editor)" />
-        </div>
-      </div>
-
-      <SttSettingsSection />
-
-      <AiSettingsSection />
-
-      <SuperAgentSettingsSection />
-
-      <CodeAgentApiSettingsSection />
-
-      <TeamSettingsSection />
-
-      <ProxySettingsSection />
-
-      <div className="settings-section">
-        <div className="settings-section-head">
-          <h2 className="settings-section-title">About</h2>
-          <div className="settings-section-sub">
-            Teamship 0.1.0 — multi-pane terminal multiplexer with command blocks,
-            Monaco editor, live preview, and Kanban-driven AI agent launcher.
+        <section id="keyboard" aria-label="Keyboard">
+          <div className="settings-section">
+            <div className="settings-section-head">
+              <h2 className="settings-section-title">Keyboard</h2>
+              <div className="settings-section-sub">Built-in shortcuts</div>
+            </div>
+            <div className="kbd-list">
+              <Row k="⌘T" v="New workspace" />
+              <Row k="⌘W" v="Close tab" />
+              <Row k="⌘P" v="Quick Open" />
+              <Row k="⌘D" v="Split pane horizontal" />
+              <Row k="⌘⇧D" v="Split pane vertical" />
+              <Row k="⌘1–9" v="Switch to tab N" />
+              <Row k="⌘S" v="Save file (in editor)" />
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section id="stt" aria-label="Speech to text">
+          <SttSettingsSection />
+        </section>
+
+        <section id="ai" aria-label="AI">
+          <AiSettingsSection />
+        </section>
+
+        <section id="super-agent" aria-label="Super Agent">
+          <SuperAgentSettingsSection />
+        </section>
+
+        <section id="code-agent-api" aria-label="Code Agent API">
+          <CodeAgentApiSettingsSection />
+        </section>
+
+        <section id="teams" aria-label="Multi-agent teams">
+          <TeamSettingsSection />
+        </section>
+
+        <section id="proxy" aria-label="Network proxy">
+          <ProxySettingsSection />
+        </section>
+
+        <section id="about" aria-label="About">
+          <div className="settings-section">
+            <div className="settings-section-head">
+              <h2 className="settings-section-title">About</h2>
+              <div className="settings-section-sub">
+                Teamship 0.1.0 — multi-pane terminal multiplexer with command
+                blocks, Monaco editor, live preview, and Kanban-driven AI agent
+                launcher.
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

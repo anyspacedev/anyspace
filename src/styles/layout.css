@@ -2451,16 +2451,91 @@
 /* ===== Settings ===== */
 
 .settings {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.settings-nav {
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  padding: var(--pad-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-md);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.settings-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.settings-nav-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim, var(--fg-muted));
+  padding: 4px 10px;
+}
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.settings-nav-item:hover {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
+.settings-nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.settings-nav-item.active {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
+.settings-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+}
+.settings-content {
+  overflow-y: auto;
   padding: var(--pad-xl);
   display: flex;
   flex-direction: column;
   gap: var(--pad-xl);
-  overflow: auto;
-  width: 100%;
-  height: 100%;
   box-sizing: border-box;
 }
-.settings > * {
+@media (prefers-reduced-motion: no-preference) {
+  .settings-content {
+    scroll-behavior: smooth;
+  }
+}
+.settings-content > * {
   max-width: 980px;
   width: 100%;
   margin-left: auto;
@@ -5282,6 +5357,6 @@ body.screenshot-dragging {
 /* Tighten the per-section cap on the settings page from 980px → 880px so
    long form rows don't stretch beyond comfortable line length on wide
    windows. Wrapper paddings/overflow already set above. */
-.settings > * { max-width: 880px; }
+.settings-content > * { max-width: 880px; }
 
 
