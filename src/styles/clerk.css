@@ -1,26 +1,9 @@
-/* Clerk overrides — force light surfaces and hide the dev-key banner.
- *
- * The popover `appearance.elements` overrides in main.tsx handle the common
- * cases; this file is a defense-in-depth layer for any nested element that
- * still picks up system dark-mode (Clerk's UserButton dropdown is especially
- * prone to this in v5).
- *
- * The dev-mode banner (orange diagonal stripes wrapping the SignIn card) only
- * appears when using a `pk_test_*` publishable key. It disappears in
- * production builds; this rule just suppresses it during local dev. */
-
-.cl-rootBox,
-.cl-card,
-.cl-modalContent,
-.cl-userButtonPopoverCard,
-.cl-userButtonPopoverMain,
-.cl-userButtonPopoverFooter {
-  color-scheme: light;
-}
-
-/* Hide Clerk's "Development mode" warning band on dev keys. Targets both the
- * documented `__developmentMode` element keys and the legacy internal class
- * fragment so version bumps don't silently re-introduce it. */
+/* Hide Clerk's "Development mode" warning band that wraps the SignIn card
+ * when a `pk_test_*` publishable key is in use. It disappears automatically
+ * with a `pk_live_*` production key; this rule just suppresses it during
+ * local dev. Targets both the documented `__developmentMode` element keys
+ * and the legacy internal class fragment so Clerk version bumps don't
+ * silently re-introduce it. */
 .cl-internal-developmentMode,
 .cl-developmentExampleMode__main,
 [class*="developmentExampleMode"],

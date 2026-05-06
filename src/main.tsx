@@ -7,6 +7,7 @@ import "./styles/layout.css";
 import "./styles/clerk.css";
 import "@xterm/xterm/css/xterm.css";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-react";
+import { dark } from "@clerk/themes";
 import { setSignedInState, setTokenGetter } from "./lib/auth";
 import { useThemeStore } from "./stores/themeStore";
 
@@ -42,48 +43,19 @@ function ClerkTokenBridge() {
   return null;
 }
 
-/** Wraps ClerkProvider so the app's current theme accent flows into Clerk's
- * appearance variables. Surfaces are pinned to a light palette so modals and
- * the UserButton popover stay legible regardless of the host theme.
- *
- * `elements.*` overrides are required for the popover specifically: Clerk's
- * UserButton dropdown is the one surface that doesn't fully respect
- * `variables.colorBackground` and falls back to system color-scheme. */
+/** Wraps ClerkProvider so Clerk's UI follows the active Teamship theme:
+ * dark themes apply Clerk's `dark` baseTheme, light themes use the default,
+ * and `colorPrimary` always tracks the theme's accent. */
 function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
+  const themeKind = useThemeStore((s) => s.current.kind);
   const accent = useThemeStore((s) => s.current.ui.accent);
   return (
     <ClerkProvider
       publishableKey={PUBLISHABLE_KEY!}
       afterSignOutUrl="/"
       appearance={{
-        variables: {
-          colorPrimary: accent,
-          colorBackground: "#ffffff",
-          colorText: "#0f172a",
-          colorTextSecondary: "#475569",
-          colorInputBackground: "#ffffff",
-          colorInputText: "#0f172a",
-        },
-        elements: {
-          rootBox: { colorScheme: "light" },
-          card: { colorScheme: "light", backgroundColor: "#ffffff" },
-          modalContent: { colorScheme: "light" },
-          userButtonPopoverCard: {
-            colorScheme: "light",
-            backgroundColor: "#ffffff",
-            color: "#0f172a",
-            border: "1px solid #e2e8f0",
-          },
-          userButtonPopoverMain: { backgroundColor: "#ffffff" },
-          userButtonPopoverFooter: { backgroundColor: "#f8fafc" },
-          userButtonPopoverActionButton: { color: "#0f172a" },
-          userButtonPopoverActionButtonText: { color: "#0f172a" },
-          userButtonPopoverActionButtonIcon: { color: "#475569" },
-          userButtonPopoverUserPreviewMainIdentifier: { color: "#0f172a" },
-          userButtonPopoverUserPreviewSecondaryIdentifier: { color: "#475569" },
-          userPreviewMainIdentifier: { color: "#0f172a" },
-          userPreviewSecondaryIdentifier: { color: "#475569" },
-        },
+        baseTheme: themeKind === "dark" ? dark : undefined,
+        variables: { colorPrimary: accent },
       }}
     >
       {children}
