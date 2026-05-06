@@ -18,6 +18,7 @@ import { ensureAgentApi } from "./lib/agentApi";
 import { startAgentApiBridge } from "./lib/agentApiBridge";
 import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
+import { AccountStatus } from "./components/auth/AccountStatus";
 import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
@@ -232,8 +233,9 @@ export default function App() {
   return (
     <div className="app-root">
       <Sidebar />
-      <header className="app-titlebar" data-tauri-drag-region="deep">
+      <header className="app-titlebar" data-tauri-drag-region="">
         <TabBar />
+        <AccountStatus />
       </header>
       <div className="app-main">
         <div className="app-content">

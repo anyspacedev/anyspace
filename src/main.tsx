@@ -7,6 +7,7 @@ import "./styles/layout.css";
 import "@xterm/xterm/css/xterm.css";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-react";
 import { setSignedInState, setTokenGetter } from "./lib/auth";
+import { useThemeStore } from "./stores/themeStore";
 
 const ua = navigator.userAgent;
 document.documentElement.dataset.platform = /Mac|iPhone|iPad/.test(ua)
@@ -40,6 +41,32 @@ function ClerkTokenBridge() {
   return null;
 }
 
+/** Wraps ClerkProvider so the app's current theme accent flows into Clerk's
+ * appearance variables. Surfaces are pinned to a light palette so the modal
+ * stays legible regardless of OS/theme. */
+function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
+  const accent = useThemeStore((s) => s.current.ui.accent);
+  return (
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY!}
+      afterSignOutUrl="/"
+      appearance={{
+        variables: {
+          colorPrimary: accent,
+          colorBackground: "#ffffff",
+          colorText: "#0f172a",
+          colorTextSecondary: "#475569",
+          colorInputBackground: "#ffffff",
+          colorInputText: "#0f172a",
+          colorNeutral: "#0f172a",
+        },
+      }}
+    >
+      {children}
+    </ClerkProvider>
+  );
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
 if (!PUBLISHABLE_KEY) {
@@ -54,10 +81,10 @@ if (!PUBLISHABLE_KEY) {
 } else {
   root.render(
     <React.StrictMode>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+      <ThemedClerkProvider>
         <ClerkTokenBridge />
         <App />
-      </ClerkProvider>
+      </ThemedClerkProvider>
     </React.StrictMode>,
   );
 }

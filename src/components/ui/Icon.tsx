@@ -36,7 +36,8 @@ export type IconName =
   | "crosshair"
   | "smartphone"
   | "camera"
-  | "users-round";
+  | "users-round"
+  | "user-round";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -244,6 +245,12 @@ const paths: Record<IconName, ReactElement> = {
       <path d="M3 20a6 6 0 0 1 12 0" />
       <circle cx="17" cy="8" r="3" />
       <path d="M16 14a5 5 0 0 1 5 5" />
+    </>
+  ),
+  "user-round": (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
     </>
   ),
 };

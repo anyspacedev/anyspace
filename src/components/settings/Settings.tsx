@@ -1,11 +1,4 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import {
-  SignInButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-  useUser,
-} from "@clerk/clerk-react";
 import { useThemeStore } from "../../stores/themeStore";
 import { themes } from "../../themes/definitions";
 import type { Theme } from "../../themes/definitions";
@@ -32,13 +25,10 @@ import {
 } from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 
-const CLERK_CONFIGURED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
 const SECTION_GROUPS = [
   {
     label: "General",
     items: [
-      { id: "account", label: "Account" },
       { id: "appearance", label: "Appearance" },
       { id: "keyboard", label: "Keyboard" },
     ],
@@ -150,10 +140,6 @@ export function Settings() {
     <div className="settings">
       <SettingsNav active={activeId} onJump={jumpTo} />
       <div className="settings-content" ref={scrollRef}>
-        <section id="account" aria-label="Account">
-          <AccountSection />
-        </section>
-
         <section id="appearance" aria-label="Appearance">
           <div className="settings-section">
             <div className="settings-section-head">
@@ -862,67 +848,6 @@ function ProxySettingsSection() {
             )}
           </>
         )}
-      </div>
-    </div>
-  );
-}
-
-function AccountSection() {
-  if (!CLERK_CONFIGURED) {
-    return (
-      <div className="settings-section">
-        <div className="settings-section-head">
-          <h2 className="settings-section-title">Account</h2>
-          <div className="settings-section-sub">
-            Auth not configured. Set <code>VITE_CLERK_PUBLISHABLE_KEY</code>{" "}
-            in <code>.env</code> and restart to enable Teamship Cloud.
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="settings-section">
-      <div className="settings-section-head">
-        <h2 className="settings-section-title">Account</h2>
-        <div className="settings-section-sub">
-          Sign in to use Teamship Cloud transcription. Your audio is decoded
-          on our server, never stored.
-        </div>
-      </div>
-      <SignedOut>
-        <SignInButton mode="modal">
-          <button className="btn-primary" style={{ marginTop: 8 }}>
-            Sign in
-          </button>
-        </SignInButton>
-      </SignedOut>
-      <SignedIn>
-        <SignedInRow />
-      </SignedIn>
-    </div>
-  );
-}
-
-function SignedInRow() {
-  const { user } = useUser();
-  const email =
-    user?.primaryEmailAddress?.emailAddress ??
-    user?.emailAddresses?.[0]?.emailAddress ??
-    "(no email)";
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        marginTop: 8,
-      }}
-    >
-      <UserButton afterSignOutUrl="/" />
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ fontWeight: 500 }}>{user?.fullName || email}</div>
-        <div style={{ color: "var(--mut, #888)", fontSize: 12 }}>{email}</div>
       </div>
     </div>
   );
