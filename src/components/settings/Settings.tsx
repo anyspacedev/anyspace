@@ -1199,9 +1199,15 @@ function CodeAgentApiSettingsSection() {
     };
   }, [info]);
 
-  const mcpAddCmd = info?.mcpBinaryPath
-    ? `claude mcp add teamship -- "${info.mcpBinaryPath}"`
-    : "";
+  // Literal ${VAR} references — Claude Code (and other MCP clients that
+  // support env interpolation) re-resolves these at startup against the host
+  // terminal pane's exported env, so each `claude` instance picks up the
+  // pane / tab id of the terminal it's running in.
+  const mcpAddCmd =
+    'claude mcp add --transport http teamship "${TEAMSHIP_API_URL}/mcp" \\\n' +
+    '  --header "Authorization: Bearer ${TEAMSHIP_API_TOKEN}" \\\n' +
+    '  --header "X-Pane-Id: ${TEAMSHIP_PANE_ID}" \\\n' +
+    '  --header "X-Tab-Id: ${TEAMSHIP_TAB_ID}"';
 
   const copy = async (label: string, text: string) => {
     try {
@@ -1278,26 +1284,28 @@ function CodeAgentApiSettingsSection() {
         </label>
         <label className="stt-field">
           <span className="stt-field-label">MCP server (Claude Code / Codex)</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="text"
-              value={info?.mcpBinaryPath ?? "(building…)"}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <textarea
+              value={mcpAddCmd}
               readOnly
               spellCheck={false}
-              style={{ flex: 1 }}
+              rows={4}
+              style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12 }}
             />
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              disabled={!mcpAddCmd}
-              onClick={() => mcpAddCmd && copy("mcp", mcpAddCmd)}
+              onClick={() => copy("mcp", mcpAddCmd)}
             >
-              {copied === "mcp" ? "Copied" : "Copy add cmd"}
+              {copied === "mcp" ? "Copied" : "Copy"}
             </button>
           </div>
           <span className="stt-field-hint">
-            One-line registration:{" "}
-            <code>{mcpAddCmd || "claude mcp add teamship -- <path>"}</code>
+            Paste this into a Code-Agent terminal pane (where{" "}
+            <code>$TEAMSHIP_API_URL</code> / <code>$TEAMSHIP_API_TOKEN</code> /{" "}
+            <code>$TEAMSHIP_PANE_ID</code> / <code>$TEAMSHIP_TAB_ID</code> are already exported).
+            Claude Code re-resolves the <code>${"${VAR}"}</code> references on each startup, so any
+            terminal where you run <code>claude</code> sends its own pane and tab id.
           </span>
         </label>
       </div>

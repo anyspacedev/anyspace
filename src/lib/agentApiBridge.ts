@@ -54,8 +54,15 @@ export async function stopAgentApiBridge(): Promise<void> {
 
 // ---- helpers ---------------------------------------------------------------
 
-function findRequesterTab(requesterPaneId?: string): Tab | undefined {
+function findRequesterTab(
+  requesterPaneId?: string,
+  requesterTabId?: string,
+): Tab | undefined {
   const ws = useWorkspaceStore.getState();
+  if (requesterTabId) {
+    const t = ws.tabs.find((t) => t.id === requesterTabId);
+    if (t) return t;
+  }
   if (requesterPaneId) {
     const t = ws.tabs.find((t) => t.panes[requesterPaneId]);
     if (t) return t;
@@ -79,6 +86,7 @@ function collectLeafIds(layout: LayoutNode): string[] {
 function resolvePreviewPane(
   targetPaneId: string | undefined,
   requesterPaneId: string | undefined,
+  requesterTabId: string | undefined,
 ): { tab: Tab; pane: Pane } | null {
   const ws = useWorkspaceStore.getState();
   if (targetPaneId) {
@@ -87,7 +95,7 @@ function resolvePreviewPane(
       if (pane && pane.kind === "preview") return { tab, pane };
     }
   }
-  const tab = findRequesterTab(requesterPaneId);
+  const tab = findRequesterTab(requesterPaneId, requesterTabId);
   if (tab) {
     const previewPane = Object.values(tab.panes).find((p) => p.kind === "preview");
     if (previewPane) return { tab, pane: previewPane };
@@ -100,10 +108,21 @@ function resolvePreviewPane(
   return null;
 }
 
+function reqIds(payload: Record<string, unknown>): {
+  requesterPaneId: string | undefined;
+  requesterTabId: string | undefined;
+} {
+  return {
+    requesterPaneId: (payload.requesterPaneId as string | undefined) || undefined,
+    requesterTabId: (payload.requesterTabId as string | undefined) || undefined,
+  };
+}
+
 // ---- handlers --------------------------------------------------------------
 
 registerAgentApiHandler("panes.list", async (payload) => {
-  const tab = findRequesterTab(String(payload.requesterPaneId ?? "") || undefined);
+  const { requesterPaneId, requesterTabId } = reqIds(payload);
+  const tab = findRequesterTab(requesterPaneId, requesterTabId);
   if (!tab) return { panes: [], tabId: null };
   const panes = Object.values(tab.panes).map((p) => ({
     id: p.id,
@@ -114,7 +133,7 @@ registerAgentApiHandler("panes.list", async (payload) => {
 });
 
 registerAgentApiHandler("preview.open", async (payload) => {
-  const requesterPaneId = (payload.requesterPaneId as string | undefined) ?? undefined;
+  const { requesterPaneId, requesterTabId } = reqIds(payload);
   const url = (payload.url as string | undefined) ?? undefined;
   const projectPath = (payload.projectPath as string | undefined) ?? undefined;
   const direction = (payload.direction as string | undefined) === "v" ? "vertical" : "horizontal";
@@ -130,7 +149,7 @@ registerAgentApiHandler("preview.open", async (payload) => {
   }
 
   const ws = useWorkspaceStore.getState();
-  const tab = findRequesterTab(requesterPaneId);
+  const tab = findRequesterTab(requesterPaneId, requesterTabId);
 
   // Reuse an existing preview pane in the requester's tab if one is already
   // open — agents shouldn't accidentally fork the preview surface.
@@ -185,8 +204,8 @@ registerAgentApiHandler("preview.open", async (payload) => {
 
 registerAgentApiHandler("preview.screenshot", async (payload) => {
   const targetPaneId = (payload.targetPaneId as string | undefined) ?? undefined;
-  const requesterPaneId = (payload.requesterPaneId as string | undefined) ?? undefined;
-  const target = resolvePreviewPane(targetPaneId, requesterPaneId);
+  const { requesterPaneId, requesterTabId } = reqIds(payload);
+  const target = resolvePreviewPane(targetPaneId, requesterPaneId, requesterTabId);
   if (!target) return { ok: false, error: "no preview pane available" };
   const iframe = getPreviewIframe(target.pane.id);
   if (!iframe) return { ok: false, error: `preview pane ${target.pane.id} has no iframe ref yet` };
@@ -202,10 +221,10 @@ registerAgentApiHandler("preview.screenshot", async (payload) => {
 
 registerAgentApiHandler("preview.click", async (payload) => {
   const targetPaneId = (payload.targetPaneId as string | undefined) ?? undefined;
-  const requesterPaneId = (payload.requesterPaneId as string | undefined) ?? undefined;
+  const { requesterPaneId, requesterTabId } = reqIds(payload);
   const selector = String(payload.selector ?? "");
   if (!selector) return { ok: false, error: "selector required" };
-  const target = resolvePreviewPane(targetPaneId, requesterPaneId);
+  const target = resolvePreviewPane(targetPaneId, requesterPaneId, requesterTabId);
   if (!target) return { ok: false, error: "no preview pane available" };
   const result = await driveIframe(target.pane.id, "drive:click", { selector });
   return result;
@@ -213,12 +232,12 @@ registerAgentApiHandler("preview.click", async (payload) => {
 
 registerAgentApiHandler("preview.fill", async (payload) => {
   const targetPaneId = (payload.targetPaneId as string | undefined) ?? undefined;
-  const requesterPaneId = (payload.requesterPaneId as string | undefined) ?? undefined;
+  const { requesterPaneId, requesterTabId } = reqIds(payload);
   const selector = String(payload.selector ?? "");
   const value = payload.value == null ? "" : String(payload.value);
   const submit = !!payload.submit;
   if (!selector) return { ok: false, error: "selector required" };
-  const target = resolvePreviewPane(targetPaneId, requesterPaneId);
+  const target = resolvePreviewPane(targetPaneId, requesterPaneId, requesterTabId);
   if (!target) return { ok: false, error: "no preview pane available" };
   const result = await driveIframe(target.pane.id, "drive:fill", {
     selector,
@@ -230,10 +249,10 @@ registerAgentApiHandler("preview.fill", async (payload) => {
 
 registerAgentApiHandler("preview.navigate", async (payload) => {
   const targetPaneId = (payload.targetPaneId as string | undefined) ?? undefined;
-  const requesterPaneId = (payload.requesterPaneId as string | undefined) ?? undefined;
+  const { requesterPaneId, requesterTabId } = reqIds(payload);
   const url = (payload.url as string | undefined) ?? undefined;
   if (!url) return { ok: false, error: "url required" };
-  const target = resolvePreviewPane(targetPaneId, requesterPaneId);
+  const target = resolvePreviewPane(targetPaneId, requesterPaneId, requesterTabId);
   if (!target) return { ok: false, error: "no preview pane available" };
   // Mutate payload — the iframe key includes url, so this remounts the iframe
   // with the new src. Avoids needing an iframe-side `drive:navigate` handler.
