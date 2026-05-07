@@ -1082,10 +1082,10 @@ function SuperAgentSettingsSection() {
             <input
               type="number"
               min={0}
-              max={32}
+              max={100}
               value={settings.maxToolCallsPerTurn}
               onChange={(e) =>
-                void update({ maxToolCallsPerTurn: Math.max(0, Number(e.target.value) || 6) })
+                void update({ maxToolCallsPerTurn: Math.max(0, Number(e.target.value) || 25) })
               }
             />
           </label>

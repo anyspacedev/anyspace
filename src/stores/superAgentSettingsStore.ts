@@ -43,7 +43,7 @@ const DEFAULT_SETTINGS: SuperAgentSettings = {
   model: "",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   memoryWindow: 30,
-  maxToolCallsPerTurn: 6,
+  maxToolCallsPerTurn: 25,
   streaming: true,
   toolEnabled: {},
   panelWidth: 360,
@@ -70,10 +70,21 @@ export const useSuperAgentSettingsStore = create<SuperAgentSettingsState>((set, 
     try {
       const stored = await settingsGet<Partial<SuperAgentSettings>>(SETTINGS_KEY);
       if (stored) {
+        // One-time migration: the old default (6) was too low for multi-step
+        // ReAct workflows and produced spurious "maxToolCallsPerTurn reached"
+        // errors. Upgrade stored old-default values to the new default.
+        const migratedMax =
+          stored.maxToolCallsPerTurn === 6
+            ? DEFAULT_SETTINGS.maxToolCallsPerTurn
+            : stored.maxToolCallsPerTurn;
         set({
           settings: {
             ...DEFAULT_SETTINGS,
             ...stored,
+            maxToolCallsPerTurn:
+              typeof migratedMax === "number" && migratedMax >= 0
+                ? migratedMax
+                : DEFAULT_SETTINGS.maxToolCallsPerTurn,
             toolEnabled: stored.toolEnabled && typeof stored.toolEnabled === "object"
               ? stored.toolEnabled
               : {},

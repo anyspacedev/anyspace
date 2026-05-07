@@ -305,7 +305,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
   let calls = 0;
   // Multi-turn loop — keep going until the assistant returns a plain message
   // or we hit the configured cap (so a runaway model can't burn tokens forever).
-  for (let i = 0; i < (sa.maxToolCallsPerTurn || 6) + 1; i++) {
+  for (let i = 0; i < (sa.maxToolCallsPerTurn || 25) + 1; i++) {
     const messages = await buildHistory(sessionId, systemPrompt);
     const tools = enabled.size > 0 ? buildToolsPayload(enabled) : undefined;
 
@@ -426,7 +426,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
     const results: ToolResult[] = [];
     for (const call of completedCalls) {
       calls++;
-      if (calls > (sa.maxToolCallsPerTurn || 6)) {
+      if (calls > (sa.maxToolCallsPerTurn || 25)) {
         // Persist the synthetic error result on the tool message so the next
         // history rebuild has a tool reply for this call_id (otherwise the
         // API rejects the follow-up with "insufficient tool messages").
