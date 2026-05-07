@@ -1,6 +1,8 @@
 pub mod auth;
+pub mod bridge;
 pub mod commands;
 pub mod handlers;
+pub mod mcp;
 pub mod server;
 pub mod state;
 

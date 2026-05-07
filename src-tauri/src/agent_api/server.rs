@@ -1,4 +1,5 @@
 use super::handlers;
+use super::mcp;
 use super::state::AgentApiState;
 use axum::{
     extract::State,
@@ -38,6 +39,7 @@ pub async fn serve(api: AgentApiState, app: AppHandle, std_listener: StdTcpListe
         }
     };
     let ctx = AppCtx { api, app };
+    let mcp_service = mcp::build_service(ctx.clone());
     let router = Router::new()
         .route("/v1/preview/detect", get(handlers::preview_detect))
         .route("/v1/panes", get(handlers::list_panes))
@@ -46,6 +48,10 @@ pub async fn serve(api: AgentApiState, app: AppHandle, std_listener: StdTcpListe
         .route("/v1/preview/click", post(handlers::preview_click))
         .route("/v1/preview/fill", post(handlers::preview_fill))
         .route("/v1/preview/navigate", post(handlers::preview_navigate))
+        // Streamable HTTP MCP. Tools read X-Pane-Id / X-Tab-Id from the
+        // request via Extension<http::request::Parts>. Inherits require_auth
+        // because Router::layer wraps every route, including nested services.
+        .nest_service("/mcp", mcp_service)
         // 8 MB cap covers eval results and full-page screenshot metadata; raw
         // PNG bytes return as file paths, not bodies.
         .layer(RequestBodyLimitLayer::new(8 * 1024 * 1024))
