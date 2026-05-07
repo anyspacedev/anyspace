@@ -146,8 +146,8 @@ registerAgentApiHandler("preview.open", async (payload) => {
     }
   }
 
-  if (!tab || !requesterPaneId) {
-    // No anchor — open in a fresh tab.
+  if (!tab) {
+    // No active workspace at all — fall back to a fresh tab.
     const tabId = ws.newTab(
       1,
       "Preview",
@@ -159,8 +159,21 @@ registerAgentApiHandler("preview.open", async (payload) => {
     return { ok: true, paneId, tabId, reused: false };
   }
 
+  // Anchor on the requester pane when it belongs to this tab; otherwise fall
+  // back to the tab's active pane, then the first leaf. Default behavior is to
+  // split a sibling preview into the current workspace — never spawn a new tab
+  // just because the caller didn't pass a pane id.
+  const anchorPaneId =
+    requesterPaneId && tab.panes[requesterPaneId]
+      ? requesterPaneId
+      : tab.activePaneId && tab.panes[tab.activePaneId]
+        ? tab.activePaneId
+        : collectLeafIds(tab.layout)[0];
+  if (!anchorPaneId) {
+    return { ok: false, error: "no pane available to split" };
+  }
   const before = new Set(collectLeafIds(tab.layout));
-  ws.splitPane(tab.id, requesterPaneId, direction, {
+  ws.splitPane(tab.id, anchorPaneId, direction, {
     kind: "preview",
     url,
     projectPath,
