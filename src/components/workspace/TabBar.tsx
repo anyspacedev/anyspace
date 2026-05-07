@@ -33,6 +33,7 @@ export function TabBar() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [folderMenuOpen, setFolderMenuOpen] = useState(false);
   const folderMenuRef = useRef<HTMLDivElement>(null);
+  const tabsStripRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<
     { tabId: string; x: number; y: number } | null
   >(null);
@@ -69,6 +70,24 @@ export function TabBar() {
   useEffect(() => {
     for (const t of tabs) if (t.projectPath) void pushRecent(t.projectPath);
   }, [tabs, pushRecent]);
+
+  // Convert vertical wheel deltas into horizontal scroll on the tabs strip.
+  // React's onWheel is passive so it can't preventDefault — register manually.
+  useEffect(() => {
+    const el = tabsStripRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.shiftKey) return; // user is already requesting horizontal
+      const dx = e.deltaX;
+      const dy = e.deltaY;
+      if (Math.abs(dy) <= Math.abs(dx)) return; // already horizontal
+      if (el.scrollWidth <= el.clientWidth) return; // nothing to scroll
+      e.preventDefault();
+      el.scrollLeft += dy;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // Close the folder popover on outside click / Escape.
   useEffect(() => {
@@ -136,7 +155,7 @@ export function TabBar() {
 
   return (
     <div className="tabbar" data-tauri-drag-region="">
-      <div className="tabbar-tabs scrollbar" data-tauri-drag-region="">
+      <div className="tabbar-tabs scrollbar" ref={tabsStripRef} data-tauri-drag-region="">
         {tabs.map((tab) => {
           const isTeam = teamTabIds.has(tab.id);
           return (
