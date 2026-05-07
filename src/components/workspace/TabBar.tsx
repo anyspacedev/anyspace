@@ -155,7 +155,7 @@ export function TabBar() {
 
   return (
     <div className="tabbar" data-tauri-drag-region="">
-      <div className="tabbar-tabs scrollbar" ref={tabsStripRef} data-tauri-drag-region="">
+      <div className="tabbar-tabs scrollbar" ref={tabsStripRef}>
         {tabs.map((tab) => {
           const isTeam = teamTabIds.has(tab.id);
           return (
