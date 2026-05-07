@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "../ui/Icon";
 
-type Row = { key: string; value: string };
+type Row = { id: number; key: string; value: string };
+
+let rowIdSeq = 0;
+const nextRowId = () => ++rowIdSeq;
 
 function parseEnv(json: string): Row[] {
   if (!json || !json.trim()) return [];
@@ -9,6 +12,7 @@ function parseEnv(json: string): Row[] {
     const obj = JSON.parse(json);
     if (!obj || typeof obj !== "object" || Array.isArray(obj)) return [];
     return Object.entries(obj).map(([k, v]) => ({
+      id: nextRowId(),
       key: k,
       value: typeof v === "string" ? v : String(v ?? ""),
     }));
@@ -34,18 +38,34 @@ export function EnvEditor({
   envJson: string;
   onChange: (next: string) => void;
 }) {
-  const rows = useMemo(() => parseEnv(envJson), [envJson]);
+  const [rows, setRows] = useState<Row[]>(() => parseEnv(envJson));
+  const lastEmitted = useRef<string>(stringifyEnv(rows));
 
-  const setRow = (idx: number, patch: Partial<Row>) => {
-    const next = rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
-    onChange(stringifyEnv(next));
+  // Resync from props when the parent swaps in a different envJson (e.g. the
+  // user picked a different agent). Ignore echoes of our own emissions, since
+  // empty-key rows are stripped on the way out and must not be discarded here.
+  useEffect(() => {
+    if (envJson === lastEmitted.current) return;
+    const parsed = parseEnv(envJson);
+    setRows(parsed);
+    lastEmitted.current = stringifyEnv(parsed);
+  }, [envJson]);
+
+  const emit = (next: Row[]) => {
+    setRows(next);
+    const json = stringifyEnv(next);
+    lastEmitted.current = json;
+    onChange(json);
   };
-  const removeRow = (idx: number) => {
-    const next = rows.filter((_, i) => i !== idx);
-    onChange(stringifyEnv(next));
+
+  const setRow = (id: number, patch: Partial<Omit<Row, "id">>) => {
+    emit(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+  const removeRow = (id: number) => {
+    emit(rows.filter((r) => r.id !== id));
   };
   const addRow = () => {
-    onChange(stringifyEnv([...rows, { key: "", value: "" }]));
+    emit([...rows, { id: nextRowId(), key: "", value: "" }]);
   };
 
   return (
@@ -56,14 +76,14 @@ export function EnvEditor({
           one if your CLI needs an API key or feature flag.
         </div>
       )}
-      {rows.map((r, i) => (
-        <div className="env-row" key={i}>
+      {rows.map((r) => (
+        <div className="env-row" key={r.id}>
           <input
             className="env-row-key"
             value={r.key}
             placeholder="KEY"
             spellCheck={false}
-            onChange={(e) => setRow(i, { key: e.target.value })}
+            onChange={(e) => setRow(r.id, { key: e.target.value })}
           />
           <span className="env-row-eq" aria-hidden="true">=</span>
           <input
@@ -71,14 +91,14 @@ export function EnvEditor({
             value={r.value}
             placeholder="value"
             spellCheck={false}
-            onChange={(e) => setRow(i, { value: e.target.value })}
+            onChange={(e) => setRow(r.id, { value: e.target.value })}
           />
           <button
             type="button"
             className="icon-btn"
             aria-label="Remove env var"
             title="Remove"
-            onClick={() => removeRow(i)}
+            onClick={() => removeRow(r.id)}
           >
             <Icon name="x" size={12} />
           </button>
