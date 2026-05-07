@@ -9,6 +9,8 @@ export type SpawnArgs = {
   env?: Record<string, string>;
   cols: number;
   rows: number;
+  paneId?: string;
+  tabId?: string;
 };
 
 export async function ptySpawn(

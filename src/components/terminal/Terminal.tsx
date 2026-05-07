@@ -311,7 +311,10 @@ export function Terminal({ pane, tabId }: Props) {
     // lands in the same directory as the rest of the workspace by default.
     const tabProjectPath = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId)?.projectPath;
     const spawnCwd = (pane.payload?.spawnCwd as string | undefined) ?? tabProjectPath;
-    void ptySpawn({ cols, rows, env: spawnEnv, cwd: spawnCwd }, channel)
+    void ptySpawn(
+      { cols, rows, env: spawnEnv, cwd: spawnCwd, paneId: pane.id, tabId },
+      channel,
+    )
       .then((sid) => {
         if (disposed) {
           ptyKill(sid).catch(() => {});
