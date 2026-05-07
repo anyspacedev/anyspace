@@ -18,7 +18,8 @@ import {
   type AiToolDef,
 } from "../tauri";
 import { capturePreviewIframeRaw } from "../previewCapture";
-import { getPreviewIframe } from "../previewDrive";
+import { driveIframe, getPreviewIframe } from "../previewDrive";
+import type { LayoutNode, Pane, Tab } from "../types";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
@@ -50,6 +51,10 @@ export type ToolName =
   | "git_status"
   | "preview_detect"
   | "capture_preview_screenshot"
+  | "preview_open"
+  | "preview_navigate"
+  | "preview_click"
+  | "preview_fill"
   | "list_kanban_tasks"
   | "list_agents"
   | "list_teams"
@@ -104,6 +109,34 @@ function bad(message: string): ToolHandlerResult {
 
 function arg<T>(args: Record<string, unknown>, key: string): T | undefined {
   return args[key] as T | undefined;
+}
+
+function collectLeafIds(layout: LayoutNode): string[] {
+  if (layout.type === "leaf") return [layout.paneId];
+  return layout.children.flatMap(collectLeafIds);
+}
+
+/** Resolve a preview pane to act on. Order: explicit paneId → preview pane in
+ *  active tab → preview pane in any tab. Mirrors `agentApiBridge.ts` minus the
+ *  requester-pane heuristic, which Super Agent has no equivalent for. */
+function resolvePreviewPane(targetPaneId?: string): { tab: Tab; pane: Pane } | null {
+  const ws = useWorkspaceStore.getState();
+  if (targetPaneId) {
+    for (const tab of ws.tabs) {
+      const pane = tab.panes[targetPaneId];
+      if (pane && pane.kind === "preview") return { tab, pane };
+    }
+  }
+  const active = ws.tabs.find((t) => t.id === ws.activeTabId);
+  if (active) {
+    const p = Object.values(active.panes).find((p) => p.kind === "preview");
+    if (p) return { tab: active, pane: p };
+  }
+  for (const tab of ws.tabs) {
+    const p = Object.values(tab.panes).find((p) => p.kind === "preview");
+    if (p) return { tab, pane: p };
+  }
+  return null;
 }
 
 export const TOOLS: Tool[] = [
@@ -316,6 +349,158 @@ export const TOOLS: Tool[] = [
           resultText: JSON.stringify({ ok: true, paneId: target.paneId, path: result.path }),
           images: [{ path: result.path, mediaType: "image/png" }],
         };
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "preview_open",
+    description:
+      "Open or refocus a live preview pane. Pass url for a specific page, or project_path to auto-detect a dev server. Reuses an existing preview pane in the active tab when present; otherwise splits a sibling next to the active pane (or creates a fresh tab if no workspace is open).",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Specific URL to load, e.g. http://localhost:5174/" },
+        project_path: {
+          type: "string",
+          description: "Project dir for framework + port auto-detection",
+        },
+        direction: {
+          type: "string",
+          enum: ["horizontal", "vertical"],
+          description: "Split direction when creating a new pane. Default horizontal.",
+        },
+      },
+      required: [],
+    },
+    handler: async (args) => {
+      const url = arg<string>(args, "url");
+      const projectPath = arg<string>(args, "project_path");
+      const direction =
+        (arg<string>(args, "direction") as "horizontal" | "vertical" | undefined) ?? "horizontal";
+      if (!url && !projectPath) return bad("provide url or project_path");
+      const ws = useWorkspaceStore.getState();
+      const tab = ws.tabs.find((t) => t.id === ws.activeTabId);
+      if (tab) {
+        const existing = Object.values(tab.panes).find((p) => p.kind === "preview");
+        if (existing) {
+          ws.setPanePayload(tab.id, existing.id, {
+            ...(existing.payload ?? {}),
+            ...(url ? { url } : {}),
+            ...(projectPath ? { projectPath } : {}),
+          });
+          return ok({ paneId: existing.id, tabId: tab.id, reused: true });
+        }
+      }
+      if (!tab) {
+        const tabId = ws.newTab(
+          1,
+          "Preview",
+          [{ kind: "preview", url, projectPath } as never],
+          projectPath,
+        );
+        const fresh = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
+        const paneId = fresh ? collectLeafIds(fresh.layout)[0] : "";
+        return ok({ paneId, tabId, reused: false });
+      }
+      const anchorPaneId =
+        (tab.activePaneId && tab.panes[tab.activePaneId] ? tab.activePaneId : null) ??
+        collectLeafIds(tab.layout)[0];
+      if (!anchorPaneId) return bad("no pane available to split");
+      const before = new Set(collectLeafIds(tab.layout));
+      ws.splitPane(tab.id, anchorPaneId, direction, {
+        kind: "preview",
+        url,
+        projectPath,
+      } as never);
+      const after = useWorkspaceStore.getState().tabs.find((t) => t.id === tab.id);
+      const newPaneId = after
+        ? collectLeafIds(after.layout).find((id) => !before.has(id))
+        : undefined;
+      return ok({ paneId: newPaneId, tabId: tab.id, reused: false });
+    },
+  },
+  {
+    name: "preview_navigate",
+    description:
+      "Navigate an existing preview pane to a new URL. Mutates the pane payload's url so the iframe remounts with the new src.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string" },
+        pane_id: { type: "string", description: "Defaults to a preview pane in the active tab" },
+      },
+      required: ["url"],
+    },
+    handler: async (args) => {
+      const url = arg<string>(args, "url");
+      if (!url) return bad("missing url");
+      const target = resolvePreviewPane(arg<string>(args, "pane_id"));
+      if (!target) return bad("no preview pane available — call preview_open first");
+      useWorkspaceStore.getState().setPanePayload(target.tab.id, target.pane.id, {
+        ...(target.pane.payload ?? {}),
+        url,
+      });
+      return ok({ paneId: target.pane.id, url });
+    },
+  },
+  {
+    name: "preview_click",
+    description: "Click an element in a preview pane by CSS selector.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        selector: { type: "string" },
+        pane_id: { type: "string", description: "Defaults to a preview pane in the active tab" },
+      },
+      required: ["selector"],
+    },
+    handler: async (args) => {
+      const selector = arg<string>(args, "selector");
+      if (!selector) return bad("missing selector");
+      const target = resolvePreviewPane(arg<string>(args, "pane_id"));
+      if (!target) return bad("no preview pane available");
+      try {
+        const result = await driveIframe(target.pane.id, "drive:click", { selector });
+        return ok({ paneId: target.pane.id, ...(result as Record<string, unknown>) });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "preview_fill",
+    description:
+      "Fill an input/textarea in a preview pane by CSS selector and dispatch input + change events. submit=true also requestSubmit()s the enclosing form.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        selector: { type: "string" },
+        value: { type: "string" },
+        submit: { type: "boolean", description: "Default false" },
+        pane_id: { type: "string" },
+      },
+      required: ["selector", "value"],
+    },
+    handler: async (args) => {
+      const selector = arg<string>(args, "selector");
+      const value = arg<string>(args, "value") ?? "";
+      const submit = arg<boolean>(args, "submit") ?? false;
+      if (!selector) return bad("missing selector");
+      const target = resolvePreviewPane(arg<string>(args, "pane_id"));
+      if (!target) return bad("no preview pane available");
+      try {
+        const result = await driveIframe(target.pane.id, "drive:fill", {
+          selector,
+          value,
+          submit,
+        });
+        return ok({ paneId: target.pane.id, ...(result as Record<string, unknown>) });
       } catch (e) {
         return bad(e instanceof Error ? e.message : String(e));
       }
