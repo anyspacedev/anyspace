@@ -14,7 +14,8 @@ import {
 } from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, findSkill } from "../../lib/teamSkills";
 import { launchTeam } from "../../lib/teamLauncher";
-import { decomposeWithAi } from "../../lib/teamDecompose";
+import { decomposeWithAi } from "../../lib/aiSuggest/teamDecompose";
+import { AiSuggestNotConfiguredError } from "../../lib/aiSuggest/runner";
 
 type RosterRow = {
   label: string;
@@ -63,6 +64,7 @@ export function TeamPickerForm({ onClose, titleId }: { onClose: () => void; titl
   const [decomposing, setDecomposing] = useState(false);
   const [decomposeNote, setDecomposeNote] = useState<string | null>(null);
   const [decomposeError, setDecomposeError] = useState<string | null>(null);
+  const [decomposeNeedsConfig, setDecomposeNeedsConfig] = useState(false);
 
   const templatesPopRef = useRef<HTMLDivElement>(null);
   const savePopRef = useRef<HTMLDivElement>(null);
@@ -198,8 +200,14 @@ export function TeamPickerForm({ onClose, titleId }: { onClose: () => void; titl
   };
 
   const runDecompose = async () => {
+    console.log("[suggestWithAi:team] runDecompose entry", {
+      goalLen: goal.trim().length,
+      decomposing,
+      agentsLen: agents.length,
+    });
     setDecomposeError(null);
     setDecomposeNote(null);
+    setDecomposeNeedsConfig(false);
     setDecomposing(true);
     try {
       const out = await decomposeWithAi({
@@ -227,7 +235,13 @@ export function TeamPickerForm({ onClose, titleId }: { onClose: () => void; titl
       if (out.notes) setDecomposeNote(out.notes);
       setExpanded((e) => ({ ...e, roster: true }));
     } catch (err) {
-      setDecomposeError(err instanceof Error ? err.message : String(err));
+      console.error("[suggestWithAi:team] handler caught", err);
+      if (err instanceof AiSuggestNotConfiguredError) {
+        setDecomposeNeedsConfig(true);
+        setDecomposeError(err.message);
+      } else {
+        setDecomposeError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setDecomposing(false);
     }
@@ -296,14 +310,38 @@ export function TeamPickerForm({ onClose, titleId }: { onClose: () => void; titl
               className="btn btn-ghost btn-with-icon"
               onClick={runDecompose}
               disabled={decomposing || !goal.trim()}
-              title="Ask the configured AI to propose a roster + skills"
+              title={
+                !goal.trim()
+                  ? "Type a goal first to enable AI suggestions"
+                  : "Ask the configured AI to propose a roster + skills"
+              }
             >
               <Icon name="sparkles" size={12} />
               <span>{decomposing ? "Thinking…" : "Suggest with AI"}</span>
             </button>
           </div>
+          {!goal.trim() && !decomposeError && (
+            <div className="form-hint">Type a goal above to enable AI suggestions.</div>
+          )}
           {decomposeError && (
-            <div className="form-hint form-hint-error">AI: {decomposeError}</div>
+            <div className="form-hint form-hint-error">
+              AI: {decomposeError}
+              {decomposeNeedsConfig && (
+                <>
+                  {" — "}
+                  <button
+                    type="button"
+                    className="team-section-link"
+                    onClick={() => {
+                      setView("settings");
+                      onClose();
+                    }}
+                  >
+                    Open Settings → AI
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {decomposeNote && <div className="form-hint">AI: {decomposeNote}</div>}
         </div>

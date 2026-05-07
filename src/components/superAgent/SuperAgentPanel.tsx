@@ -11,6 +11,9 @@ import { Icon } from "../ui/Icon";
 import { Waveform } from "../stt/Waveform";
 import { MessageBubble } from "./MessageBubble";
 import { registerSuperAgentInput } from "./inputRegistry";
+import { suggestSuperAgentPrompt } from "../../lib/aiSuggest/superAgentPrompt";
+import { AiSuggestNotConfiguredError } from "../../lib/aiSuggest/runner";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 
 // Render a KeyboardEvent.code as a human-readable token. Mirrors SttBubble's
 // helper but kept local so the SA panel doesn't import from a sibling component.
@@ -59,6 +62,10 @@ export function SuperAgentPanel() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
   const [unread, setUnread] = useState(0);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestNeedsConfig, setSuggestNeedsConfig] = useState(false);
+  const setView = useWorkspaceStore((s) => s.setView);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
@@ -178,6 +185,30 @@ export function SuperAgentPanel() {
       await sendUserMessage(sid, text);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runSuggest = async () => {
+    console.log("[suggestWithAi:super-agent] click", { busy, suggesting });
+    if (suggesting || busy) return;
+    setSuggestError(null);
+    setSuggestNeedsConfig(false);
+    setSuggesting(true);
+    try {
+      const out = await suggestSuperAgentPrompt();
+      setInput(out.prompt);
+      // Focus the textarea so the user can edit / press Enter immediately.
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch (err) {
+      console.error("[suggestWithAi:super-agent] caught", err);
+      if (err instanceof AiSuggestNotConfiguredError) {
+        setSuggestNeedsConfig(true);
+        setSuggestError(err.message);
+      } else {
+        setSuggestError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setSuggesting(false);
     }
   };
 
@@ -511,6 +542,26 @@ export function SuperAgentPanel() {
             <span className="sa-composer-model" title={settings.model || "no model"}>
               {settings.streaming ? "stream" : "one-shot"} · {settings.model || "(no model)"}
             </span>
+            {suggestError && (
+              <span className="sa-hotkey-hint sa-hotkey-hint-warn">
+                AI: {suggestError}
+                {suggestNeedsConfig && (
+                  <>
+                    {" — "}
+                    <button
+                      type="button"
+                      className="team-section-link"
+                      onClick={() => {
+                        setView("settings");
+                        setPanelOpen(false);
+                      }}
+                    >
+                      Open Settings → AI
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
           </div>
 
           <div className="sa-composer-actions">
@@ -575,6 +626,17 @@ export function SuperAgentPanel() {
               ) : (
                 <Icon name="mic" size={16} />
               )}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={runSuggest}
+              disabled={suggesting || busy}
+              title="Draft a starter prompt from the active pane (last command, file, or URL)"
+            >
+              <Icon name="sparkles" size={14} />
+              <span>{suggesting ? "Thinking…" : "Suggest"}</span>
             </button>
 
             {activeStreamId ? (

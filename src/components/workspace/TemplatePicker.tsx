@@ -4,6 +4,8 @@ import { TEMPLATES, useWorkspaceStore, type PanePreset } from "../../stores/work
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { agentLaunch } from "../../lib/tauri";
 import { Icon } from "../ui/Icon";
+import { suggestTemplateSetup } from "../../lib/aiSuggest/templateSetup";
+import { AiSuggestNotConfiguredError } from "../../lib/aiSuggest/runner";
 
 type Step = "template" | "agents";
 
@@ -17,10 +19,17 @@ export function TemplatePickerForm({ onClose, titleId }: { onClose: () => void; 
   const [chosen, setChosen] = useState<typeof TEMPLATES[number] | null>(null);
   const [projectPath, setProjectPath] = useState<string>("");
   const [paneAssign, setPaneAssign] = useState<Record<number, string>>({});
+  const [goal, setGoal] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestNeedsConfig, setSuggestNeedsConfig] = useState(false);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
   const newTab = useWorkspaceStore((s) => s.newTab);
+  const setView = useWorkspaceStore((s) => s.setView);
   const agents = useKanbanStore((s) => s.agents);
 
   const projectInputId = useId();
+  const goalInputId = useId();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -99,14 +108,100 @@ export function TemplatePickerForm({ onClose, titleId }: { onClose: () => void; 
     if (typeof selected === "string") setProjectPath(selected);
   };
 
+  const runSuggest = async () => {
+    console.log("[suggestWithAi:template] click", {
+      goalLen: goal.trim().length,
+      agents: agents.length,
+    });
+    if (suggesting || !goal.trim()) return;
+    setSuggestError(null);
+    setSuggestNote(null);
+    setSuggestNeedsConfig(false);
+    setSuggesting(true);
+    try {
+      const out = await suggestTemplateSetup({
+        goal,
+        templates: TEMPLATES.map((t) => ({ id: t.id, label: t.label, panes: t.panes })),
+        agents: agents.map((a) => ({ id: a.id, name: a.name, command: a.command })),
+      });
+      const tpl = TEMPLATES.find((t) => t.id === out.templateId);
+      if (tpl) setChosen(tpl);
+      setPaneAssign(out.paneAssign);
+      if (out.notes) setSuggestNote(out.notes);
+      setStep("agents");
+    } catch (err) {
+      console.error("[suggestWithAi:template] caught", err);
+      if (err instanceof AiSuggestNotConfiguredError) {
+        setSuggestNeedsConfig(true);
+        setSuggestError(err.message);
+      } else {
+        setSuggestError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   if (step === "template") {
     return (
       <>
         <h2 id={titleId} className="modal-title">Quick start — pick a layout</h2>
         <div className="modal-sub">
-          Pick a layout. Next you can assign an AI agent to each pane —
-          all panes spawn and fire their agent in parallel.
+          Pick a layout, or describe your goal and let the AI lay it out.
         </div>
+
+        <div className="form-row">
+          <label htmlFor={goalInputId}>What are you working on? (optional)</label>
+          <div className="form-row-inline">
+            <input
+              id={goalInputId}
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="e.g. Build a Next.js landing page with live preview"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && goal.trim() && !suggesting) {
+                  e.preventDefault();
+                  void runSuggest();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={runSuggest}
+              disabled={suggesting || !goal.trim()}
+              title={
+                !goal.trim()
+                  ? "Type a goal first to enable AI suggestions"
+                  : "Ask the configured AI to pick a layout and assign panes"
+              }
+            >
+              <Icon name="sparkles" size={12} />
+              <span>{suggesting ? "Thinking…" : "Suggest with AI"}</span>
+            </button>
+          </div>
+          {suggestError && (
+            <div className="form-hint form-hint-error">
+              AI: {suggestError}
+              {suggestNeedsConfig && (
+                <>
+                  {" — "}
+                  <button
+                    type="button"
+                    className="team-section-link"
+                    onClick={() => {
+                      setView("settings");
+                      onClose();
+                    }}
+                  >
+                    Open Settings → AI
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="template-grid">
           {TEMPLATES.map((t) => (
             <button
@@ -139,6 +234,7 @@ export function TemplatePickerForm({ onClose, titleId }: { onClose: () => void; 
         Pick an agent for each pane (or leave as <em>Plain shell</em>).
         Optionally point the workspace at a project folder.
       </div>
+      {suggestNote && <div className="form-hint">AI: {suggestNote}</div>}
 
       <div className="form-row">
         <label htmlFor={projectInputId}>Project folder (optional)</label>

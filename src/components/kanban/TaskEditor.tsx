@@ -1,11 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import { useFocusTrap } from "../../lib/useFocusTrap";
 import type { Task } from "../../lib/types";
 import { Icon } from "../ui/Icon";
 import { Select } from "../ui/Select";
+import { suggestKanbanTask } from "../../lib/aiSuggest/kanbanTask";
+import { AiSuggestNotConfiguredError } from "../../lib/aiSuggest/runner";
 
 export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
   useFocusReturn();
@@ -20,6 +23,11 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
   const [body, setBody] = useState(task?.body ?? "");
   const [agentId, setAgentId] = useState(task?.agentId ?? "");
   const [projectPath, setProjectPath] = useState(task?.projectPath ?? "");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestNeedsConfig, setSuggestNeedsConfig] = useState(false);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
+  const setView = useWorkspaceStore((s) => s.setView);
 
   const titleId = useId();
   const titleInputId = useId();
@@ -69,6 +77,39 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
     if (typeof selected === "string") setProjectPath(selected);
   };
 
+  const runSuggest = async () => {
+    console.log("[suggestWithAi:kanban] click", {
+      titleLen: title.trim().length,
+      hasBody: body.trim().length > 0,
+      agents: agents.length,
+    });
+    if (!title.trim() || suggesting) return;
+    setSuggestError(null);
+    setSuggestNote(null);
+    setSuggestNeedsConfig(false);
+    setSuggesting(true);
+    try {
+      const out = await suggestKanbanTask({
+        title,
+        agents: agents.map((a) => ({ id: a.id, name: a.name, command: a.command })),
+        existingBody: body || undefined,
+      });
+      setBody(out.body);
+      if (out.agentId && !agentId) setAgentId(out.agentId);
+      if (out.notes) setSuggestNote(out.notes);
+    } catch (err) {
+      console.error("[suggestWithAi:kanban] caught", err);
+      if (err instanceof AiSuggestNotConfiguredError) {
+        setSuggestNeedsConfig(true);
+        setSuggestError(err.message);
+      } else {
+        setSuggestError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={tryClose}>
       <div
@@ -103,6 +144,49 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
             <span>Body</span>
           </label>
           <textarea id={bodyInputId} value={body} onChange={(e) => setBody(e.target.value)} rows={6} />
+          <div
+            className="form-row-inline"
+            style={{ justifyContent: "flex-end", marginTop: 6 }}
+          >
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={runSuggest}
+              disabled={suggesting || !title.trim()}
+              title={
+                !title.trim()
+                  ? "Type a title first to enable AI suggestions"
+                  : "Ask the configured AI to draft the body and pick an agent"
+              }
+            >
+              <Icon name="sparkles" size={12} />
+              <span>{suggesting ? "Thinking…" : "Suggest with AI"}</span>
+            </button>
+          </div>
+          {!title.trim() && !suggestError && (
+            <div className="form-hint">Type a title above to enable AI suggestions.</div>
+          )}
+          {suggestError && (
+            <div className="form-hint form-hint-error">
+              AI: {suggestError}
+              {suggestNeedsConfig && (
+                <>
+                  {" — "}
+                  <button
+                    type="button"
+                    className="team-section-link"
+                    onClick={() => {
+                      setView("settings");
+                      onClose();
+                    }}
+                  >
+                    Open Settings → AI
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {suggestNote && <div className="form-hint">AI: {suggestNote}</div>}
         </div>
         <div className="form-row">
           <label className="label-with-icon" htmlFor={agentSelectId}>
