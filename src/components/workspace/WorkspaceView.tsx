@@ -1,23 +1,20 @@
 import { useEffect } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useNewWorkspacePickerStore } from "../../stores/newWorkspacePickerStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { PaneGrid } from "./PaneGrid";
 import { SuperAgentPanel } from "../superAgent/SuperAgentPanel";
-import { useThemeStore } from "../../stores/themeStore";
 import { Icon } from "../ui/Icon";
+import { SetupChecklist } from "../onboarding/SetupChecklist";
+import { DragCoachmark } from "./DragCoachmark";
+import { SelectionTray } from "./SelectionTray";
 
 export function WorkspaceView() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const tab = tabs.find((t) => t.id === activeTabId);
   const splitPane = useWorkspaceStore((s) => s.splitPane);
-  const newTab = useWorkspaceStore((s) => s.newTab);
-  const setView = useWorkspaceStore((s) => s.setView);
-  const theme = useThemeStore((s) => s.current);
-  const openPickerWith = useNewWorkspacePickerStore((s) => s.openWith);
   const superAgentOpen = useSuperAgentStore((s) => s.panelOpen);
   const setSuperAgentOpen = useSuperAgentStore((s) => s.setPanelOpen);
   const superAgentWidth = useSuperAgentSettingsStore((s) => s.settings.panelWidth);
@@ -35,64 +32,7 @@ export function WorkspaceView() {
   }, [tab, splitPane]);
 
   if (tabs.length === 0) {
-    return (
-      <>
-        <div className="welcome">
-          <div className="welcome-card">
-            <div
-              className="welcome-mark"
-              style={{
-                background: `linear-gradient(135deg, ${theme.ui.accent}, ${theme.ui.info})`,
-                color: theme.ui.accentFg,
-              }}
-            >
-              T
-            </div>
-            <h1 className="welcome-title">Welcome aboard</h1>
-            <div className="welcome-sub">
-              Open a terminal to get started, or browse your task board.
-            </div>
-            <div className="welcome-actions">
-              <button
-                className="btn btn-primary btn-with-icon"
-                onClick={() => newTab(1)}
-              >
-                <Icon name="terminal" size={14} />
-                <span>Open Terminal</span>
-              </button>
-              <button
-                className="btn btn-with-icon"
-                onClick={() => openPickerWith("team")}
-              >
-                <Icon name="users-round" size={14} />
-                <span>Start team</span>
-              </button>
-            </div>
-            <button
-              type="button"
-              className="welcome-tertiary"
-              onClick={() => setView("kanban")}
-            >
-              or browse your task board →
-            </button>
-            <div className="welcome-hints">
-              <div className="welcome-hint">
-                <kbd>⌘T</kbd>
-                <span>New workspace</span>
-              </div>
-              <div className="welcome-hint">
-                <kbd>⌘P</kbd>
-                <span>Quick open file</span>
-              </div>
-              <div className="welcome-hint">
-                <kbd>⌘D</kbd>
-                <span>Split pane</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
+    return <SetupChecklist />;
   }
 
   const cls = ["workspace"];
@@ -124,6 +64,8 @@ export function WorkspaceView() {
             <Icon name="sparkles" size={14} />
           </button>
         )}
+        <SelectionTray />
+        <DragCoachmark />
       </div>
       {superAgentOpen && <SuperAgentPanel />}
     </div>

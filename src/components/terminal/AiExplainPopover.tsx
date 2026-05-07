@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "../ui/Icon";
 import { aiChat } from "../../lib/tauri";
 import { useAiStore } from "../../stores/aiStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import type { CommandBlock } from "./osc133";
 
 type Phase =
   | { state: "loading" }
   | { state: "ok"; text: string }
-  | { state: "err"; message: string };
+  | { state: "err"; message: string; needsConfig?: boolean };
 
 type Props = {
   block: CommandBlock;
@@ -25,12 +26,16 @@ export function AiExplainPopover({ block, output, onClose }: Props) {
 
   // Fire one request on mount. Re-trigger requires unmount + remount via
   // a key change on the parent — explainingBlockId in Terminal.tsx.
+  const setView = useWorkspaceStore((s) => s.setView);
+
   useEffect(() => {
     let cancelled = false;
-    if (!settings.apiKey) {
+    if (!settings.endpoint || !settings.apiKey || !settings.model) {
       setPhase({
         state: "err",
-        message: "No API key — open Settings → AI",
+        message:
+          "AI provider isn't configured. Set endpoint, API key, and model first.",
+        needsConfig: true,
       });
       return;
     }
@@ -113,7 +118,23 @@ export function AiExplainPopover({ block, output, onClose }: Props) {
           <div className="ai-explain-text">{phase.text}</div>
         )}
         {phase.state === "err" && (
-          <div className="ai-explain-error">{phase.message}</div>
+          <div className="ai-explain-error">
+            <div>{phase.message}</div>
+            {phase.needsConfig && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-with-icon"
+                style={{ marginTop: 6 }}
+                onClick={() => {
+                  setView("settings");
+                  onClose();
+                }}
+              >
+                <Icon name="settings" size={12} />
+                <span>Open Settings → AI</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

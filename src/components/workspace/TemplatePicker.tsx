@@ -211,10 +211,12 @@ export function TemplatePickerForm({ onClose, titleId }: { onClose: () => void; 
                 setChosen(t);
                 setStep("agents");
               }}
+              title={t.description}
             >
               <TemplatePreview panes={t.panes} />
               <div className="template-label">{t.label}</div>
               <div className="template-sub">{t.panes} pane{t.panes === 1 ? "" : "s"}</div>
+              <div className="template-desc">{t.description}</div>
             </button>
           ))}
         </div>

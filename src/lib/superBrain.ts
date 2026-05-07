@@ -8,6 +8,7 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useAiStore } from "../stores/aiStore";
 import { aiChat, ptyWrite } from "./tauri";
 import { getTerminalContext, type TerminalContext } from "../components/terminal/terminalRegistry";
+import { toast } from "../stores/toastStore";
 
 const SUPER_BRAIN_SYSTEM_PROMPT =
   "You are a paired engineer driving a terminal. Given the user's last " +
@@ -72,12 +73,38 @@ export async function runQuickSuggest(opts: {
   return safe;
 }
 
-export async function runSuperBrain(tabId: string): Promise<void> {
+export type SuperBrainStatus =
+  | "ok"
+  | "no-tab"
+  | "no-targets"
+  | "ai-not-configured"
+  | "missing-pane"
+  | "non-terminal"
+  | "no-context"
+  | "empty-draft"
+  | "error";
+
+export type SuperBrainPaneResult = {
+  paneId: string;
+  status: SuperBrainStatus;
+  /** Set when status === "error". */
+  errorMessage?: string;
+  /** True when guardDraft prefixed `# ` because the heuristic flagged it. */
+  guarded?: boolean;
+};
+
+export type SuperBrainResult = {
+  /** Top-level status when no per-pane work was attempted. "ok" if any pane was attempted. */
+  status: SuperBrainStatus;
+  results: SuperBrainPaneResult[];
+};
+
+export async function runSuperBrain(tabId: string): Promise<SuperBrainResult> {
   console.log("[superBrain] invoked", { tabId });
   const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
   if (!tab) {
     console.warn("[superBrain] no tab found for id", tabId);
-    return;
+    return { status: "no-tab", results: [] };
   }
   const sel = tab.selectedPaneIds ?? [];
   const targets = sel.length > 0 ? sel : (tab.activePaneId ? [tab.activePaneId] : []);
@@ -88,7 +115,7 @@ export async function runSuperBrain(tabId: string): Promise<void> {
   });
   if (targets.length === 0) {
     console.warn("[superBrain] no target panes — select a pane or focus a terminal first");
-    return;
+    return { status: "no-targets", results: [] };
   }
 
   const ai = useAiStore.getState().settings;
@@ -103,19 +130,19 @@ export async function runSuperBrain(tabId: string): Promise<void> {
       hasApiKey: !!ai.apiKey,
       hasModel: !!ai.model,
     });
-    return;
+    return { status: "ai-not-configured", results: [] };
   }
 
-  const results = await Promise.all(
-    targets.map(async (paneId) => {
+  const results: SuperBrainPaneResult[] = await Promise.all(
+    targets.map(async (paneId): Promise<SuperBrainPaneResult> => {
       const pane = tab.panes[paneId];
       if (!pane) {
         console.warn("[superBrain] pane missing in tab", { paneId });
-        return "missing-pane";
+        return { paneId, status: "missing-pane" };
       }
       if (pane.kind !== "terminal") {
         console.warn("[superBrain] skipping non-terminal pane", { paneId, kind: pane.kind });
-        return "non-terminal";
+        return { paneId, status: "non-terminal" };
       }
       const ctx = getTerminalContext(paneId);
       if (!ctx) {
@@ -123,7 +150,7 @@ export async function runSuperBrain(tabId: string): Promise<void> {
           "[superBrain] no completed command block for pane — run a command and wait for it to finish first",
           { paneId },
         );
-        return "no-context";
+        return { paneId, status: "no-context" };
       }
       console.log("[superBrain] context captured", {
         paneId,
@@ -145,26 +172,117 @@ export async function runSuperBrain(tabId: string): Promise<void> {
         const cmd = sanitize(reply);
         if (!cmd) {
           console.warn("[superBrain] sanitize produced empty draft — model returned no usable command", { paneId, reply });
-          return "empty-draft";
+          return { paneId, status: "empty-draft" };
         }
         const safe = guardDraft(cmd);
-        if (safe !== cmd) {
+        const guarded = safe !== cmd;
+        if (guarded) {
           console.log("[superBrain] draft guarded with comment prefix (destructive heuristic)", { paneId, cmd, safe });
         }
         console.log("[superBrain] writing draft to PTY (no newline)", { paneId, sessionId: ctx.sessionId, draft: safe });
         // Raw bytes, no newline — the user reviews before pressing Enter.
         await ptyWrite(ctx.sessionId, new TextEncoder().encode(safe));
-        return "ok";
+        return { paneId, status: "ok", guarded };
       } catch (e) {
-        // Tauri rejects with a plain string from the Rust command; ensure it's
-        // visible (some loggers stringify Error wrappers as "[object Object]").
         const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
         console.error("[superBrain] failed for pane", paneId, "→", msg, "(raw)", e);
-        return "error";
+        return { paneId, status: "error", errorMessage: msg };
       }
     }),
   );
   console.log("[superBrain] done", { results });
+  return { status: "ok", results };
+}
+
+/**
+ * Toast a user-facing summary of a SuperBrainResult. Caller-side helper so
+ * non-UI callers (Super Agent tools, Run Task flows) can decide whether they
+ * want their own surface; the keybind + pane-header button use this.
+ *
+ * On success with no guarded drafts: silent (the new text in the PTY *is* the
+ * feedback). Mixed / failed states show one toast describing what happened.
+ */
+export function toastSuperBrainResult(result: SuperBrainResult): void {
+  const openSettings = () =>
+    useWorkspaceStore.getState().setView("settings");
+
+  if (result.status === "no-tab") return; // not a user-actionable error
+  if (result.status === "no-targets") {
+    toast.warn(
+      "Suggest with AI: no target pane",
+      "Focus a terminal pane (or Cmd-click multiple) and try again.",
+    );
+    return;
+  }
+  if (result.status === "ai-not-configured") {
+    toast.error(
+      "AI provider not configured",
+      "Set endpoint, API key, and model in Settings → AI.",
+      { label: "Open Settings", onClick: openSettings },
+    );
+    return;
+  }
+
+  const counts = result.results.reduce(
+    (acc, r) => {
+      acc[r.status] = (acc[r.status] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<SuperBrainStatus, number>,
+  );
+  const ok = counts.ok ?? 0;
+  const guarded = result.results.filter((r) => r.guarded).length;
+  const noContext = counts["no-context"] ?? 0;
+  const empty = counts["empty-draft"] ?? 0;
+  const errored = counts.error ?? 0;
+  const total = result.results.length;
+
+  if (ok === total && guarded === 0) {
+    // Silent success — the command in the PTY is the feedback.
+    return;
+  }
+  if (ok === total && guarded > 0) {
+    toast.warn(
+      `Drafted with \`#\` prefix (${guarded === 1 ? "looks destructive" : `${guarded} look destructive`})`,
+      "Edit the line and remove the leading `#` to run.",
+    );
+    return;
+  }
+  if (ok === 0 && noContext === total) {
+    toast.warn(
+      "No completed command yet",
+      "Run a command in the selected pane and wait for it to finish, then try again.",
+    );
+    return;
+  }
+  if (ok === 0 && empty === total) {
+    toast.warn(
+      "AI didn't return a usable command",
+      "Try again, or rephrase by running a more descriptive command first.",
+    );
+    return;
+  }
+  if (ok === 0 && errored === total) {
+    const sample = result.results.find((r) => r.status === "error")?.errorMessage;
+    toast.error(
+      "Suggest with AI failed",
+      sample ?? "See devtools console for details.",
+    );
+    return;
+  }
+  // Mixed.
+  const skipped = total - ok;
+  toast.info(
+    `Drafted in ${ok} pane${ok === 1 ? "" : "s"}; skipped ${skipped}`,
+    [
+      noContext ? `${noContext} had no completed command` : "",
+      empty ? `${empty} returned no draft` : "",
+      errored ? `${errored} errored` : "",
+      guarded ? `${guarded} drafted with \`#\` prefix` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  );
 }
 
 /**

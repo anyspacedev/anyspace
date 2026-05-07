@@ -7,6 +7,8 @@ import {
   type OperatorPing,
 } from "../stores/operatorInboxStore";
 import { useTeamStore } from "../stores/teamStore";
+import { toast } from "../stores/toastStore";
+import { handoffInboxToSuperAgent } from "./operatorInboxHandoff";
 
 type TeamMessagesEvent = { teamId: string; messagesPath: string };
 
@@ -18,7 +20,7 @@ const COMPACT_KEEP = 250;
 const COMPACT_DEBOUNCE_MS = 60_000;
 const lastCompactAt = new Map<string, number>();
 
-function maybeCompact(teamId: string, teamDir: string, blockCount: number): void {
+function maybeCompact(teamId: string, teamDir: string, teamName: string, blockCount: number): void {
   if (blockCount < COMPACT_THRESHOLD) return;
   const last = lastCompactAt.get(teamId) ?? 0;
   const now = Date.now();
@@ -30,7 +32,13 @@ function maybeCompact(teamId: string, teamDir: string, blockCount: number): void
     keepRecent: COMPACT_KEEP,
   })
     .then((r) => {
-      if (r.archived > 0) console.log("[operatorInbox] compacted", teamId, r);
+      if (r.archived > 0) {
+        console.log("[operatorInbox] compacted", teamId, r);
+        toast.info(
+          `Archived ${r.archived} old messages`,
+          `Team "${teamName}" — older messages moved to MESSAGES.archive.md to keep the active log focused.`,
+        );
+      }
     })
     .catch((e) => console.warn("[operatorInbox] compact failed", teamId, e));
 }
@@ -49,7 +57,7 @@ async function refreshFor(teamId: string, teamDir: string, teamName: string): Pr
     return;
   }
   const all = parseMessages(content);
-  maybeCompact(teamId, teamDir, all.length);
+  maybeCompact(teamId, teamDir, teamName, all.length);
   const fresh: OperatorPing[] = [];
   for (const m of all) {
     if (!isOperatorPing(m)) continue;
@@ -67,6 +75,27 @@ async function refreshFor(teamId: string, teamDir: string, teamName: string): Pr
   }
   if (fresh.length > 0) {
     useOperatorInboxStore.getState().addPings(fresh);
+    // Initial drain (when lastSeen is unset) means the user just opened the
+    // app and these pings might have been waiting for hours — surface a
+    // toast for *new* pings only (after we already had a baseline).
+    if (lastSeen) {
+      const newest = fresh[fresh.length - 1];
+      const escalations = fresh.filter((p) => p.type === "escalation").length;
+      const tone = escalations > 0 ? "error" : "warn";
+      const title =
+        escalations > 0
+          ? `${escalations} escalation${escalations === 1 ? "" : "s"} from team "${teamName}"`
+          : `${fresh.length} @operator message${fresh.length === 1 ? "" : "s"} from "${teamName}"`;
+      const preview = newest.body.split("\n")[0]?.slice(0, 120);
+      toast[tone](title, preview, {
+        label: "Open Super Agent",
+        onClick: () => {
+          void handoffInboxToSuperAgent().catch((e) =>
+            console.warn("[operatorInbox] handoff failed", e),
+          );
+        },
+      });
+    }
   } else if (!lastSeen && all.length > 0) {
     // No operator pings but file has content — seed lastSeen so future
     // pings are correctly bounded against this baseline.

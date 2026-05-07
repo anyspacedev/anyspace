@@ -10,7 +10,17 @@ import { Select } from "../ui/Select";
 import { suggestKanbanTask } from "../../lib/aiSuggest/kanbanTask";
 import { AiSuggestNotConfiguredError } from "../../lib/aiSuggest/runner";
 
-export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
+export function TaskEditor({
+  task,
+  onClose,
+  focusAgent,
+}: {
+  task?: Task;
+  onClose: () => void;
+  /** When true, scroll to and focus the agent dropdown — used when Run was
+   *  attempted without an agent so the user lands on the field that needs them. */
+  focusAgent?: boolean;
+}) {
   useFocusReturn();
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef);
@@ -34,6 +44,18 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
   const bodyInputId = useId();
   const agentSelectId = useId();
   const projectInputId = useId();
+  const agentSelectRef = useRef<HTMLSelectElement>(null);
+
+  // When opened from a Run-without-agent click, focus the field that's blocking
+  // launch so the user sees what to fix.
+  useEffect(() => {
+    if (!focusAgent) return;
+    const t = window.setTimeout(() => {
+      agentSelectRef.current?.focus();
+      agentSelectRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [focusAgent]);
 
   // Dirty if user has typed anything (new task) or changed something (edit).
   const dirty = task
@@ -188,17 +210,53 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
           )}
           {suggestNote && <div className="form-hint">AI: {suggestNote}</div>}
         </div>
-        <div className="form-row">
+        <div className={"form-row" + (focusAgent && !agentId ? " form-row--needs" : "")}>
           <label className="label-with-icon" htmlFor={agentSelectId}>
             <Icon name="sparkles" size={12} />
             <span>Agent</span>
+            {focusAgent && !agentId && (
+              <span className="form-row-tag">required to Run</span>
+            )}
           </label>
-          <Select id={agentSelectId} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            <option value="">— none —</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </Select>
+          <div className="form-row-inline">
+            <Select
+              id={agentSelectId}
+              ref={agentSelectRef}
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+            >
+              <option value="">— none —</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </Select>
+            <button
+              type="button"
+              className="btn btn-ghost btn-with-icon"
+              onClick={() => {
+                setView("agents");
+                onClose();
+              }}
+              title={
+                agents.length === 0
+                  ? "Create your first agent — opens the Agents view"
+                  : "Open the Agents view to add or edit an agent"
+              }
+            >
+              <Icon name="plus" size={12} />
+              <span>{agents.length === 0 ? "Create agent" : "Manage agents"}</span>
+            </button>
+          </div>
+          {agents.length === 0 && (
+            <div className="form-hint">
+              Run Task spawns the chosen agent's command in a terminal pane.
+              Define one in <button
+                type="button"
+                className="team-section-link"
+                onClick={() => { setView("agents"); onClose(); }}
+              >Agents</button> first.
+            </div>
+          )}
         </div>
         <div className="form-row">
           <label className="label-with-icon" htmlFor={projectInputId}>

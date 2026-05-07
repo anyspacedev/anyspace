@@ -3,7 +3,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { usePaneDragStore, type DropZone } from "../../stores/paneDragStore";
 import type { Pane, PaneKind } from "../../lib/types";
 import { Icon, type IconName } from "../ui/Icon";
-import { runSuperBrain } from "../../lib/superBrain";
+import { runSuperBrain, toastSuperBrainResult } from "../../lib/superBrain";
 
 const KIND_LABELS: Record<PaneKind, string> = {
   terminal: "Terminal",
@@ -149,13 +149,31 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
       </button>
       {menuOpen && (
         <div className="pane-menu" onMouseLeave={() => setMenuOpen(false)}>
+          <div className="pane-menu-section">Change pane kind</div>
           {(Object.keys(KIND_LABELS) as PaneKind[])
             .filter((k) => k !== "empty")
             .map((k) => (
               <button
                 key={k}
                 className={"pane-menu-item" + (k === pane.kind ? " active" : "")}
+                disabled={k === pane.kind}
                 onClick={() => {
+                  if (k === pane.kind) return;
+                  // Terminal panes own a live PTY and command-block history;
+                  // switching away ends the session. Confirm so a misclick
+                  // doesn't destroy work the user wanted to keep.
+                  const hasState =
+                    pane.kind === "terminal" &&
+                    Boolean(pane.payload?.sessionId);
+                  if (hasState) {
+                    const ok = window.confirm(
+                      `Replace this Terminal pane with ${KIND_LABELS[k]}? The PTY session and scrollback will be discarded.`,
+                    );
+                    if (!ok) {
+                      setMenuOpen(false);
+                      return;
+                    }
+                  }
                   setPaneKind(tabId, pane.id, k, {});
                   setMenuOpen(false);
                 }}
@@ -191,7 +209,7 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
             className="icon-btn"
             title="Super Brain — AI suggests next command (⌘⇧B)"
             aria-label="Super Brain"
-            onClick={() => void runSuperBrain(tabId)}
+            onClick={() => void runSuperBrain(tabId).then(toastSuperBrainResult)}
           >
             <Icon name="sparkles" size={14} />
           </button>

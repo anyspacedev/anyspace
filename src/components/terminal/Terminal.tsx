@@ -447,7 +447,19 @@ export function Terminal({ pane, tabId }: Props) {
     };
     const uPrev = registerShortcut("jumpBlockPrev", () => jump("prev"));
     const uNext = registerShortcut("jumpBlockNext", () => jump("next"));
-    return () => { uPrev(); uNext(); };
+
+    // Cmd+Alt+(C|O|M) — operate on the focused block. Only fires if this
+    // pane owns the focus, so multiple terminals don't fight for the keybind.
+    const handleCopy = (variant: BlockAction) => {
+      if (!focusedHere()) return;
+      const id = focusedBlockIdRef.current;
+      if (!id) return;
+      handleAction(variant, id);
+    };
+    const uCmd = registerShortcut("copyBlockCommand", () => handleCopy("copyCmd"));
+    const uOut = registerShortcut("copyBlockOutput", () => handleCopy("copyOut"));
+    const uMd  = registerShortcut("copyBlockMarkdown", () => handleCopy("copyMd"));
+    return () => { uPrev(); uNext(); uCmd(); uOut(); uMd(); };
   }, []);
 
   const runSearch = (q: string, dir: "next" | "prev") => {

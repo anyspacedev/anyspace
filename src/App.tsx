@@ -11,7 +11,8 @@ import { useTeamSettingsStore } from "./stores/teamSettingsStore";
 import { useNewWorkspacePickerStore } from "./stores/newWorkspacePickerStore";
 import { NewWorkspacePickerHost } from "./components/workspace/NewWorkspacePicker";
 import { attachGlobalShortcuts, registerShortcut } from "./lib/shortcuts";
-import { runSuperBrain } from "./lib/superBrain";
+import { runSuperBrain, toastSuperBrainResult } from "./lib/superBrain";
+import { toast } from "./stores/toastStore";
 import { resumeTeam } from "./lib/teamLauncher";
 import { syncOperatorInboxSubscriptions } from "./lib/operatorInbox";
 import { ensureAgentApi } from "./lib/agentApi";
@@ -26,10 +27,13 @@ import { AgentManager } from "./components/agents/AgentManager";
 import { Settings } from "./components/settings/Settings";
 import { useSuperAgentStore } from "./stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "./stores/superAgentSettingsStore";
+import { useRecentFoldersStore } from "./stores/recentFoldersStore";
+import { useUiHintsStore } from "./stores/uiHintsStore";
 import { StatusBar } from "./components/workspace/StatusBar";
 import { QuickOpen } from "./components/sidebar/QuickOpen";
 import { SttBubble } from "./components/stt/SttBubble";
 import { ScreenshotStack } from "./components/screenshot/ScreenshotStack";
+import { Toaster } from "./components/ui/Toaster";
 
 export default function App() {
   const loadTheme = useThemeStore((s) => s.load);
@@ -48,6 +52,8 @@ export default function App() {
   const loadTeamSettings = useTeamSettingsStore((s) => s.load);
   const loadSuperAgent = useSuperAgentStore((s) => s.load);
   const loadSuperAgentSettings = useSuperAgentSettingsStore((s) => s.load);
+  const loadRecentFolders = useRecentFoldersStore((s) => s.load);
+  const loadUiHints = useUiHintsStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
@@ -83,12 +89,14 @@ export default function App() {
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
+    void loadRecentFolders().catch((e) => console.warn("[recentFolders] load failed", e));
+    void loadUiHints().catch((e) => console.warn("[uiHints] load failed", e));
     // Boot the agent_api bridge before any Code Agent terminal can spawn —
     // launchers read the cached URL+token to inject TEAMSHIP_API_URL/TOKEN
     // into the child env.
     void ensureAgentApi().catch((e) => console.warn("[agent_api] info load failed", e));
     void startAgentApiBridge().catch((e) => console.warn("[agent_api] bridge start failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
@@ -205,9 +213,16 @@ export default function App() {
         console.log("[shortcut] runSuperBrain dispatched", { activeTabId: id });
         if (!id) {
           console.warn("[shortcut] runSuperBrain: no active tab");
+          toast.warn("Suggest with AI: no active workspace", "Open a tab first.");
           return;
         }
-        void runSuperBrain(id);
+        void runSuperBrain(id).then(toastSuperBrainResult).catch((e) => {
+          console.error("[shortcut] runSuperBrain threw", e);
+          toast.error(
+            "Suggest with AI failed",
+            e instanceof Error ? e.message : String(e),
+          );
+        });
       }),
     ];
     // Esc clears multi-pane selection. Use capture so we beat any per-component
@@ -238,9 +253,9 @@ export default function App() {
         <AccountStatus />
       </header>
       <div className="app-main">
-        <div className="app-content">
+        <div className="app-content" data-view={view}>
           <div
-            className="view-workspace"
+            className="view-workspace view-fade"
             style={
               view === "workspace"
                 ? undefined
@@ -250,9 +265,21 @@ export default function App() {
           >
             <WorkspaceView />
           </div>
-          {view === "kanban" && <KanbanBoard />}
-          {view === "agents" && <AgentManager />}
-          {view === "settings" && <Settings />}
+          {view === "kanban" && (
+            <div className="view-overlay view-fade" key="kanban">
+              <KanbanBoard />
+            </div>
+          )}
+          {view === "agents" && (
+            <div className="view-overlay view-fade" key="agents">
+              <AgentManager />
+            </div>
+          )}
+          {view === "settings" && (
+            <div className="view-overlay view-fade" key="settings">
+              <Settings />
+            </div>
+          )}
         </div>
         <StatusBar />
       </div>
@@ -260,6 +287,7 @@ export default function App() {
       <QuickOpen />
       <SttBubble />
       <ScreenshotStack />
+      <Toaster />
     </div>
   );
 }

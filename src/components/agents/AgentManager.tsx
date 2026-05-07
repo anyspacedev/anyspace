@@ -2,6 +2,8 @@ import { useEffect, useId, useState } from "react";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import type { Agent } from "../../lib/types";
 import { Icon } from "../ui/Icon";
+import { EnvEditor } from "./EnvEditor";
+import { AgentExamples, type AgentExample } from "./AgentExamples";
 
 const BLANK: Omit<Agent, "id"> = {
   name: "",
@@ -45,6 +47,19 @@ export function AgentManager() {
     setDirty(true);
   };
 
+  const applyExample = (ex: AgentExample) => {
+    setDraft({
+      name: ex.name,
+      command: ex.command,
+      systemPrompt: ex.systemPrompt,
+      envJson: ex.envJson,
+    });
+    setDirty(true);
+  };
+
+  // Show the examples column when starting fresh: no agent picked, no name typed.
+  const showExamples = editingId === null && !draft.name && !draft.command;
+
   const save = async () => {
     if (!draft.name || !draft.command) return;
     if (editingId) {
@@ -63,13 +78,16 @@ export function AgentManager() {
   };
 
   return (
-    <div className="agent-manager">
+    <div className={"agent-manager" + (showExamples ? " agent-manager--has-examples" : "")}>
       <div className="agent-list">
         <div className="section-title">Agents</div>
         {agents.length === 0 && (
           <div className="agent-list-empty">
             <Icon name="sparkles" size={18} />
-            <div>No agents yet. Create one to launch via task or pane.</div>
+            <div>
+              No agents yet. Pick an example on the right to seed the form,
+              or fill it in by hand.
+            </div>
           </div>
         )}
         {agents.map((a) => (
@@ -118,21 +136,38 @@ export function AgentManager() {
             value={draft.command}
             placeholder="e.g. claude --resume {task_file}"
             onChange={(e) => update({ command: e.target.value })}
+            spellCheck={false}
           />
           <div className="hint">
-            Use <code>{"{task_file}"}</code> placeholder or <code>$TEAMSHIP_TASK_FILE</code> env var.
+            Spawned in a terminal pane when Run Task fires.{" "}
+            <code>{"{task_file}"}</code> expands to the rendered task body
+            on disk; <code>$TEAMSHIP_TASK_FILE</code> is set in the agent's env
+            for tools that prefer reading from an env var.
           </div>
         </div>
         <div className="form-row">
           <label className="label-with-icon" htmlFor={systemPromptId}>
             <Icon name="sparkles" size={12} />
             <span>System prompt</span>
+            <span className="form-row-tag">optional</span>
           </label>
           <textarea
             id={systemPromptId}
             value={draft.systemPrompt}
             rows={4}
             onChange={(e) => update({ systemPrompt: e.target.value })}
+            placeholder="Prepended to the task body before the agent runs. Useful for setting persona or constraints (e.g. &quot;You are a security-focused reviewer.&quot;)."
+          />
+        </div>
+        <div className="form-row">
+          <label className="label-with-icon">
+            <Icon name="terminal" size={12} />
+            <span>Environment variables</span>
+            <span className="form-row-tag">optional</span>
+          </label>
+          <EnvEditor
+            envJson={draft.envJson}
+            onChange={(next) => update({ envJson: next })}
           />
         </div>
         <div className="modal-actions">
@@ -153,6 +188,7 @@ export function AgentManager() {
           </button>
         </div>
       </div>
+      {showExamples && <AgentExamples onPick={applyExample} />}
     </div>
   );
 }

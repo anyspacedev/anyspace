@@ -599,12 +599,52 @@ useWorkspaceStore.subscribe((state) => {
 });
 
 export const TEMPLATES = [
-  { id: 1, label: "Single", panes: 1 },
-  { id: 2, label: "Split", panes: 2 },
-  { id: 4, label: "Quad", panes: 4 },
-  { id: 6, label: "Six", panes: 6 },
-  { id: 8, label: "Eight", panes: 8 },
-  { id: 9, label: "Nine (3×3)", panes: 9 },
-  { id: 12, label: "Twelve", panes: 12 },
-  { id: 16, label: "Sixteen", panes: 16 },
+  {
+    id: 1,
+    label: "Solo",
+    panes: 1,
+    description: "One pane — quick shell or single-agent run.",
+  },
+  {
+    id: 2,
+    label: "Pair",
+    panes: 2,
+    description: "Side-by-side — agent + reviewer, or terminal + editor.",
+  },
+  {
+    id: 4,
+    label: "Quad",
+    panes: 4,
+    description: "2×2 dashboard — multiple agents or terminal/editor/preview/files.",
+  },
+  {
+    id: 6,
+    label: "Squad",
+    panes: 6,
+    description: "Two rows of three — small team workspace.",
+  },
+  {
+    id: 8,
+    label: "Pipeline",
+    panes: 8,
+    description: "Two rows of four — parallel pipeline runs.",
+  },
+  {
+    id: 9,
+    label: "Grid 3×3",
+    panes: 9,
+    description: "Nine equal panes — broad observation board.",
+  },
+  {
+    id: 12,
+    label: "Wide grid",
+    panes: 12,
+    description: "Three rows of four — heavy parallel workload.",
+  },
+  {
+    id: 16,
+    label: "Mega grid",
+    panes: 16,
+    description: "4×4 — maximum density. Reduces per-pane width significantly.",
+  },
 ];

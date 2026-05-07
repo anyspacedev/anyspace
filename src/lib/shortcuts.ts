@@ -26,6 +26,9 @@ export type ShortcutAction =
   | "togglePreview"
   | "jumpBlockPrev"
   | "jumpBlockNext"
+  | "copyBlockCommand"
+  | "copyBlockOutput"
+  | "copyBlockMarkdown"
   | "runSuperBrain";
 
 const handlers = new Map<ShortcutAction, () => void>();
@@ -50,6 +53,16 @@ export function attachGlobalShortcuts() {
     if (e.shiftKey && k === "d") return dispatch("splitPaneVertical"), e.preventDefault();
     if (e.shiftKey && k === "b") return dispatch("runSuperBrain"), e.preventDefault();
     if (e.shiftKey && k === "t") return dispatch("newTeam"), e.preventDefault();
+    // Cmd+Alt+C / O / M — copy command / output / markdown of the focused
+    // command block, when there is one. Cmd+C alone stays bound to xterm
+    // for terminal-text selection.
+    if (e.altKey && (k === "c" || k === "o" || k === "m")) {
+      if (k === "c") dispatch("copyBlockCommand");
+      if (k === "o") dispatch("copyBlockOutput");
+      if (k === "m") dispatch("copyBlockMarkdown");
+      e.preventDefault();
+      return;
+    }
     switch (k) {
       case "t": dispatch("newTab"); e.preventDefault(); break;
       case "w": dispatch("closeTab"); e.preventDefault(); break;

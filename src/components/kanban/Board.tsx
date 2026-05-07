@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -11,6 +11,7 @@ import { COLUMNS, COLUMN_LABEL, type Task } from "../../lib/types";
 import { Column } from "./Column";
 import { TaskEditor } from "./TaskEditor";
 import { launchAgent } from "../../lib/agentLauncher";
+import { toast } from "../../stores/toastStore";
 import { Icon } from "../ui/Icon";
 
 export function KanbanBoard() {
@@ -18,16 +19,9 @@ export function KanbanBoard() {
   const agents = useKanbanStore((s) => s.agents);
   const moveTask = useKanbanStore((s) => s.moveTask);
 
-  const [editing, setEditing] = useState<Task | null>(null);
+  const [editing, setEditing] = useState<{ task: Task; focusAgent?: boolean } | null>(null);
   const [creating, setCreating] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  useEffect(() => {
-    if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 3500);
-    return () => window.clearTimeout(id);
-  }, [toast]);
 
   const onDragEnd = (e: DragEndEvent) => {
     const id = String(e.active.id);
@@ -42,7 +36,9 @@ export function KanbanBoard() {
 
   const runTask = async (task: Task) => {
     if (!task.agentId) {
-      setToast("Pick an agent for this task first.");
+      // Fail-forward: open the editor focused on the agent dropdown rather
+      // than firing a toast the user will read after-the-fact.
+      setEditing({ task, focusAgent: true });
       return;
     }
     const tabId = await launchAgent({
@@ -54,7 +50,12 @@ export function KanbanBoard() {
       taskColumn: task.column,
       cwd: task.projectPath,
     });
-    if (!tabId) setToast("That agent is no longer available — pick another.");
+    if (!tabId) {
+      toast.warn(
+        "Agent unavailable",
+        "That agent is no longer defined — pick another in the task editor.",
+      );
+    }
   };
 
   return (
@@ -74,19 +75,19 @@ export function KanbanBoard() {
               title={COLUMN_LABEL[col]}
               tasks={tasks.filter((t) => t.column === col).sort((a, b) => a.ordinal - b.ordinal)}
               agents={agents}
-              onEdit={(t) => setEditing(t)}
+              onEdit={(t) => setEditing({ task: t })}
               onRun={runTask}
             />
           ))}
         </div>
       </DndContext>
       {creating && <TaskEditor onClose={() => setCreating(false)} />}
-      {editing && <TaskEditor task={editing} onClose={() => setEditing(null)} />}
-      {toast && (
-        <div className="kanban-toast" role="status" aria-live="polite">
-          <Icon name="alert-circle" size={14} />
-          <span>{toast}</span>
-        </div>
+      {editing && (
+        <TaskEditor
+          task={editing.task}
+          focusAgent={editing.focusAgent}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );

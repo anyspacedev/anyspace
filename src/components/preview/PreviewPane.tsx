@@ -12,6 +12,7 @@ import {
 } from "../../lib/tauri";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { usePickerStore } from "../../stores/pickerStore";
 import { PreviewToolbar, type Device } from "./PreviewToolbar";
 import { DeviceFrame } from "./DeviceFrame";
 import { Icon } from "../ui/Icon";
@@ -54,6 +55,20 @@ export function PreviewPane({ pane, tabId }: Props) {
   const [framework, setFramework] = useState<string>("");
   const [load, setLoad] = useState<LoadState>({ kind: "idle" });
   const [pickerActive, setPickerActive] = useState(false);
+
+  // Surface the picker mode globally (status-bar mode chip + cursor cue).
+  // The store calls our setter back when the user clicks the cancel chip.
+  useEffect(() => {
+    if (pickerActive) {
+      usePickerStore.getState().setActive(pane.id, () => setPickerActive(false));
+    } else {
+      usePickerStore.getState().clear(pane.id);
+    }
+    return () => {
+      // On unmount, drop any global ownership we hold.
+      usePickerStore.getState().clear(pane.id);
+    };
+  }, [pickerActive, pane.id]);
   const [capture, setCapture] = useState<ElementCapture | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 

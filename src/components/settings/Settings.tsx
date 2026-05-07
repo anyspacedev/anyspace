@@ -27,6 +27,30 @@ import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 import { useAuthStore } from "../../stores/authStore";
 import { TEAMSHIP_CLOUD_URL } from "../../lib/auth";
 import { SignInButton, SignOutButton } from "@clerk/clerk-react";
+import { SettingsSearch } from "./SettingsSearch";
+import { TestAiConnection } from "./TestConnection";
+
+/**
+ * Per-section keyword bag for the search filter. Adding a field means adding
+ * its label here so users can find it. Cheaper than walking the rendered DOM.
+ */
+const SECTION_KEYWORDS: Record<string, string> = {
+  appearance: "appearance theme dark light color palette swatch",
+  keyboard: "keyboard shortcut hotkey keybinding",
+  stt: "speech to text stt dictation transcribe microphone hotkey provider whisper groq elevenlabs language",
+  ai: "ai openai anthropic groq openrouter chat completions endpoint api key model system prompt",
+  "super-agent": "super agent chat tool tools memory window streaming vision pause",
+  "code-agent-api": "code agent api token mcp loopback bearer",
+  teams: "teams team multi agent role skill template coordinator developer reviewer qa",
+  proxy: "proxy http https socks5 noproxy network",
+  about: "about version",
+};
+
+function sectionMatches(id: string, q: string): boolean {
+  if (!q) return true;
+  const hay = SECTION_KEYWORDS[id] ?? id;
+  return hay.toLowerCase().includes(q.toLowerCase());
+}
 
 const SECTION_GROUPS = [
   {
@@ -63,30 +87,48 @@ const SECTION_IDS = SECTION_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 function SettingsNav({
   active,
   onJump,
+  query,
+  onQueryChange,
 }: {
   active: string;
   onJump: (id: string) => void;
+  query: string;
+  onQueryChange: (q: string) => void;
 }) {
+  const filteredGroups = SECTION_GROUPS
+    .map((g) => ({
+      label: g.label,
+      items: g.items.filter((i) => sectionMatches(i.id, query)),
+    }))
+    .filter((g) => g.items.length > 0);
+
   return (
     <aside className="settings-nav" aria-label="Settings sections">
-      {SECTION_GROUPS.map((group) => (
-        <div key={group.label} className="settings-nav-group">
-          <div className="settings-nav-group-label">{group.label}</div>
-          {group.items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={
-                "settings-nav-item" + (active === item.id ? " active" : "")
-              }
-              aria-current={active === item.id ? "true" : undefined}
-              onClick={() => onJump(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
+      <SettingsSearch value={query} onChange={onQueryChange} />
+      {filteredGroups.length === 0 ? (
+        <div className="settings-nav-empty">
+          No sections match "{query}".
         </div>
-      ))}
+      ) : (
+        filteredGroups.map((group) => (
+          <div key={group.label} className="settings-nav-group">
+            <div className="settings-nav-group-label">{group.label}</div>
+            {group.items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={
+                  "settings-nav-item" + (active === item.id ? " active" : "")
+                }
+                aria-current={active === item.id ? "true" : undefined}
+                onClick={() => onJump(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ))
+      )}
     </aside>
   );
 }
@@ -100,6 +142,22 @@ export function Settings() {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeId, setActiveId] = useState<string>(SECTION_IDS[0]);
+  const [query, setQuery] = useState("");
+
+  // Auto-jump to the first matching section when the user starts a search,
+  // so they don't have to scroll past dimmed-out blocks.
+  useEffect(() => {
+    if (!query) return;
+    const first = SECTION_IDS.find((id) => sectionMatches(id, query));
+    if (first) {
+      const el = document.getElementById(first);
+      if (el) {
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+        setActiveId(first);
+      }
+    }
+  }, [query]);
 
   const jumpTo = (id: string) => {
     const el = document.getElementById(id);
@@ -139,11 +197,19 @@ export function Settings() {
     };
   }, []);
 
+  const sectionClass = (id: string) =>
+    "settings-section-wrap" + (query && !sectionMatches(id, query) ? " is-dim" : "");
+
   return (
     <div className="settings">
-      <SettingsNav active={activeId} onJump={jumpTo} />
+      <SettingsNav
+        active={activeId}
+        onJump={jumpTo}
+        query={query}
+        onQueryChange={setQuery}
+      />
       <div className="settings-content" ref={scrollRef}>
-        <section id="appearance" aria-label="Appearance">
+        <section id="appearance" aria-label="Appearance" className={sectionClass("appearance")}>
           <div className="settings-section">
             <div className="settings-section-head">
               <h2 className="settings-section-title">Appearance</h2>
@@ -155,7 +221,7 @@ export function Settings() {
           </div>
         </section>
 
-        <section id="keyboard" aria-label="Keyboard">
+        <section id="keyboard" aria-label="Keyboard" className={sectionClass("keyboard")}>
           <div className="settings-section">
             <div className="settings-section-head">
               <h2 className="settings-section-title">Keyboard</h2>
@@ -169,35 +235,36 @@ export function Settings() {
               <Row k="⌘⇧D" v="Split pane vertical" />
               <Row k="⌘1–9" v="Switch to tab N" />
               <Row k="⌘S" v="Save file (in editor)" />
+              <Row k="⌘⇧B" v="Suggest with AI (terminal)" />
             </div>
           </div>
         </section>
 
-        <section id="stt" aria-label="Speech to text">
+        <section id="stt" aria-label="Speech to text" className={sectionClass("stt")}>
           <SttSettingsSection />
         </section>
 
-        <section id="ai" aria-label="AI">
+        <section id="ai" aria-label="AI" className={sectionClass("ai")}>
           <AiSettingsSection />
         </section>
 
-        <section id="super-agent" aria-label="Super Agent">
+        <section id="super-agent" aria-label="Super Agent" className={sectionClass("super-agent")}>
           <SuperAgentSettingsSection />
         </section>
 
-        <section id="code-agent-api" aria-label="Code Agent API">
+        <section id="code-agent-api" aria-label="Code Agent API" className={sectionClass("code-agent-api")}>
           <CodeAgentApiSettingsSection />
         </section>
 
-        <section id="teams" aria-label="Multi-agent teams">
+        <section id="teams" aria-label="Multi-agent teams" className={sectionClass("teams")}>
           <TeamSettingsSection />
         </section>
 
-        <section id="proxy" aria-label="Network proxy">
+        <section id="proxy" aria-label="Network proxy" className={sectionClass("proxy")}>
           <ProxySettingsSection />
         </section>
 
-        <section id="about" aria-label="About">
+        <section id="about" aria-label="About" className={sectionClass("about")}>
           <div className="settings-section">
             <div className="settings-section-head">
               <h2 className="settings-section-title">About</h2>
@@ -820,6 +887,12 @@ function AiSettingsSection() {
             spellCheck={false}
           />
         </label>
+
+        <TestAiConnection
+          endpoint={settings.endpoint}
+          apiKey={settings.apiKey}
+          model={settings.model}
+        />
       </div>
     </div>
   );
@@ -1047,6 +1120,12 @@ function SuperAgentSettingsSection() {
           </span>
         </label>
       </div>
+
+      <TestAiConnection
+        endpoint={effectiveEndpoint}
+        apiKey={settings.apiKey || ai.apiKey}
+        model={effectiveModel}
+      />
 
       <div className="settings-section-head" style={{ marginTop: 16 }}>
         <h3 className="settings-section-title" style={{ fontSize: 14 }}>Tools</h3>
