@@ -283,6 +283,11 @@
   background: color-mix(in oklab, var(--danger) 18%, var(--bg-elev-2));
   color: var(--fg);
 }
+.tabbar-tabs-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+}
 .tabbar-actions { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
 
 .tab-context-menu {

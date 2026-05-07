@@ -211,6 +211,7 @@ export function TabBar() {
             </div>
           );
         })}
+        <div className="tabbar-tabs-spacer" data-tauri-drag-region="" aria-hidden="true" />
       </div>
       <div className="tabbar-actions" data-tauri-drag-region="">
         {activeTab && (
