@@ -1,4 +1,3 @@
-use super::handlers;
 use super::mcp;
 use super::state::AgentApiState;
 use axum::{
@@ -6,7 +5,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{get, post},
     Router,
 };
 use std::net::TcpListener as StdTcpListener;
@@ -41,13 +39,6 @@ pub async fn serve(api: AgentApiState, app: AppHandle, std_listener: StdTcpListe
     let ctx = AppCtx { api, app };
     let mcp_service = mcp::build_service(ctx.clone());
     let router = Router::new()
-        .route("/v1/preview/detect", get(handlers::preview_detect))
-        .route("/v1/panes", get(handlers::list_panes))
-        .route("/v1/preview/open", post(handlers::preview_open))
-        .route("/v1/preview/screenshot", post(handlers::preview_screenshot))
-        .route("/v1/preview/click", post(handlers::preview_click))
-        .route("/v1/preview/fill", post(handlers::preview_fill))
-        .route("/v1/preview/navigate", post(handlers::preview_navigate))
         // Streamable HTTP MCP. Tools read X-Pane-Id / X-Tab-Id from the
         // request via Extension<http::request::Parts>. Inherits require_auth
         // because Router::layer wraps every route, including nested services.
