@@ -5,7 +5,10 @@ import {
   teamRpcReply,
   type TeamRpcEvent,
 } from "./tauri";
-import { getTerminalContext } from "../components/terminal/terminalRegistry";
+import {
+  getTerminalContext,
+  getTerminalSessionId,
+} from "../components/terminal/terminalRegistry";
 import { useTeamStore } from "../stores/teamStore";
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { TEAM_ROLES, type TeamRole } from "./teamRoles";
@@ -163,13 +166,13 @@ async function handleWrite(req: RpcRequest): Promise<RpcResult> {
   if (!found || !found.agent.paneId) {
     return { ok: false, error: `no live pane for label ${label}` };
   }
-  const ctx = getTerminalContext(found.agent.paneId);
-  if (!ctx) {
+  const sid = getTerminalSessionId(found.agent.paneId);
+  if (!sid) {
     return { ok: false, error: `pane ${label} has no live PTY session yet` };
   }
   // Never auto-execute — write bytes only. Receiver will see the draft and
   // press Enter to submit. Mirrors the Super Brain rule.
-  await ptyWrite(ctx.sessionId, new TextEncoder().encode(body));
+  await ptyWrite(sid, new TextEncoder().encode(body));
   return { ok: true, data: `wrote ${body.length} bytes to ${label} (no newline)` };
 }
 

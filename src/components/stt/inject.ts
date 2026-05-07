@@ -5,7 +5,7 @@ import { broadcastBytes } from "../../lib/paneBroadcast";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useTeamStore } from "../../stores/teamStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
-import { getTerminalContext } from "../terminal/terminalRegistry";
+import { getTerminalSessionId } from "../terminal/terminalRegistry";
 import { getEditor } from "./editorRegistry";
 import { getSuperAgentInput } from "../superAgent/inputRegistry";
 
@@ -191,10 +191,10 @@ async function fanToTeamPanes(
   for (const pane of Object.values(tab.panes)) {
     if (pane.id === originPaneId) continue;
     if (pane.kind !== "terminal") continue;
-    const ctx = getTerminalContext(pane.id);
-    if (!ctx || ctx.sessionId === originSessionId) continue;
+    const sid = getTerminalSessionId(pane.id);
+    if (!sid || sid === originSessionId) continue;
     try {
-      await ptyWrite(ctx.sessionId, bytes);
+      await ptyWrite(sid, bytes);
       count++;
     } catch (e) {
       console.warn("[stt:inject] team-fan failed pane=%s:", pane.id, e);

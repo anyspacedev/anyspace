@@ -46,6 +46,16 @@ export type TerminalContext = {
   sessionId: string;
 };
 
+// Lightweight lookup for callers that only need to write to the PTY (e.g.
+// write_pane, team_send_to_pane, voice fan-out). Avoids the OSC-133-completed-
+// block requirement that getTerminalContext imposes — a fresh terminal with no
+// finished command yet still has a live sessionId we can write into.
+export function getTerminalSessionId(paneId: string): string | null {
+  const e = entries.get(paneId);
+  if (!e) return null;
+  return e.getSessionId();
+}
+
 // Returns the most recent finished command block (with extracted output) for
 // the given pane, or null if no completed block is available — e.g. fresh
 // terminal that hasn't run anything yet, or buffer-evicted scrollback.

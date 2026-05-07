@@ -27,6 +27,7 @@ import { useOperatorInboxStore } from "../../stores/operatorInboxStore";
 import {
   getTerminalContext,
   getTerminalScreen,
+  getTerminalSessionId,
 } from "../../components/terminal/terminalRegistry";
 import { addAgentToLiveTeam, launchTeam } from "../teamLauncher";
 import { runQuickSuggest, runSuperBrainTeamBroadcast } from "../superBrain";
@@ -381,11 +382,11 @@ export const TOOLS: Tool[] = [
       const submit = arg<boolean>(args, "submit") ?? false;
       if (!paneId) return bad("missing pane_id");
       if (text == null) return bad("missing text");
-      const ctx = getTerminalContext(paneId);
-      if (!ctx) return bad(`pane ${paneId} has no live PTY session`);
+      const sid = getTerminalSessionId(paneId);
+      if (!sid) return bad(`pane ${paneId} has no live PTY session`);
       const payload = submit ? `${text}\n` : text;
       try {
-        await ptyWrite(ctx.sessionId, new TextEncoder().encode(payload));
+        await ptyWrite(sid, new TextEncoder().encode(payload));
         return ok({ wroteBytes: payload.length, submitted: submit });
       } catch (e) {
         return bad(e instanceof Error ? e.message : String(e));
@@ -607,11 +608,11 @@ export const TOOLS: Tool[] = [
         paneId = match.paneId;
       }
       if (!paneId) return bad("provide pane_id or label");
-      const ctx = getTerminalContext(paneId);
-      if (!ctx) return bad(`pane ${paneId} has no live PTY session`);
+      const sid = getTerminalSessionId(paneId);
+      if (!sid) return bad(`pane ${paneId} has no live PTY session`);
       const payload = withNewline ? `${text}\n` : text;
       try {
-        await ptyWrite(ctx.sessionId, new TextEncoder().encode(payload));
+        await ptyWrite(sid, new TextEncoder().encode(payload));
         return ok({ teamId, paneId, wroteBytes: payload.length, submitted: withNewline });
       } catch (e) {
         return bad(e instanceof Error ? e.message : String(e));
