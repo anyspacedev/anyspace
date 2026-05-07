@@ -70,11 +70,11 @@ xcap = "0.3"
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
 
-# Official MCP Rust SDK. Powers the `teamship-mcp` stdio binary that Claude Code
-# (and any MCP-aware client) spawns to talk to the loopback agent_api. Only the
-# bin target actually uses it, but it sits in the shared [dependencies] block
-# because we share a Cargo.toml with the main lib.
-rmcp = { version = "1.6.0", features = ["server", "macros", "transport-io"] }
+# Official MCP Rust SDK. Backs the in-process Streamable HTTP MCP endpoint
+# (mounted at /mcp on the loopback agent_api server) that Claude Code and other
+# MCP-aware clients connect to. Tool methods read X-Pane-Id / X-Tab-Id from
+# the request via Extension<http::request::Parts>.
+rmcp = { version = "1.6.0", features = ["server", "macros", "transport-io", "transport-streamable-http-server"] }
 
 # WebKitGTK isn't shown navigator.mediaDevices unless we toggle enable-media-stream
 # on the WebView at startup and answer the permission-request signal — needed by
