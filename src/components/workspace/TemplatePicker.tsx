@@ -73,6 +73,7 @@ export function TemplatePickerForm({ onClose, titleId }: { onClose: () => void; 
         taskTitle: `pane ${i + 1}`,
         taskBody: `Auto-launched in workspace at ${new Date().toLocaleString()}`,
         systemPrompt: agent.systemPrompt,
+        envJson: agent.envJson,
       });
       presets.push({
         kind: "terminal",
