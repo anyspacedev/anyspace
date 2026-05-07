@@ -9,7 +9,6 @@ pub struct AgentApiInfo {
     pub url: String,
     pub token: String,
     pub port: u16,
-    pub mcp_binary_path: Option<String>,
 }
 
 /// Frontend reads this once at boot to inject TEAMSHIP_API_URL/TOKEN into
@@ -20,7 +19,6 @@ pub fn agent_api_info(state: State<'_, AgentApiState>) -> AgentApiInfo {
         url: format!("http://127.0.0.1:{}", state.port),
         token: state.token.clone(),
         port: state.port,
-        mcp_binary_path: state.mcp_binary_path.clone(),
     }
 }
 

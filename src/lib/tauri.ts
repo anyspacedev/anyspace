@@ -352,7 +352,6 @@ export type AgentApiInfo = {
   url: string;
   token: string;
   port: number;
-  mcpBinaryPath: string | null;
 };
 
 export async function agentApiInfo(): Promise<AgentApiInfo> {

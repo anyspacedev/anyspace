@@ -174,24 +174,13 @@ pub fn run() {
             match agent_api::server::bind_local() {
                 Ok((std_listener, port)) => {
                     let token = agent_api::auth::load_or_mint(app.handle());
-                    let mcp_binary_path = match agent_api::resolve_mcp_binary() {
-                        Ok(p) => Some(p.to_string_lossy().into_owned()),
-                        Err(e) => {
-                            eprintln!("[agent_api] resolve_mcp_binary: {e:#}");
-                            None
-                        }
-                    };
-                    let api_state =
-                        agent_api::AgentApiState::new(port, token, mcp_binary_path.clone());
+                    let api_state = agent_api::AgentApiState::new(port, token);
                     app.manage(api_state.clone());
                     let app_handle = app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         agent_api::server::serve(api_state, app_handle, std_listener).await;
                     });
                     println!("[agent_api] server listening on 127.0.0.1:{port}");
-                    if let Some(p) = &mcp_binary_path {
-                        println!("[agent_api] MCP binary at {p}");
-                    }
                 }
                 Err(e) => {
                     eprintln!("[agent_api] bind failed: {e:?} — Code Agent preview API disabled");

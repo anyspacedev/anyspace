@@ -4,10 +4,6 @@ version = "0.1.0"
 description = "Teamship — orchestrate AI agents across multi-pane workspaces"
 edition = "2021"
 rust-version = "1.77"
-# Now that the package ships two binaries (the main app and `teamship-mcp`),
-# `cargo run` and `tauri dev` need an explicit default — otherwise cargo
-# refuses to pick between them.
-default-run = "teamship"
 
 [lib]
 name = "teamship_lib"
@@ -74,7 +70,7 @@ base64 = "0.22"
 # (mounted at /mcp on the loopback agent_api server) that Claude Code and other
 # MCP-aware clients connect to. Tool methods read X-Pane-Id / X-Tab-Id from
 # the request via Extension<http::request::Parts>.
-rmcp = { version = "1.6.0", features = ["server", "macros", "transport-io", "transport-streamable-http-server"] }
+rmcp = { version = "1.6.0", features = ["server", "macros", "transport-streamable-http-server"] }
 
 # WebKitGTK isn't shown navigator.mediaDevices unless we toggle enable-media-stream
 # on the WebView at startup and answer the permission-request signal — needed by
@@ -104,11 +100,3 @@ block2 = "0.6"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
-
-# Stdio MCP bridge that Claude Code spawns. Calls the loopback REST API at
-# $TEAMSHIP_API_URL using $TEAMSHIP_API_TOKEN / $TEAMSHIP_PANE_ID. Built as a
-# sibling of the main `teamship` binary; located by current_exe()'s parent dir
-# at runtime.
-[[bin]]
-name = "teamship-mcp"
-path = "src/bin/teamship-mcp.rs"
