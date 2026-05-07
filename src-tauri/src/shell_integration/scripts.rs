@@ -97,8 +97,19 @@ elif [ -n "$BASH_VERSION" ]; then
   trap '__teamship_debug_trap' DEBUG
 fi
 
-# Team mode: when this shell was spawned for a Team workspace, source the
-# tmsg helper so the agent CLI inherits a `tmsg` shell function.
+# Team mode: prepend the per-launch bin dir to PATH so subprocesses (claude,
+# codex, …) launched from this shell can resolve `tmsg` by name. PATH is
+# exported, so any process this shell spawns inherits the modified PATH
+# directly — no re-sourcing required in the child.
+if [ -n "${TEAMSHIP_TEAM_BIN_DIR:-}" ] && [ -d "$TEAMSHIP_TEAM_BIN_DIR" ]; then
+  case ":$PATH:" in
+    *":$TEAMSHIP_TEAM_BIN_DIR:"*) ;;
+    *) export PATH="$TEAMSHIP_TEAM_BIN_DIR:$PATH" ;;
+  esac
+fi
+
+# Team mode: also source the tmsg helper so the operator's interactive shell
+# resolves `tmsg` as a no-fork shell function (function lookup precedes PATH).
 if [ -n "$TEAMSHIP_TEAM_TMSG" ] && [ -f "$TEAMSHIP_TEAM_TMSG" ]; then
   # shellcheck disable=SC1090
   source "$TEAMSHIP_TEAM_TMSG"

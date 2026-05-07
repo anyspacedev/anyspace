@@ -282,6 +282,7 @@ export type TeamPaths = {
   promptsDir: string;
   rpcDir: string;
   tmsgPath: string;
+  tmsgBinDir: string;
 };
 
 export async function teamInit(args: {

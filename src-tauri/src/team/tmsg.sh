@@ -1,5 +1,8 @@
+#!/usr/bin/env bash
 # Teamship team coordination — tmsg helper.
-# Sourced by the OSC 133 integration when $TEAMSHIP_TEAM_TMSG is set.
+# Dual-mode: sourced by the OSC 133 integration when $TEAMSHIP_TEAM_TMSG is set
+# (defines a `tmsg` shell function for the prompt user) AND directly executable
+# from PATH so subprocesses launched by agent CLIs can resolve `tmsg` by name.
 # Required env (set by team launcher): TEAMSHIP_TEAM_DIR TEAMSHIP_TEAM_ID
 #                                      TEAMSHIP_AGENT_LABEL TEAMSHIP_BOARD_PATH
 #                                      TEAMSHIP_MESSAGES_PATH
@@ -248,3 +251,11 @@ EOF
 }
 
 export -f tmsg 2>/dev/null
+
+# When executed directly (kernel uses the shebang → bash), run the dispatcher.
+# When sourced (by integration.sh under bash *or* zsh), this guard is skipped:
+#   - bash source: BASH_SOURCE[0] != $0
+#   - zsh source:  BASH_VERSION unset
+if [ -n "${BASH_VERSION:-}" ] && [ "${BASH_SOURCE[0]:-}" = "${0:-}" ]; then
+  tmsg "$@"
+fi

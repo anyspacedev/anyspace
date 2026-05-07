@@ -14,6 +14,7 @@ pub struct TeamPaths {
     pub prompts_dir: String,
     pub rpc_dir: String,
     pub tmsg_path: String,
+    pub tmsg_bin_dir: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,10 +55,23 @@ fn init_team_dir(team_id: &str, project_path: &str, board_markdown: &str) -> any
         std::fs::write(&messages_path, "").context("write MESSAGES.md")?;
     }
 
-    // tmsg.sh is identical for every team; write it once to a shared
-    // integration root so updates between releases propagate cleanly.
-    let tmsg_path = shared_tmsg_path()?;
-    std::fs::write(&tmsg_path, TMSG_SCRIPT).context("write tmsg.sh")?;
+    // tmsg is identical for every team; write it once to a shared bin dir as
+    // an executable. Subprocesses launched from team panes resolve `tmsg` via
+    // PATH (the shell integration prepends this dir for team panes), and the
+    // OSC 133 integration also sources the same file to define the in-shell
+    // function form.
+    let tmsg_bin_dir = shared_tmsg_bin_dir()?;
+    let tmsg_path = tmsg_bin_dir.join("tmsg");
+    std::fs::write(&tmsg_path, TMSG_SCRIPT).context("write tmsg")?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&tmsg_path)
+            .context("stat tmsg")?
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&tmsg_path, perms).context("chmod tmsg")?;
+    }
 
     Ok(TeamPaths {
         team_dir: team_dir.to_string_lossy().into_owned(),
@@ -66,13 +80,16 @@ fn init_team_dir(team_id: &str, project_path: &str, board_markdown: &str) -> any
         prompts_dir: prompts_dir.to_string_lossy().into_owned(),
         rpc_dir: rpc_dir.to_string_lossy().into_owned(),
         tmsg_path: tmsg_path.to_string_lossy().into_owned(),
+        tmsg_bin_dir: tmsg_bin_dir.to_string_lossy().into_owned(),
     })
 }
 
-fn shared_tmsg_path() -> anyhow::Result<PathBuf> {
-    let dir = std::env::temp_dir().join("teamship-shell-integration");
-    std::fs::create_dir_all(&dir).context("create integration dir")?;
-    Ok(dir.join("tmsg.sh"))
+fn shared_tmsg_bin_dir() -> anyhow::Result<PathBuf> {
+    let dir = std::env::temp_dir()
+        .join("teamship-shell-integration")
+        .join("bin");
+    std::fs::create_dir_all(&dir).context("create tmsg bin dir")?;
+    Ok(dir)
 }
 
 #[tauri::command]

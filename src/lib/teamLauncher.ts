@@ -169,6 +169,7 @@ export async function launchTeam(
       TEAMSHIP_BOARD_PATH: paths.boardPath,
       TEAMSHIP_MESSAGES_PATH: paths.messagesPath,
       TEAMSHIP_TEAM_TMSG: paths.tmsgPath,
+      TEAMSHIP_TEAM_BIN_DIR: paths.tmsgBinDir,
     };
 
     presets.push({
@@ -389,6 +390,7 @@ export async function addAgentToLiveTeam(
       TEAMSHIP_BOARD_PATH: paths.boardPath,
       TEAMSHIP_MESSAGES_PATH: paths.messagesPath,
       TEAMSHIP_TEAM_TMSG: paths.tmsgPath,
+      TEAMSHIP_TEAM_BIN_DIR: paths.tmsgBinDir,
     },
     spawnCwd: team.projectPath,
     title: `${args.label} (${roleLabel(args.role, customRoles)})`,
@@ -537,6 +539,7 @@ export async function resumeTeam(teamId: string): Promise<boolean> {
       TEAMSHIP_BOARD_PATH: paths.boardPath,
       TEAMSHIP_MESSAGES_PATH: paths.messagesPath,
       TEAMSHIP_TEAM_TMSG: paths.tmsgPath,
+      TEAMSHIP_TEAM_BIN_DIR: paths.tmsgBinDir,
       TEAMSHIP_PANE_ID: ta.paneId,
       TEAMSHIP_TAB_ID: team.tabId,
     };
