@@ -150,7 +150,25 @@ export type PanePreset = {
   spawnEnv?: Record<string, string>;
   spawnCwd?: string;
   title?: string;
+  // Preview-only seeds: PreviewPane reads payload.url / payload.projectPath
+  // (the latter triggers auto-detect of a Vite/Next/etc dev server).
+  url?: string;
+  projectPath?: string;
 };
+
+function presetToPayload(preset: PanePreset): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    pendingCommand: preset.pendingCommand,
+    spawnEnv: preset.spawnEnv,
+    spawnCwd: preset.spawnCwd,
+    title: preset.title,
+  };
+  if (preset.kind === "preview") {
+    if (preset.url !== undefined) payload.url = preset.url;
+    if (preset.projectPath !== undefined) payload.projectPath = preset.projectPath;
+  }
+  return payload;
+}
 
 type WorkspaceState = {
   tabs: Tab[];
@@ -289,14 +307,7 @@ function makeTab(
     acc[id] = {
       id,
       kind: preset?.kind ?? "terminal",
-      payload: preset
-        ? {
-            pendingCommand: preset.pendingCommand,
-            spawnEnv: preset.spawnEnv,
-            spawnCwd: preset.spawnCwd,
-            title: preset.title,
-          }
-        : {},
+      payload: preset ? presetToPayload(preset) : {},
     };
     return acc;
   }, {});
@@ -504,12 +515,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (t.id !== tabId) return t;
         const newPane = emptyPane(preset?.kind ?? "terminal");
         if (preset) {
-          newPane.payload = {
-            pendingCommand: preset.pendingCommand,
-            spawnEnv: preset.spawnEnv,
-            spawnCwd: preset.spawnCwd,
-            title: preset.title,
-          };
+          newPane.payload = presetToPayload(preset);
         }
         const newLayout = findAndMutateLayout(
           t.layout,

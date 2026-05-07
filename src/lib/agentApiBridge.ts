@@ -170,7 +170,7 @@ registerAgentApiHandler("preview.open", async (payload) => {
     const tabId = ws.newTab(
       1,
       "Preview",
-      [{ kind: "preview", url, projectPath } as never],
+      [{ kind: "preview", url, projectPath }],
       projectPath,
     );
     const newTab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
@@ -196,7 +196,7 @@ registerAgentApiHandler("preview.open", async (payload) => {
     kind: "preview",
     url,
     projectPath,
-  } as never);
+  });
   const after = useWorkspaceStore.getState().tabs.find((t) => t.id === tab.id);
   const newPaneId = after ? collectLeafIds(after.layout).find((id) => !before.has(id)) : undefined;
   return { ok: true, paneId: newPaneId, tabId: tab.id, reused: false };

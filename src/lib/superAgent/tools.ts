@@ -398,7 +398,7 @@ export const TOOLS: Tool[] = [
         const tabId = ws.newTab(
           1,
           "Preview",
-          [{ kind: "preview", url, projectPath } as never],
+          [{ kind: "preview", url, projectPath }],
           projectPath,
         );
         const fresh = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
@@ -414,7 +414,7 @@ export const TOOLS: Tool[] = [
         kind: "preview",
         url,
         projectPath,
-      } as never);
+      });
       const after = useWorkspaceStore.getState().tabs.find((t) => t.id === tab.id);
       const newPaneId = after
         ? collectLeafIds(after.layout).find((id) => !before.has(id))
