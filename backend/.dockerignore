@@ -1,0 +1,42 @@
+# Build context excludes — keep the image small and platform-agnostic.
+
+# Virtualenv and uv cache (built fresh inside the image)
+.venv/
+.uv-cache/
+
+# Python build/cache artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Persistent data — model weights and SQLite DB belong in the named volume
+data/
+tmp/
+
+# Local env files; secrets must come from compose/CLI env at runtime
+.env
+.env.local
+.env.*.local
+
+# VCS and editor noise
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+
+# Test + planning files (not needed in the image)
+tests/
+PLAN.md
+README.md
+
+# systemd unit is for the host install, not the container
+deploy/teamship-backend.service
+
+# Misc
+*.log
+.DS_Store

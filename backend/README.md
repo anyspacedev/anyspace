@@ -33,6 +33,123 @@ uv run pytest                       # fast tests only
 uv run pytest -m slow               # also hits the real sherpa-onnx model
 ```
 
+## Run in Docker
+
+The backend ships with a multi-stage `Dockerfile` and a `docker-compose.yml`
+so the service can be started directly from its image. The compose stack
+is single-replica; see "Parallel replicas" below before scaling out.
+
+### Quick start
+
+```bash
+cd backend
+docker compose build
+docker compose up -d
+docker compose logs -f api          # watch startup
+curl http://127.0.0.1:9100/healthz  # {"ok":true,"recognizer_ready":true}
+```
+
+The first request after a fresh boot triggers a one-time HuggingFace
+download of the sherpa-onnx int8 SenseVoice weights (~810 MB) into the
+`teamship-data` volume. Cold start is therefore 30–90 s; subsequent
+boots reuse the cache and become ready in <10 s.
+
+Smoke test once `/healthz` reports `recognizer_ready: true`:
+
+```bash
+curl -X POST http://127.0.0.1:9100/v1/audio/transcriptions \
+     -F file=@../ast-test/audio/en.wav
+```
+
+### Configuration
+
+Every setting is read from process env (pydantic-settings, see
+`app/settings.py`). The compose file pre-sets the values that differ
+between the systemd install and a containerized run; everything else
+falls back to the in-code default. To override, either uncomment the
+key under `services.api.environment:` in `docker-compose.yml` or pass
+`-e KEY=VALUE` to `docker run`.
+
+| Variable | Default (container) | Meaning |
+| --- | --- | --- |
+| **Network** | | |
+| `LISTEN_HOST` | `0.0.0.0` | Bind address. **Must be `0.0.0.0` in the container** so the published port is reachable. The code default (`127.0.0.1`) is load-bearing for the systemd install — do not revert. |
+| `LISTEN_PORT` | `9100` | Listen port. Change here and in `ports:` together. |
+| `TRUSTED_PROXY_IPS` | `127.0.0.1,::1,100.64.0.0/10` | Comma-separated CIDRs whose `X-Forwarded-For` is trusted. |
+| `CORS_ALLOW_ORIGINS` | `tauri://localhost,https://teamship.app,https://www.teamship.app` | Comma-separated allowed origins. |
+| **Storage** | | |
+| `DATABASE_URL` | `sqlite:///./data/teamship.db` | SQLAlchemy URL. Resolves against the container's WORKDIR (`/app`) to `/app/data/teamship.db`, which lives in the volume. |
+| `MODEL_CACHE_DIR` | `/app/data/models` | HuggingFace cache dir for the sherpa weights. |
+| **Logging** | | |
+| `LOG_LEVEL` | `info` | uvicorn / structlog level. |
+| `LOG_JSON` | `true` | Emit JSON log lines (set `false` for human-readable dev). |
+| **Limits** | | |
+| `RATE_LIMIT_PER_MIN` | `60` | Per-IP request budget. |
+| `RATE_LIMIT_PER_HOUR` | `600` | Per-IP hourly cap. |
+| `MAX_AUDIO_SECONDS` | `600` | Reject audio longer than this. |
+| `MAX_BODY_BYTES` | `26214400` | 25 MB request body cap. |
+| **Sherpa** | | |
+| `SHERPA_HF_REPO` | `csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17` | HuggingFace repo for the model. |
+| `SHERPA_MODEL_FILE` | `model.int8.onnx` | Model filename inside the repo. |
+| `SHERPA_TOKENS_FILE` | `tokens.txt` | Tokens filename inside the repo. |
+| `SHERPA_NUM_THREADS` | `4` | onnxruntime intra-op threads. Raise to use spare cores before adding replicas. |
+| **Clerk auth** (all empty by default; webhooks return 503 until set) | | |
+| `CLERK_PUBLISHABLE_KEY` | `""` | `pk_test_…` / `pk_live_…`. |
+| `CLERK_SECRET_KEY` | `""` | `sk_…`. |
+| `CLERK_FRONTEND_API` | `""` | e.g. `https://<slug>.clerk.accounts.dev`. |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | `""` | Svix webhook secret. |
+| `CLERK_JWT_LEEWAY_SEC` | `30` | Allowed clock skew for JWT validation. |
+
+### Volume
+
+The named volume `teamship-data` holds the SQLite DB and the model
+cache, so restarts and image rebuilds preserve both.
+
+```bash
+docker volume inspect teamship-data           # find the host path
+docker run --rm -v teamship-data:/data -v "$PWD":/backup busybox \
+    tar czf /backup/teamship-data.tgz -C /data .   # backup
+```
+
+Wiping the volume forces a fresh model download and resets the DB.
+
+### Healthcheck and logs
+
+```bash
+docker compose ps
+docker inspect --format '{{.State.Health.Status}}' teamship-backend
+docker compose logs -f api
+```
+
+### Parallel replicas
+
+The compose file is intentionally single-replica. Three blockers must
+land before `docker compose up --scale api=N` is safe:
+
+- **sherpa-onnx is a CPU-bound singleton** held on `app.state.recognizer`
+  (`app/main.py`). N replicas means N copies of the ~810 MB model in RAM;
+  raising `SHERPA_NUM_THREADS` is more efficient than horizontal scale
+  until cores saturate.
+- **SQLite has one writer.** `audit_log` writes from concurrent replicas
+  will lock-contend even with WAL. **Switch `DATABASE_URL` to Postgres
+  before scaling out.**
+- **The rate limiter is in-process** (token buckets in
+  `app/services/ratelimit.py`); two replicas double the effective per-IP
+  limit. **Move to Redis** before scaling out.
+
+These match the phase-2/3 commitments in `PLAN.md`.
+
+### Coexistence with the systemd install
+
+The container and the systemd unit cannot run on the same host on `:9100`
+at once. Stop one before starting the other:
+
+```bash
+sudo systemctl stop teamship-backend && docker compose up -d
+# or
+docker compose down && sudo systemctl start teamship-backend
+```
+
 ## Layout
 
 ```

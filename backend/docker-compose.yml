@@ -1,0 +1,85 @@
+# Single-replica compose for the Teamship backend. See README.md
+# (Run in Docker) for usage and the full configuration parameters table.
+#
+# Scale-out (`docker compose up --scale api=2`) is intentionally NOT supported
+# yet: the API holds a sherpa-onnx singleton in process memory, writes to a
+# single-writer SQLite file, and rate-limits via in-process buckets. Postgres
+# + Redis are required first (see README.md "Parallel replicas").
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: teamship-backend:local
+    container_name: teamship-backend
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    environment:
+      # --- Network -------------------------------------------------------
+      # MUST be 0.0.0.0 inside the container. The pydantic default at
+      # app/settings.py:26 is 127.0.0.1 (load-bearing for the systemd
+      # install) — do not revert this override.
+      LISTEN_HOST: "0.0.0.0"
+      LISTEN_PORT: "9100"
+      # TRUSTED_PROXY_IPS: "127.0.0.1,::1,100.64.0.0/10"
+      # CORS_ALLOW_ORIGINS: "tauri://localhost,https://teamship.app,https://www.teamship.app"
+
+      # --- Storage (paths inside the named volume) ----------------------
+      # Relative form (3 slashes) — resolves against WORKDIR=/app to
+      # /app/data/teamship.db. The 4-slash absolute form trips an
+      # lstrip("/") in app/db.py:33 that turns it back into a relative
+      # path; until that's fixed upstream, stick with this shape.
+      DATABASE_URL: "sqlite:///./data/teamship.db"
+      MODEL_CACHE_DIR: "/app/data/models"
+
+      # --- Logging -------------------------------------------------------
+      LOG_LEVEL: "info"
+      LOG_JSON: "true"
+
+      # --- Limits (defaults from .env.example) ---------------------------
+      # RATE_LIMIT_PER_MIN: "60"
+      # RATE_LIMIT_PER_HOUR: "600"
+      # MAX_AUDIO_SECONDS: "600"
+      # MAX_BODY_BYTES: "26214400"
+
+      # --- Sherpa --------------------------------------------------------
+      # SHERPA_HF_REPO: "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
+      # SHERPA_MODEL_FILE: "model.int8.onnx"
+      # SHERPA_TOKENS_FILE: "tokens.txt"
+      # SHERPA_NUM_THREADS: "4"
+
+      # --- Clerk auth (leave unset to keep webhook 503 / JWT off) -------
+      # CLERK_PUBLISHABLE_KEY: ""
+      # CLERK_SECRET_KEY: ""
+      # CLERK_FRONTEND_API: ""
+      # CLERK_WEBHOOK_SIGNING_SECRET: ""
+      # CLERK_JWT_LEEWAY_SEC: "30"
+
+    # Optional: mirror values from a host .env. Note that compose's
+    # `environment:` block above wins over `env_file`, which is what
+    # keeps LISTEN_HOST=0.0.0.0 in force.
+    # env_file:
+    #   - ./.env
+
+    volumes:
+      - teamship-data:/app/data
+
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - |
+          import urllib.request,sys,json
+          r=json.load(urllib.request.urlopen('http://127.0.0.1:9100/healthz',timeout=2))
+          sys.exit(0 if r.get('recognizer_ready') else 1)
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 120s
+
+volumes:
+  teamship-data:
+    name: teamship-data
