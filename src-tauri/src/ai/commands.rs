@@ -38,6 +38,16 @@ fn format_reqwest_err(err: &reqwest::Error) -> String {
     parts.join(" → ")
 }
 
+fn preview(s: &str, max: usize) -> String {
+    let one_line: String = s.chars().map(|c| if c == '\n' { '⏎' } else { c }).collect();
+    if one_line.chars().count() <= max {
+        one_line
+    } else {
+        let head: String = one_line.chars().take(max).collect();
+        format!("{head}… ({} chars total)", s.chars().count())
+    }
+}
+
 #[tauri::command]
 pub async fn ai_chat(app: tauri::AppHandle, args: AiChatArgs) -> Result<String, String> {
     let url = format!(
@@ -45,6 +55,8 @@ pub async fn ai_chat(app: tauri::AppHandle, args: AiChatArgs) -> Result<String, 
         args.endpoint.trim_end_matches('/')
     );
     eprintln!("[ai_chat] POST {url} model={} msglen={}", args.model, args.user_message.len());
+    eprintln!("[ai_chat]   system: {}", preview(&args.system_prompt, 400));
+    eprintln!("[ai_chat]   user:   {}", preview(&args.user_message, 400));
 
     let body = serde_json::json!({
         "model": args.model,
