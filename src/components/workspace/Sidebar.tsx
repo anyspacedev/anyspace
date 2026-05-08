@@ -49,14 +49,14 @@ export function Sidebar() {
           aria-hidden="true"
         >
           <rect x="0" y="0" width="500" height="500" rx="112.5" fill="#0f172a" />
-          <rect x="68.75" y="112.5" width="100" height="275" rx="12.5" fill="#1e293b" stroke="#334155" strokeWidth="1.5" />
-          <rect x="200" y="112.5" width="100" height="275" rx="12.5" fill="#1e293b" stroke="#334155" strokeWidth="1.5" />
-          <rect x="331.25" y="112.5" width="100" height="275" rx="12.5" fill="#1e293b" stroke="#334155" strokeWidth="1.5" />
-          <rect x="87.5" y="143.75" width="62.5" height="9.375" rx="3" fill="#64748b" />
-          <rect x="87.5" y="168.75" width="43.75" height="9.375" rx="3" fill="#64748b" />
-          <rect x="218.75" y="143.75" width="62.5" height="9.375" rx="3" fill="#64748b" />
-          <rect x="218.75" y="168.75" width="50" height="9.375" rx="3" fill="#64748b" />
-          <rect x="350" y="143.75" width="62.5" height="9.375" rx="3" fill="#64748b" />
+          <rect x="68.75" y="112.5" width="100" height="275" rx="12.5" fill="#334155" />
+          <rect x="200" y="112.5" width="100" height="275" rx="12.5" fill="#334155" />
+          <rect x="331.25" y="112.5" width="100" height="275" rx="12.5" fill="#334155" />
+          <rect x="87.5" y="143.75" width="62.5" height="9.375" rx="3" fill="#94a3b8" />
+          <rect x="87.5" y="168.75" width="43.75" height="9.375" rx="3" fill="#94a3b8" />
+          <rect x="218.75" y="143.75" width="62.5" height="9.375" rx="3" fill="#94a3b8" />
+          <rect x="218.75" y="168.75" width="50" height="9.375" rx="3" fill="#94a3b8" />
+          <rect x="350" y="143.75" width="62.5" height="9.375" rx="3" fill="#94a3b8" />
           <rect x="218.75" y="200" width="62.5" height="9.375" rx="3" fill="#10b981" />
           <rect x="287.5" y="190.625" width="6.25" height="28.125" fill="#10b981">
             <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite" />
