@@ -125,6 +125,28 @@ export function SuperAgentPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [sttPhase]);
 
+  // Cmd/Ctrl+F opens the message search row when focus is inside the panel.
+  // Scoped to descendants of the <aside> so the shortcut doesn't fight the
+  // browser's native find-in-page when the user is in another part of the app.
+  const asideRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      if (e.key !== "f" && e.key !== "F") return;
+      const aside = asideRef.current;
+      if (!aside) return;
+      const target = e.target as Node | null;
+      if (!target || !aside.contains(target)) return;
+      e.preventDefault();
+      setFilterOpen((open) => {
+        if (open) setFilter("");
+        return !open;
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const onScroll = () => {
     const el = listRef.current;
     if (!el) return;
@@ -276,7 +298,7 @@ export function SuperAgentPanel() {
   const hotkeyLabel = displayHotkey(sttHotkey);
 
   return (
-    <aside className="sa-panel sa-panel-rail" aria-label="Super Agent">
+    <aside ref={asideRef} className="sa-panel sa-panel-rail" aria-label="Super Agent">
       <div
         className="sa-resize"
         onPointerDown={onResizePointerDown}
@@ -306,65 +328,29 @@ export function SuperAgentPanel() {
                 if (e.key === "Escape") setEditingTitle(false);
               }}
             />
-          ) : (
-            <h2 className="sa-title-wrap">
-              <button
-                type="button"
-                className="sa-title"
-                onDoubleClick={() => session && setEditingTitle(true)}
-                title="Double-click to rename"
-              >
-                {session?.name ?? "Super Agent"}
-              </button>
-            </h2>
-          )}
-          {sessions.length > 0 && (
+          ) : sessions.length > 0 ? (
             <select
               aria-label="Session"
               className="sa-session-switch"
               value={activeSessionId ?? ""}
               onChange={(e) => setActiveSession(e.target.value || null)}
+              onContextMenu={(e) => {
+                if (!session) return;
+                e.preventDefault();
+                setEditingTitle(true);
+              }}
+              title="Right-click to rename"
             >
               {!activeSessionId && <option value="">— pick a session —</option>}
               {sessions.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+          ) : (
+            <span className="sa-session-placeholder">Super Agent</span>
           )}
         </div>
         <div className="sa-header-actions">
-          <button
-            type="button"
-            className={"btn btn-ghost sa-pause-toggle" + (pauseToolCalls ? " active" : "")}
-            onClick={() => setPauseToolCalls(!pauseToolCalls)}
-            title={
-              pauseToolCalls
-                ? "Tool calls paused — Run/Skip each one inline"
-                : "Auto-running tool calls — click to require approval"
-            }
-            aria-pressed={pauseToolCalls}
-            aria-label={pauseToolCalls ? "Tool calls paused" : "Tool calls auto-running"}
-          >
-            <span className="sa-pause-toggle-dot" aria-hidden="true" />
-            <span>{pauseToolCalls ? "Paused" : "Auto"}</span>
-          </button>
-          <button
-            type="button"
-            className={"btn btn-ghost sa-icon-btn" + (filterOpen ? " active" : "")}
-            onClick={() => {
-              if (filterOpen) {
-                setFilter("");
-                setFilterOpen(false);
-              } else {
-                setFilterOpen(true);
-              }
-            }}
-            title={filterOpen ? "Hide search" : "Search messages"}
-            aria-label={filterOpen ? "Hide search" : "Search messages"}
-            aria-pressed={filterOpen}
-          >
-            <Icon name="search" size={12} />
-          </button>
           <button
             type="button"
             className="btn btn-ghost sa-icon-btn"
@@ -530,18 +516,21 @@ export function SuperAgentPanel() {
 
         <div className="sa-composer-bar">
           <div className="sa-composer-meta">
-            {sttApiKey ? (
-              <span className="sa-hotkey-hint">
-                Hold <kbd>{hotkeyLabel}</kbd> to talk
-              </span>
-            ) : (
+            {!settings.model && (
               <span className="sa-hotkey-hint sa-hotkey-hint-warn">
-                Voice off — add an STT key in Settings
+                No model configured —{" "}
+                <button
+                  type="button"
+                  className="team-section-link"
+                  onClick={() => {
+                    setView("settings");
+                    setPanelOpen(false);
+                  }}
+                >
+                  Open Settings → Super Agent
+                </button>
               </span>
             )}
-            <span className="sa-composer-model" title={settings.model || "no model"}>
-              {settings.streaming ? "stream" : "one-shot"} · {settings.model || "(no model)"}
-            </span>
             {suggestError && (
               <span className="sa-hotkey-hint sa-hotkey-hint-warn">
                 AI: {suggestError}
@@ -630,13 +619,28 @@ export function SuperAgentPanel() {
 
             <button
               type="button"
-              className="btn btn-ghost btn-with-icon"
+              className={"btn btn-ghost sa-icon-btn sa-suggest-btn" + (suggesting ? " loading" : "")}
               onClick={runSuggest}
               disabled={suggesting || busy}
-              title="Draft a starter prompt from the active pane (last command, file, or URL)"
+              title="Suggest a starter prompt from the active pane (last command, file, or URL)"
+              aria-label="Suggest a starter prompt"
             >
               <Icon name="sparkles" size={14} />
-              <span>{suggesting ? "Thinking…" : "Suggest"}</span>
+            </button>
+
+            <button
+              type="button"
+              className={"btn btn-ghost sa-icon-btn sa-pause-btn" + (pauseToolCalls ? " active" : "")}
+              onClick={() => setPauseToolCalls(!pauseToolCalls)}
+              title={
+                pauseToolCalls
+                  ? "Tool approvals required — click to resume auto"
+                  : "Auto-running tool calls — click to require approval"
+              }
+              aria-pressed={pauseToolCalls}
+              aria-label={pauseToolCalls ? "Tool approvals required" : "Auto tool calls"}
+            >
+              <Icon name="shield" size={14} />
             </button>
 
             {activeStreamId ? (

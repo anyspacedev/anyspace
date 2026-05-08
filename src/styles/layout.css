@@ -5301,20 +5301,6 @@ body.screenshot-dragging {
   min-width: 0;
   flex: 1;
 }
-.sa-title {
-  background: none;
-  border: none;
-  padding: 0;
-  font-weight: 600;
-  font-size: var(--font-size-sm);
-  color: var(--fg);
-  cursor: text;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-}
-.sa-title:hover { color: var(--accent, var(--fg)); }
 .sa-title-input {
   font-weight: 600;
   font-size: var(--font-size-sm);
@@ -5322,25 +5308,50 @@ body.screenshot-dragging {
   border: 1px solid var(--border);
   color: var(--fg);
   border-radius: var(--radius-sm);
-  padding: 2px 6px;
-  max-width: 180px;
+  padding: 2px 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .sa-session-switch {
-  background: var(--bg);
-  border: 1px solid var(--border);
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 2px 6px;
-  color: var(--fg-muted);
-  font-size: var(--font-size-xs);
-  max-width: 140px;
+  padding: 3px 22px 3px 8px;
+  color: var(--fg);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sa-session-switch:hover {
+  background-color: color-mix(in oklab, var(--fg) 6%, transparent);
+  border-color: var(--border);
+}
+.sa-session-switch:focus-visible {
+  outline: none;
+  border-color: var(--accent, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent, var(--fg)) 25%, transparent);
+}
+.sa-session-placeholder {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  padding: 3px 8px;
 }
 .sa-header-actions {
   display: flex;
   gap: 2px;
-}
-.sa-header-actions .btn.active {
-  color: var(--danger);
-  background: color-mix(in oklab, var(--danger) 12%, transparent);
 }
 .sa-search {
   position: relative;
@@ -5861,14 +5872,6 @@ body.screenshot-dragging {
   line-height: 1.4;
 }
 .sa-hotkey-hint-warn { color: var(--warning, #f59e0b); }
-.sa-composer-model {
-  font-size: 10px;
-  color: var(--fg-muted);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .sa-composer-actions {
   display: flex;
   align-items: center;
@@ -6377,17 +6380,9 @@ body.screenshot-dragging {
    handled by the global h1-h6 reset in globals.css. The rules below only
    add what wasn't already there for divs with the same class. */
 .welcome-title,
-.sa-title-wrap,
 .kanban-col-title,
 .settings-section-title,
 .modal-title { margin: 0; }
-
-/* Wrap the SuperAgent rename button in an h2 without changing its layout. */
-.sa-title-wrap {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
 
 /* Active pane gets visibly stronger weight than a selected (broadcast)
    sibling. Active = thicker accent border + outer halo; selected without
@@ -6400,36 +6395,15 @@ body.screenshot-dragging {
   border-bottom-color: color-mix(in oklab, var(--accent) 55%, var(--border));
 }
 
-/* Pause-tool-calls toggle reads as a status pill, not a glyph swap. */
-.sa-header-actions .btn.active {
+/* Composer-side action buttons. Sparkle stays accent-tinted so it doesn't
+   read as a generic icon; pause shield turns red when approval-required. */
+.sa-suggest-btn { color: var(--accent, var(--fg)); }
+.sa-suggest-btn.loading { opacity: 0.7; }
+.sa-pause-btn { color: var(--fg-muted); }
+.sa-pause-btn.active {
   color: var(--danger);
-  background: color-mix(in oklab, var(--danger) 14%, transparent);
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
   border-color: color-mix(in oklab, var(--danger) 30%, transparent);
-}
-.sa-pause-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-.sa-pause-toggle-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.sa-pause-toggle.active .sa-pause-toggle-dot {
-  animation: sa-pause-pulse 1.6s ease-in-out infinite;
-}
-@keyframes sa-pause-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sa-pause-toggle.active .sa-pause-toggle-dot { animation: none; }
 }
 
 /* Bigger hit area for the search-clear chip on Super Agent.
