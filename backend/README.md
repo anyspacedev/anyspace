@@ -49,10 +49,14 @@ docker compose logs -f api          # watch startup
 curl http://127.0.0.1:9100/healthz  # {"ok":true,"recognizer_ready":true}
 ```
 
-The first request after a fresh boot triggers a one-time HuggingFace
-download of the sherpa-onnx int8 SenseVoice weights (~810 MB) into the
-`teamship-data` volume. Cold start is therefore 30–90 s; subsequent
-boots reuse the cache and become ready in <10 s.
+The sherpa-onnx int8 SenseVoice weights (~210 MB) are baked into the
+image at build time, so cold start is offline-capable and finishes in
+~5 s. On the first run against a fresh `teamship-data` volume, Docker
+copies the baked cache into the volume; subsequent boots read directly
+from the volume. To use a different model, override `SHERPA_HF_REPO` /
+`SHERPA_MODEL_FILE` / `SHERPA_TOKENS_FILE` — `app/services/asr.py` will
+fall back to lazy `hf_hub_download` when the override isn't already
+cached, which does need network on first run.
 
 Smoke test once `/healthz` reports `recognizer_ready: true`:
 
