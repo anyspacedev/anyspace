@@ -5436,7 +5436,6 @@ body.screenshot-dragging {
   border-radius: 12px;
   font-size: var(--font-size-sm);
   line-height: 1.5;
-  white-space: pre-wrap;
   word-break: break-word;
   max-width: 92%;
 }
@@ -5444,6 +5443,7 @@ body.screenshot-dragging {
   background: color-mix(in oklab, var(--accent, var(--fg)) 14%, var(--bg));
   border: 1px solid color-mix(in oklab, var(--accent, var(--fg)) 30%, var(--border));
   color: var(--fg);
+  white-space: pre-wrap;
 }
 .sa-bubble-assistant {
   background: var(--bg);
@@ -5463,6 +5463,85 @@ body.screenshot-dragging {
   font-style: italic;
   opacity: 0.92;
 }
+
+.sa-bubble-assistant > :first-child,
+.sa-bubble-system > :first-child { margin-top: 0; }
+.sa-bubble-assistant > :last-child,
+.sa-bubble-system > :last-child { margin-bottom: 0; }
+.sa-bubble-assistant p,
+.sa-bubble-system p { margin: 0 0 0.5em; }
+.sa-bubble-assistant ul,
+.sa-bubble-assistant ol,
+.sa-bubble-system ul,
+.sa-bubble-system ol { padding-left: 1.25em; margin: 0.25em 0 0.5em; }
+.sa-bubble-assistant li,
+.sa-bubble-system li { margin: 0.1em 0; }
+.sa-bubble-assistant pre,
+.sa-bubble-system pre {
+  background: color-mix(in oklab, var(--fg) 4%, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5em 0.75em;
+  margin: 0.5em 0;
+  overflow-x: auto;
+  font-size: 0.92em;
+}
+.sa-bubble-assistant pre code,
+.sa-bubble-system pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.sa-bubble-assistant code,
+.sa-bubble-system code {
+  background: color-mix(in oklab, var(--fg) 8%, var(--bg));
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.sa-bubble-assistant a,
+.sa-bubble-system a {
+  color: var(--accent, var(--fg));
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sa-bubble-assistant blockquote,
+.sa-bubble-system blockquote {
+  margin: 0.25em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid var(--border);
+  color: color-mix(in oklab, var(--fg) 75%, transparent);
+}
+.sa-bubble-assistant table,
+.sa-bubble-system table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.92em;
+}
+.sa-bubble-assistant th,
+.sa-bubble-assistant td,
+.sa-bubble-system th,
+.sa-bubble-system td {
+  border: 1px solid var(--border);
+  padding: 0.25em 0.5em;
+  text-align: left;
+}
+.sa-bubble-assistant h1,
+.sa-bubble-system h1 { font-size: 1.15em; font-weight: 600; margin: 0.5em 0 0.25em; }
+.sa-bubble-assistant h2,
+.sa-bubble-system h2 { font-size: 1.08em; font-weight: 600; margin: 0.5em 0 0.25em; }
+.sa-bubble-assistant h3,
+.sa-bubble-assistant h4,
+.sa-bubble-assistant h5,
+.sa-bubble-assistant h6,
+.sa-bubble-system h3,
+.sa-bubble-system h4,
+.sa-bubble-system h5,
+.sa-bubble-system h6 { font-size: 1em; font-weight: 600; margin: 0.5em 0 0.25em; }
+.sa-bubble-assistant hr,
+.sa-bubble-system hr { border: none; border-top: 1px solid var(--border); margin: 0.5em 0; }
 .sa-cursor {
   display: inline-block;
   margin-left: 2px;

@@ -1,4 +1,5 @@
 import type { Message } from "../../stores/superAgentStore";
+import { Markdown } from "./Markdown";
 import { ToolCallCard } from "./ToolCallCard";
 
 export function MessageBubble({
@@ -46,7 +47,9 @@ export function MessageBubble({
     // the model, so this never round-trips as duplicate system prompt.
     return (
       <div className="sa-msg sa-msg-system">
-        <div className="sa-bubble sa-bubble-system">{message.content}</div>
+        <div className="sa-bubble sa-bubble-system">
+          <Markdown>{message.content}</Markdown>
+        </div>
       </div>
     );
   }
@@ -55,7 +58,9 @@ export function MessageBubble({
   return (
     <div className="sa-msg sa-msg-assistant">
       <div className={"sa-bubble sa-bubble-assistant" + (message.streaming ? " streaming" : "")}>
-        {message.content || (message.streaming ? "…" : "")}
+        {message.content
+          ? <Markdown>{message.content}</Markdown>
+          : (message.streaming ? "…" : "")}
         {message.streaming && <span className="sa-cursor">▍</span>}
       </div>
     </div>
