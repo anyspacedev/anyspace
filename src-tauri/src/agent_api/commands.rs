@@ -11,7 +11,7 @@ pub struct AgentApiInfo {
     pub port: u16,
 }
 
-/// Frontend reads this once at boot to inject TEAMSHIP_API_URL/TOKEN into
+/// Frontend reads this once at boot to inject ANYSPACE_API_URL/TOKEN into
 /// every Code-Agent terminal it spawns (solo + team).
 #[tauri::command]
 pub fn agent_api_info(state: State<'_, AgentApiState>) -> AgentApiInfo {

@@ -38,7 +38,7 @@ fn restrict_perms(_path: &Path) {}
 
 /// Read the persisted token from disk, or mint and write a fresh one. Same
 /// token is reused across restarts so long-lived agent shells don't need to
-/// re-export TEAMSHIP_API_TOKEN every session.
+/// re-export ANYSPACE_API_TOKEN every session.
 pub fn load_or_mint(app: &AppHandle) -> String {
     match load_or_mint_inner(app) {
         Ok(tok) => tok,
@@ -72,7 +72,7 @@ fn load_or_mint_inner(app: &AppHandle) -> anyhow::Result<String> {
 
 /// Mint a new token and persist it, returning the new value. Invalidates any
 /// previously-issued bearer token — long-lived agent shells need to re-import
-/// TEAMSHIP_API_TOKEN after a rotation.
+/// ANYSPACE_API_TOKEN after a rotation.
 pub fn rotate(app: &AppHandle) -> anyhow::Result<String> {
     let path = token_file(app)?;
     let token = mint_token();

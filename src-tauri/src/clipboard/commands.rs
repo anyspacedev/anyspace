@@ -15,7 +15,7 @@ fn sanitize_ext(raw: &str) -> String {
 
 #[tauri::command]
 pub fn clipboard_save_blob(bytes: Vec<u8>, ext: String) -> Result<String, String> {
-    let dir = std::env::temp_dir().join("teamship-clipboard");
+    let dir = std::env::temp_dir().join("anyspace-clipboard");
     fs::create_dir_all(&dir).map_err(|e| format!("create clipboard dir: {e}"))?;
     let path = dir.join(format!(
         "paste-{}.{}",

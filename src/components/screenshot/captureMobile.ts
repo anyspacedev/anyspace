@@ -3,7 +3,7 @@ import { useScreenshotStore } from "../../stores/screenshotStore";
 
 // Captures the current frame painted on the mobile pane's <canvas> (Android
 // scrcpy or iOS ScreenCaptureKit) as PNG, persists it under
-// /tmp/teamship-screenshots/, and pushes a thumbnail into the floating stack.
+// /tmp/anyspace-screenshots/, and pushes a thumbnail into the floating stack.
 export async function captureMobileCanvas(canvas: HTMLCanvasElement): Promise<void> {
   if (!canvas.width || !canvas.height) {
     console.warn("[screenshot] mobile canvas has no frame yet");

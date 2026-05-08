@@ -100,7 +100,7 @@ export function SetupChecklist() {
         >
           T
         </div>
-        <h1 className="welcome-title">Welcome to Teamship</h1>
+        <h1 className="welcome-title">Welcome to AnySpace</h1>
         <div className="welcome-sub">
           Two quick steps to unlock everything. Skip what you don't need —
           you can always come back from <kbd>⌘,</kbd> Settings.

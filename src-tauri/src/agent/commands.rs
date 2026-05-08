@@ -44,7 +44,7 @@ pub fn agent_launch(args: LaunchArgs) -> Result<LaunchPlan, String> {
     let task_file_str = inv.task_file.to_string_lossy().to_string();
     let mut env: HashMap<String, String> = HashMap::new();
 
-    // Agent's persisted envJson wins for nothing — TEAMSHIP_* are sourced from
+    // Agent's persisted envJson wins for nothing — ANYSPACE_* are sourced from
     // the task and overwrite any same-named keys the user put in envJson.
     if !args.env_json.trim().is_empty() {
         if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&args.env_json) {
@@ -52,10 +52,10 @@ pub fn agent_launch(args: LaunchArgs) -> Result<LaunchPlan, String> {
         }
     }
 
-    env.insert("TEAMSHIP_TASK_FILE".to_string(), task_file_str.clone());
-    env.insert("TEAMSHIP_TASK_ID".to_string(), args.task_id);
-    env.insert("TEAMSHIP_TASK_TITLE".to_string(), args.task_title);
-    env.insert("TEAMSHIP_TASK_COLUMN".to_string(), args.task_column);
+    env.insert("ANYSPACE_TASK_FILE".to_string(), task_file_str.clone());
+    env.insert("ANYSPACE_TASK_ID".to_string(), args.task_id);
+    env.insert("ANYSPACE_TASK_TITLE".to_string(), args.task_title);
+    env.insert("ANYSPACE_TASK_COLUMN".to_string(), args.task_column);
 
     Ok(LaunchPlan {
         command: inv.command,

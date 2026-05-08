@@ -1,4 +1,4 @@
-# Single-replica compose for the Teamship backend. See README.md
+# Single-replica compose for the AnySpace backend. See README.md
 # (Run in Docker) for usage and the full configuration parameters table.
 #
 # Scale-out (`docker compose up --scale api=2`) is intentionally NOT supported
@@ -11,8 +11,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: teamship-backend:local
-    container_name: teamship-backend
+    image: anyspace-backend:local
+    container_name: anyspace-backend
     restart: unless-stopped
     ports:
       - "9100:9100"
@@ -24,14 +24,14 @@ services:
       LISTEN_HOST: "0.0.0.0"
       LISTEN_PORT: "9100"
       # TRUSTED_PROXY_IPS: "127.0.0.1,::1,100.64.0.0/10"
-      # CORS_ALLOW_ORIGINS: "tauri://localhost,https://teamship.app,https://www.teamship.app"
+      # CORS_ALLOW_ORIGINS: "tauri://localhost,https://anyspace.dev,https://www.anyspace.dev"
 
       # --- Storage (paths inside the named volume) ----------------------
       # Relative form (3 slashes) — resolves against WORKDIR=/app to
-      # /app/data/teamship.db. The 4-slash absolute form trips an
+      # /app/data/anyspace.db. The 4-slash absolute form trips an
       # lstrip("/") in app/db.py:33 that turns it back into a relative
       # path; until that's fixed upstream, stick with this shape.
-      DATABASE_URL: "sqlite:///./data/teamship.db"
+      DATABASE_URL: "sqlite:///./data/anyspace.db"
       MODEL_CACHE_DIR: "/app/data/models"
 
       # --- Logging -------------------------------------------------------
@@ -64,7 +64,7 @@ services:
     #   - ./.env
 
     volumes:
-      - teamship-data:/app/data
+      - anyspace-data:/app/data
 
     healthcheck:
       test:
@@ -81,5 +81,5 @@ services:
       start_period: 30s
 
 volumes:
-  teamship-data:
-    name: teamship-data
+  anyspace-data:
+    name: anyspace-data

@@ -93,7 +93,7 @@ export default function App() {
     void loadRecentFolders().catch((e) => console.warn("[recentFolders] load failed", e));
     void loadUiHints().catch((e) => console.warn("[uiHints] load failed", e));
     // Boot the agent_api bridge before any Code Agent terminal can spawn —
-    // launchers read the cached URL+token to inject TEAMSHIP_API_URL/TOKEN
+    // launchers read the cached URL+token to inject ANYSPACE_API_URL/TOKEN
     // into the child env.
     void ensureAgentApi().catch((e) => console.warn("[agent_api] info load failed", e));
     void startAgentApiBridge().catch((e) => console.warn("[agent_api] bridge start failed", e));

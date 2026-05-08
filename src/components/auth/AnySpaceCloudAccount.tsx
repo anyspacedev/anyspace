@@ -3,7 +3,7 @@ import { useAuthStore } from "../../stores/authStore";
 
 /**
  * Inline account row shown in Settings sections that select the
- * Teamship Cloud provider (STT, AI, Super Agent). Renders one of:
+ * AnySpace Cloud provider (STT, AI, Super Agent). Renders one of:
  *   - "this build wasn't compiled with a Clerk key" notice
  *   - "checking sign-in…" while the bridge initializes
  *   - signed-in row with email + sign-out
@@ -11,7 +11,7 @@ import { useAuthStore } from "../../stores/authStore";
  *
  * Reused across Settings panels and the Login Guide modal.
  */
-export function TeamshipCloudAccount() {
+export function AnySpaceCloudAccount() {
   const ready = useAuthStore((s) => s.ready);
   const signedIn = useAuthStore((s) => s.signedIn);
   const email = useAuthStore((s) => s.email);
@@ -20,7 +20,7 @@ export function TeamshipCloudAccount() {
   if (!clerkConfigured) {
     return (
       <div className="stt-tc-account stt-tc-account-muted">
-        This build wasn't compiled with a Clerk key — Teamship Cloud is
+        This build wasn't compiled with a Clerk key — AnySpace Cloud is
         unavailable. Pick another provider.
       </div>
     );
@@ -48,7 +48,7 @@ export function TeamshipCloudAccount() {
   }
   return (
     <div className="stt-tc-account">
-      <span>Sign in to use Teamship Cloud — no API key required.</span>
+      <span>Sign in to use AnySpace Cloud — no API key required.</span>
       <SignInButton mode="modal">
         <button type="button" className="btn btn-primary">
           Sign in

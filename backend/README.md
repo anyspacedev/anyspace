@@ -1,4 +1,4 @@
-# Teamship backend
+# AnySpace backend
 
 Phase 1: skeleton + cloud transcription. Plan: `PLAN.md`.
 
@@ -51,7 +51,7 @@ curl http://127.0.0.1:9100/healthz  # {"ok":true,"recognizer_ready":true}
 
 The sherpa-onnx int8 SenseVoice weights (~210 MB) are baked into the
 image at build time, so cold start is offline-capable and finishes in
-~5 s. On the first run against a fresh `teamship-data` volume, Docker
+~5 s. On the first run against a fresh `anyspace-data` volume, Docker
 copies the baked cache into the volume; subsequent boots read directly
 from the volume. To use a different model, override `SHERPA_HF_REPO` /
 `SHERPA_MODEL_FILE` / `SHERPA_TOKENS_FILE` — `app/services/asr.py` will
@@ -80,9 +80,9 @@ key under `services.api.environment:` in `docker-compose.yml` or pass
 | `LISTEN_HOST` | `0.0.0.0` | Bind address. **Must be `0.0.0.0` in the container** so the published port is reachable. The code default (`127.0.0.1`) is load-bearing for the systemd install — do not revert. |
 | `LISTEN_PORT` | `9100` | Listen port. Change here and in `ports:` together. |
 | `TRUSTED_PROXY_IPS` | `127.0.0.1,::1,100.64.0.0/10` | Comma-separated CIDRs whose `X-Forwarded-For` is trusted. |
-| `CORS_ALLOW_ORIGINS` | `tauri://localhost,https://teamship.app,https://www.teamship.app` | Comma-separated allowed origins. |
+| `CORS_ALLOW_ORIGINS` | `tauri://localhost,https://anyspace.dev,https://www.anyspace.dev` | Comma-separated allowed origins. |
 | **Storage** | | |
-| `DATABASE_URL` | `sqlite:///./data/teamship.db` | SQLAlchemy URL. Resolves against the container's WORKDIR (`/app`) to `/app/data/teamship.db`, which lives in the volume. |
+| `DATABASE_URL` | `sqlite:///./data/anyspace.db` | SQLAlchemy URL. Resolves against the container's WORKDIR (`/app`) to `/app/data/anyspace.db`, which lives in the volume. |
 | `MODEL_CACHE_DIR` | `/app/data/models` | HuggingFace cache dir for the sherpa weights. |
 | **Logging** | | |
 | `LOG_LEVEL` | `info` | uvicorn / structlog level. |
@@ -106,13 +106,13 @@ key under `services.api.environment:` in `docker-compose.yml` or pass
 
 ### Volume
 
-The named volume `teamship-data` holds the SQLite DB and the model
+The named volume `anyspace-data` holds the SQLite DB and the model
 cache, so restarts and image rebuilds preserve both.
 
 ```bash
-docker volume inspect teamship-data           # find the host path
-docker run --rm -v teamship-data:/data -v "$PWD":/backup busybox \
-    tar czf /backup/teamship-data.tgz -C /data .   # backup
+docker volume inspect anyspace-data           # find the host path
+docker run --rm -v anyspace-data:/data -v "$PWD":/backup busybox \
+    tar czf /backup/anyspace-data.tgz -C /data .   # backup
 ```
 
 Wiping the volume forces a fresh model download and resets the DB.
@@ -121,7 +121,7 @@ Wiping the volume forces a fresh model download and resets the DB.
 
 ```bash
 docker compose ps
-docker inspect --format '{{.State.Health.Status}}' teamship-backend
+docker inspect --format '{{.State.Health.Status}}' anyspace-backend
 docker compose logs -f api
 ```
 
@@ -149,9 +149,9 @@ The container and the systemd unit cannot run on the same host on `:9100`
 at once. Stop one before starting the other:
 
 ```bash
-sudo systemctl stop teamship-backend && docker compose up -d
+sudo systemctl stop anyspace-backend && docker compose up -d
 # or
-docker compose down && sudo systemctl start teamship-backend
+docker compose down && sudo systemctl start anyspace-backend
 ```
 
 ## Layout
@@ -180,8 +180,8 @@ to report ready. Run from the backend dir on the target box:
 
 ```bash
 ./deploy/deploy.sh
-sudo systemctl status teamship-backend
-journalctl -u teamship-backend -f
+sudo systemctl status anyspace-backend
+journalctl -u anyspace-backend -f
 ```
 
 The backend listens on `127.0.0.1:9100`. To expose it over HTTPS, add a
@@ -201,7 +201,7 @@ different ports until cutover, then we retire the demo to free RAM.
 
 `src-tauri/src/stt/commands.rs:69` already builds
 `{endpoint}/audio/transcriptions` and posts multipart. So adding a
-"Teamship Cloud (beta)" preset in `src/stores/sttStore.ts:47` whose
+"AnySpace Cloud (beta)" preset in `src/stores/sttStore.ts:47` whose
 `endpoint` is `https://<host>/api` is the only desktop change needed for
 phase 1. (No auth header yet; phase 2 adds Bearer.)
 

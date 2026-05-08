@@ -15,13 +15,13 @@ const COPY: Record<
   "ai-explain": {
     title: "Sign in to use Explain",
     subtitle:
-      "Explain runs on Teamship Cloud — no API key required when you're signed in.",
+      "Explain runs on AnySpace Cloud — no API key required when you're signed in.",
     settingsHint: "Settings → AI",
   },
   "super-agent": {
     title: "Sign in to use Super Agent",
     subtitle:
-      "Super Agent runs on Teamship Cloud — no API key required when you're signed in.",
+      "Super Agent runs on AnySpace Cloud — no API key required when you're signed in.",
     settingsHint: "Settings → Super Agent",
   },
 };
@@ -82,7 +82,7 @@ export function LoginGuideModal() {
 
         {!clerkConfigured ? (
           <div className="login-guide-warn">
-            This build wasn't compiled with a Clerk key — Teamship Cloud is
+            This build wasn't compiled with a Clerk key — AnySpace Cloud is
             unavailable. Switch to your own provider in {copy.settingsHint}.
           </div>
         ) : (

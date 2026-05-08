@@ -1,12 +1,12 @@
 [package]
-name = "teamship"
+name = "anyspace"
 version = "0.1.0"
-description = "Teamship — orchestrate AI agents across multi-pane workspaces"
+description = "AnySpace — orchestrate AI agents across multi-pane workspaces"
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "teamship_lib"
+name = "anyspace_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -49,7 +49,7 @@ libc = "0.2"
 # http probe for preview port detection
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks", "stream"] }
 
-# in-process HTTP server that backs $TEAMSHIP_API_URL for terminal-spawned
+# in-process HTTP server that backs $ANYSPACE_API_URL for terminal-spawned
 # Code Agents (drives Preview, returns screenshot paths). Loopback-only,
 # bearer-token authed. axum 0.7 pairs cleanly with the tokio 1 runtime
 # Tauri 2 already runs.

@@ -5,7 +5,7 @@ export type AiSettings = {
   endpoint: string;
   apiKey: string;
   model: string;
-  presetId: "teamship-cloud" | "openai" | "groq" | "openrouter" | "custom";
+  presetId: "anyspace-cloud" | "openai" | "groq" | "openrouter" | "custom";
   systemPrompt: string;
 };
 
@@ -16,16 +16,16 @@ const DEFAULT_SYSTEM_PROMPT =
 
 /** Default model the cloud route maps onto its upstream LLM. Keep in sync with
  *  the backend model allow-list in `backend/app/services/llm.py`. */
-export const TEAMSHIP_CLOUD_DEFAULT_MODEL = "teamship-default";
+export const ANYSPACE_CLOUD_DEFAULT_MODEL = "anyspace-default";
 
 /** First-run defaults for fresh installs. Existing users keep their stored
- *  config — see `load()`. The endpoint is left empty here because Teamship
- *  Cloud resolves it at call time from `VITE_TEAMSHIP_CLOUD_URL`. */
+ *  config — see `load()`. The endpoint is left empty here because AnySpace
+ *  Cloud resolves it at call time from `VITE_ANYSPACE_CLOUD_URL`. */
 const DEFAULT_SETTINGS: AiSettings = {
   endpoint: "",
   apiKey: "",
-  model: TEAMSHIP_CLOUD_DEFAULT_MODEL,
-  presetId: "teamship-cloud",
+  model: ANYSPACE_CLOUD_DEFAULT_MODEL,
+  presetId: "anyspace-cloud",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };
 

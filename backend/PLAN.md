@@ -1,16 +1,16 @@
-# Teamship backend — plan
+# AnySpace backend — plan
 
 ## Context
 
 The Tauri desktop app (`src-tauri/`, `src/`) currently has zero backend. Every
 external feature is BYO API key — the user pastes a Groq/OpenAI key into
 Settings and the desktop app calls those vendors directly. There is no
-`teamship.app` server beyond a placeholder `updates.teamship.app` URL in
+`anyspace.dev` server beyond a placeholder `updates.anyspace.dev` URL in
 `src-tauri/tauri.conf.json:30` that the auto-updater points at.
 
 The Astro marketing landing (`landing/`) already promises a Pro tier with
 14-day trial, Stripe-style billing, and Pro-gated features (AI agents,
-broadcast, dictation). That plus the `updates.teamship.app` referenced from
+broadcast, dictation). That plus the `updates.anyspace.dev` referenced from
 the binary means a backend has to exist before public download.
 
 In parallel, `ast-test/` is a working sherpa-onnx int8 SenseVoice ASR
@@ -56,13 +56,13 @@ These exist so the desktop app can be wired against the URL shape now and
 upgraded in place when phase 2 fills them in.
 
 **Operational**:
-- systemd unit (`deploy/teamship-backend.service`) with
+- systemd unit (`deploy/anyspace-backend.service`) with
   `Restart=on-failure`, `MemoryMax=5G`.
 - Tailscale Funnel at `https://api.<tailnet>.ts.net` (separate hostname or
   port from the ast-test demo so we can run them side by side during
   cutover).
 - structured logs (structlog → JSON in prod, console in dev).
-- nightly `pg_dump`/`sqlite3 .backup` cron writing to `/var/backups/teamship/`.
+- nightly `pg_dump`/`sqlite3 .backup` cron writing to `/var/backups/anyspace/`.
 - ufw rule for the listen port (only needed if we drop Funnel later).
 
 **Phase 1 explicitly does NOT do**:
@@ -141,7 +141,7 @@ backend/
 │   ├── test_updates.py
 │   └── test_stubs.py          # asserts stub endpoints return 501
 └── deploy/
-    ├── teamship-backend.service
+    ├── anyspace-backend.service
     ├── Caddyfile              # optional; we'll likely use Tailscale Funnel
     └── deploy.sh              # rsync code, run alembic, restart unit
 ```
@@ -243,7 +243,7 @@ trust-proxy allowlist).
 
 ```
 # .env (phase 1)
-DATABASE_URL=sqlite:///./data/teamship.db
+DATABASE_URL=sqlite:///./data/anyspace.db
 MODEL_CACHE_DIR=./data/models
 LOG_LEVEL=info
 LISTEN_HOST=127.0.0.1
@@ -255,24 +255,24 @@ MAX_BODY_BYTES=26214400          # 25 MB
 ```
 
 `pydantic-settings` reads `.env` and merges with process env so the
-`teamship-backend.service` unit's `Environment=` directives win.
+`anyspace-backend.service` unit's `Environment=` directives win.
 
 ## Deploy plan
 
 1. Provision the box (already done — same as ast-test).
 2. `git pull` on the box, then run `cd backend && uv sync`.
 3. Apply migrations: `uv run alembic upgrade head`.
-4. Drop `deploy/teamship-backend.service` into `/etc/systemd/system/` and
-   `systemctl enable --now teamship-backend`.
+4. Drop `deploy/anyspace-backend.service` into `/etc/systemd/system/` and
+   `systemctl enable --now anyspace-backend`.
 5. Add Tailscale Funnel mapping:
    `sudo tailscale funnel --bg --https=443 --set-path=/api 9100`
    so `https://<tailnet>.ts.net/api/v1/audio/transcriptions` reaches the
    backend, while the existing 8443 mapping keeps the demo alive during
    cutover. (Or: use a different hostname via `tailscale serve` with a CNAME
-   from `api.teamship.app` once the domain is wired.)
+   from `api.anyspace.dev` once the domain is wired.)
 6. Smoke test:
    `curl -X POST https://<host>/api/v1/audio/transcriptions -F file=@a.wav`
-7. Update the Tauri app's STT settings to add a "Teamship Cloud (beta)"
+7. Update the Tauri app's STT settings to add a "AnySpace Cloud (beta)"
    preset pointing at the new URL. (Desktop change; out of scope for this
    plan but tracked.)
 
@@ -282,7 +282,7 @@ MAX_BODY_BYTES=26214400          # 25 MB
 `groq | openai | elevenlabs | custom`. Phase 1 adds a 5th preset:
 
 ```ts
-"teamship-cloud-beta"   // hardcoded endpoint, no api key, marked Beta in UI
+"anyspace-cloud-beta"   // hardcoded endpoint, no api key, marked Beta in UI
 ```
 
 `src-tauri/src/stt/commands.rs:69` already constructs
@@ -333,7 +333,7 @@ auth, rate-limited per-IP". Phase 2 changes the auth header from "none" to
 - **Phase 2 auth provider**: Clerk vs Supabase Auth vs build it ourselves?
   Clerk has the strongest Google/GitHub/Okta story for Team-tier SSO; build
   is cheaper at v1 but expensive when SSO lands.
-- **Domain**: when do we register `api.teamship.app` and point it at the
+- **Domain**: when do we register `api.anyspace.dev` and point it at the
   Tailscale Funnel hostname (CNAME)?
 - **Public IP / open ports**: do we keep Tailscale Funnel as the only
   ingress, or terminate TLS on the box with Caddy + Let's Encrypt? Funnel
@@ -344,7 +344,7 @@ auth, rate-limited per-IP". Phase 2 changes the auth header from "none" to
 ## Verification checklist (phase 1 done means)
 
 - [ ] `uv run pytest` passes locally.
-- [ ] `systemctl status teamship-backend` is `active (running)` after deploy.
+- [ ] `systemctl status anyspace-backend` is `active (running)` after deploy.
 - [ ] `curl https://<host>/api/healthz` returns
       `{"ok": true, "recognizer_ready": true}`.
 - [ ] `curl -X POST https://<host>/api/v1/audio/transcriptions
@@ -352,7 +352,7 @@ auth, rate-limited per-IP". Phase 2 changes the auth header from "none" to
       demo, with non-empty `text`.
 - [ ] `curl https://<host>/api/updates/linux/x86_64/0.0.1` returns 204.
 - [ ] All `/v1/auth/*`, `/v1/billing/*`, `/v1/me`, `/v1/license` return 501.
-- [ ] Desktop app's "Teamship Cloud (beta)" STT preset transcribes a real
+- [ ] Desktop app's "AnySpace Cloud (beta)" STT preset transcribes a real
       browser recording end-to-end via Tailscale Funnel.
 - [ ] `audit_log` table grew by N rows after N requests.
 - [ ] Killing the uvicorn process and waiting 5s shows systemd restarted it.

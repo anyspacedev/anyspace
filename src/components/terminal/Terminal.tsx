@@ -333,7 +333,7 @@ export function Terminal({ pane, tabId }: Props) {
         });
       })
       .catch((e) => {
-        term.writeln(`\x1b[31m[teamship] failed to spawn pty: ${e}\x1b[0m`);
+        term.writeln(`\x1b[31m[anyspace] failed to spawn pty: ${e}\x1b[0m`);
       });
 
     // Forward keystrokes. When this pane is part of a multi-select group,

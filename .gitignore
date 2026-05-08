@@ -35,4 +35,4 @@ smoke-initial.png
 # Team mode coordination files (BOARD/MESSAGES/.prompts/.rpc/.consumed) live
 # under each team's project_path. They're per-session scratch state, not
 # code, so don't commit them when this repo is itself a team's working dir.
-.teamship/
+.anyspace/

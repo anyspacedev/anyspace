@@ -1,4 +1,4 @@
-# Teamship
+# AnySpace
 
 > orchestrate AI agents across multi-pane workspaces, manage tasks visually, and ship from one native app
 
@@ -10,7 +10,7 @@ A Tauri v2 + React 19 desktop app — terminal multiplexer, code editor, live br
 - **Warp-style command blocks** captured via OSC 133 shell-integration sequences (bash + zsh)
 - **Monaco editor pane** with Cmd+P fuzzy file search
 - **v0.dev-style live preview pane** — auto-detects local dev servers (Vite, Next, Astro, SvelteKit, Nuxt, Remix), reloads on file changes, device frames (Desktop / Tablet / iPhone 15 / Fluid), zoom 50–200%
-- **Kanban board** with @dnd-kit; click *Run Task* and a fresh pane spawns with the agent CLI auto-fired and task context injected via temp file + `$TEAMSHIP_TASK_FILE`
+- **Kanban board** with @dnd-kit; click *Run Task* and a fresh pane spawns with the agent CLI auto-fired and task context injected via temp file + `$ANYSPACE_TASK_FILE`
 - **5 themes** (Void, Dracula, Synthwave, Paper, Solar), CSS-variable driven with mirrored xterm + Monaco palettes
 - **SQLite persistence** for tasks, agents, prompts, and saved workspace layouts
 
@@ -114,12 +114,12 @@ app/
 
 ## Agent flow
 
-1. Define an agent in **Agents** with a `command` template — placeholders: `{task_file}` or `$TEAMSHIP_TASK_FILE`.
+1. Define an agent in **Agents** with a `command` template — placeholders: `{task_file}` or `$ANYSPACE_TASK_FILE`.
 2. Create a task in **Tasks**, attach an agent + project path.
-3. Hit **Run Task**. Teamship:
-   - Writes the task title + body + system prompt to `/tmp/teamship-tasks/task-<uuid>.md`
+3. Hit **Run Task**. AnySpace:
+   - Writes the task title + body + system prompt to `/tmp/anyspace-tasks/task-<uuid>.md`
    - Spawns a new workspace tab with one terminal pane in the project's `cwd`
-   - Sets `TEAMSHIP_TASK_FILE` env var on the PTY
+   - Sets `ANYSPACE_TASK_FILE` env var on the PTY
    - Waits for the first OSC 133 prompt-start, then types the resolved command + Enter
 4. The agent's output streams through xterm with command-block segmentation.
 
@@ -127,7 +127,7 @@ app/
 
 1. Add a **Preview** pane to a workspace (pane header → kind switcher).
 2. Click *Watch folder*, pick your project root.
-3. Teamship reads `package.json` to identify framework, then probes conventional ports (5173, 3000, 4321, 4173, 8080…).
+3. AnySpace reads `package.json` to identify framework, then probes conventional ports (5173, 3000, 4321, 4173, 8080…).
 4. The detected URL renders inside an iframe wrapped in your selected device frame.
 5. A `notify` watcher (debounced 150ms; ignores `node_modules`, `.git`, `dist`, `.next`, `target`, `.turbo`) emits `preview:reload:<paneId>`; the pane reloads.
 

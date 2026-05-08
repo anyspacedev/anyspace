@@ -1,5 +1,5 @@
 [Unit]
-Description=Teamship backend (FastAPI + sherpa-onnx)
+Description=AnySpace backend (FastAPI + sherpa-onnx)
 After=network-online.target
 Wants=network-online.target
 
@@ -34,7 +34,7 @@ ProtectHome=read-only
 ReadWritePaths=/home/debian/app/backend/data
 PrivateTmp=true
 
-# Standard logging (journalctl -u teamship-backend)
+# Standard logging (journalctl -u anyspace-backend)
 StandardOutput=journal
 StandardError=journal
 

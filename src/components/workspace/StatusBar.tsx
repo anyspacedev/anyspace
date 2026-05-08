@@ -17,7 +17,7 @@ export function StatusBar() {
     <div className="statusbar">
       <div className="status-left">
         <ModeStrip />
-        <span>Teamship 0.1.0</span>
+        <span>AnySpace 0.1.0</span>
         <span className="status-divider" />
         <span>{tabs.length} tab{tabs.length === 1 ? "" : "s"}</span>
         <span className="status-divider" />

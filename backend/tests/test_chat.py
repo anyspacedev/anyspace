@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 
-def _body(model: str = "teamship-default", **extra) -> dict:
+def _body(model: str = "anyspace-default", **extra) -> dict:
     return {
         "model": model,
         "messages": [{"role": "user", "content": "hi"}],
@@ -66,7 +66,7 @@ def test_oneshot_proxies_to_upstream(client, auth_headers, monkeypatch):
     # the (here-patched) proxy. Our fake captures whatever body the router
     # passed in — model untouched since the real resolve_model only runs
     # inside proxy_chat_oneshot, which we replaced.
-    assert captured["model"] == "teamship-default"
+    assert captured["model"] == "anyspace-default"
 
 
 def test_streaming_passthrough(client, auth_headers, monkeypatch):

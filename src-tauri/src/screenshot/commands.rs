@@ -7,11 +7,11 @@ use image::{codecs::png::PngEncoder, ImageEncoder, RgbaImage};
 use image::imageops;
 use serde::Serialize;
 
-// Captured PNGs land in /tmp/teamship-screenshots so the screenshot stack
+// Captured PNGs land in /tmp/anyspace-screenshots so the screenshot stack
 // and the clipboard's blob dir stay separate (easier ops debugging, simpler
 // per-feature cleanup if we ever add reaping).
 fn screenshots_dir() -> Result<PathBuf, String> {
-    let dir = std::env::temp_dir().join("teamship-screenshots");
+    let dir = std::env::temp_dir().join("anyspace-screenshots");
     fs::create_dir_all(&dir).map_err(|e| format!("create screenshots dir: {e}"))?;
     Ok(dir)
 }
@@ -32,7 +32,7 @@ pub struct ScreenshotResult {
 }
 
 /// Capture a window-local pixel rectangle from THIS process's main window
-/// and persist it as PNG. Works even when Teamship is occluded, behind
+/// and persist it as PNG. Works even when AnySpace is occluded, behind
 /// another app, or on a different desktop/Space — xcap pulls from the
 /// window's compositor surface, not the screen.
 ///
@@ -43,7 +43,7 @@ pub struct ScreenshotResult {
 /// from `Window::capture_image()`.
 ///
 /// Replaces the old `screenshot_capture_region` (monitor-based) which was
-/// only correct when Teamship was the foreground app. The agent-driven
+/// only correct when AnySpace was the foreground app. The agent-driven
 /// preview-screenshot path can fire at any time, including while the
 /// operator is in another app, so monitor-based capture is no longer safe.
 ///
@@ -72,7 +72,7 @@ pub async fn screenshot_capture_window_region(
     let win = candidates
         .into_iter()
         .next()
-        .ok_or_else(|| "no Teamship window found (minimised or no compositor surface)".to_string())?;
+        .ok_or_else(|| "no AnySpace window found (minimised or no compositor surface)".to_string())?;
 
     let full: RgbaImage = win.capture_image().map_err(|e| format!("capture: {e}"))?;
 

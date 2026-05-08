@@ -108,7 +108,7 @@ export function Editor({ pane, tabId }: Props) {
     };
   }, [pane.id]);
 
-  // Apply the Teamship-derived Monaco theme on every theme change.
+  // Apply the AnySpace-derived Monaco theme on every theme change.
   useEffect(() => {
     const def = monacoThemeFor(theme);
     monaco.editor.defineTheme(def.name, {

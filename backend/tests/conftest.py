@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 # Force settings BEFORE we import the app — pydantic-settings reads env at
 # import time via lru_cache.
-TMP_DB = Path("/tmp") / "teamship-test.db"
+TMP_DB = Path("/tmp") / "anyspace-test.db"
 if TMP_DB.exists():
     TMP_DB.unlink()
 os.environ["DATABASE_URL"] = f"sqlite:///{TMP_DB}"

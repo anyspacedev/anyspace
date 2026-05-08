@@ -3,7 +3,7 @@
 //  2. A pending-response map keyed by per-drive uuid
 //  3. A single window-level "message" listener that dispatches drive:result
 //     replies from any of our registered preview iframes. The picker_script
-//     posts {src:"teamship", type:"drive:result", reqId, ok, ...} back via
+//     posts {src:"anyspace", type:"drive:result", reqId, ok, ...} back via
 //     window.parent.postMessage.
 
 const refs = new Map<string, HTMLIFrameElement>();
@@ -29,7 +29,7 @@ function ensureListener() {
     const msg = e.data as
       | { src?: string; type?: string; reqId?: string; ok?: boolean }
       | undefined;
-    if (!msg || msg.src !== "teamship" || msg.type !== "drive:result") return;
+    if (!msg || msg.src !== "anyspace" || msg.type !== "drive:result") return;
     // Only accept messages whose source window is one of our registered iframes.
     const fromOurs = Array.from(refs.values()).some(
       (frame) => frame.contentWindow === e.source,
@@ -69,6 +69,6 @@ export async function driveIframe(
       window.clearTimeout(timer);
       resolve(result);
     });
-    win.postMessage({ src: "teamship", type, reqId, payload }, "*");
+    win.postMessage({ src: "anyspace", type, reqId, payload }, "*");
   });
 }

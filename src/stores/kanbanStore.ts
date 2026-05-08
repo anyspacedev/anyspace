@@ -5,7 +5,7 @@ import type { Agent, Task } from "../lib/types";
 let dbPromise: Promise<Database> | null = null;
 function getDb(): Promise<Database> {
   if (!dbPromise) {
-    dbPromise = Database.load("sqlite:teamship.db");
+    dbPromise = Database.load("sqlite:anyspace.db");
   }
   return dbPromise;
 }

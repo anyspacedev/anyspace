@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Teamship",
+  "productName": "AnySpace",
   "version": "0.1.0",
-  "identifier": "com.teamship.app",
+  "identifier": "dev.anyspace.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Teamship",
+        "title": "AnySpace",
         "width": 1440,
         "height": 900,
         "minWidth": 800,
@@ -42,13 +42,13 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Orchestrate AI agents across multi-pane workspaces",
-    "longDescription": "Teamship — terminal, task board, and agents unified in one native app for vibe coding."
+    "longDescription": "AnySpace — terminal, task board, and agents unified in one native app for vibe coding."
   },
   "plugins": {
     "updater": {
       "active": true,
       "endpoints": [
-        "https://updates.teamship.app/{{target}}/{{arch}}/{{current_version}}"
+        "https://updates.anyspace.dev/{{target}}/{{arch}}/{{current_version}}"
       ],
       "dialog": false,
       "pubkey": ""

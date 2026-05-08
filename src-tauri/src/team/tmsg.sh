@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Teamship team coordination — tmsg helper.
-# Dual-mode: sourced by the OSC 133 integration when $TEAMSHIP_TEAM_TMSG is set
+# AnySpace team coordination — tmsg helper.
+# Dual-mode: sourced by the OSC 133 integration when $ANYSPACE_TEAM_TMSG is set
 # (defines a `tmsg` shell function for the prompt user) AND directly executable
 # from PATH so subprocesses launched by agent CLIs can resolve `tmsg` by name.
-# Required env (set by team launcher): TEAMSHIP_TEAM_DIR TEAMSHIP_TEAM_ID
-#                                      TEAMSHIP_AGENT_LABEL TEAMSHIP_BOARD_PATH
-#                                      TEAMSHIP_MESSAGES_PATH
+# Required env (set by team launcher): ANYSPACE_TEAM_DIR ANYSPACE_TEAM_ID
+#                                      ANYSPACE_AGENT_LABEL ANYSPACE_BOARD_PATH
+#                                      ANYSPACE_MESSAGES_PATH
 
 __tmsg_slug() {
   printf '%s' "$1" | tr ' ' '_' | tr -c 'A-Za-z0-9_-' '_' | tr -s '_'
@@ -27,7 +27,7 @@ __tmsg_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 # Append-safe write under a per-team lock so concurrent senders don't interleave.
 __tmsg_append() {
   local file="$1"; shift
-  local lock="${TEAMSHIP_TEAM_DIR}/.lock"
+  local lock="${ANYSPACE_TEAM_DIR}/.lock"
   mkdir -p "$(dirname "$lock")" 2>/dev/null
   if command -v flock >/dev/null 2>&1; then
     ( flock -x 9
@@ -39,9 +39,9 @@ __tmsg_append() {
 }
 
 __tmsg_require_env() {
-  if [ -z "${TEAMSHIP_TEAM_DIR:-}" ] || [ -z "${TEAMSHIP_AGENT_LABEL:-}" ] \
-     || [ -z "${TEAMSHIP_MESSAGES_PATH:-}" ]; then
-    printf 'tmsg: not in a team workspace (TEAMSHIP_TEAM_DIR / TEAMSHIP_AGENT_LABEL missing)\n' >&2
+  if [ -z "${ANYSPACE_TEAM_DIR:-}" ] || [ -z "${ANYSPACE_AGENT_LABEL:-}" ] \
+     || [ -z "${ANYSPACE_MESSAGES_PATH:-}" ]; then
+    printf 'tmsg: not in a team workspace (ANYSPACE_TEAM_DIR / ANYSPACE_AGENT_LABEL missing)\n' >&2
     return 1
   fi
 }
@@ -64,7 +64,7 @@ __tmsg_send() {
   local id ts from
   id="$(__tmsg_uuid)"
   ts="$(__tmsg_iso)"
-  from="$TEAMSHIP_AGENT_LABEL"
+  from="$ANYSPACE_AGENT_LABEL"
 
   # Escape double quotes inside attribute values to keep header parseable.
   local from_e to_e type_e
@@ -75,7 +75,7 @@ __tmsg_send() {
   local block
   block="$(printf '\n<!-- msg id="%s" from="%s" to="%s" type="%s" ts="%s" -->\n%s\n<!-- /msg -->\n' \
     "$id" "$from_e" "$to_e" "$type_e" "$ts" "$body")"
-  __tmsg_append "$TEAMSHIP_MESSAGES_PATH" "$block"
+  __tmsg_append "$ANYSPACE_MESSAGES_PATH" "$block"
   printf '%s\n' "$id"
 }
 
@@ -86,16 +86,16 @@ __tmsg_check() {
   local consume=0
   if [ "${1:-}" = "--consume" ]; then consume=1; fi
 
-  local me="$TEAMSHIP_AGENT_LABEL"
+  local me="$ANYSPACE_AGENT_LABEL"
   local me_slug; me_slug="$(__tmsg_slug "$me")"
-  local consumed_dir="${TEAMSHIP_TEAM_DIR}/.consumed"
+  local consumed_dir="${ANYSPACE_TEAM_DIR}/.consumed"
   local consumed_file="${consumed_dir}/${me_slug}.txt"
   mkdir -p "$consumed_dir"
   : > "${consumed_file}.tmp" 2>/dev/null
   rm -f "${consumed_file}.tmp" 2>/dev/null
   [ -f "$consumed_file" ] || : > "$consumed_file"
 
-  if [ ! -f "$TEAMSHIP_MESSAGES_PATH" ]; then return 0; fi
+  if [ ! -f "$ANYSPACE_MESSAGES_PATH" ]; then return 0; fi
 
   awk -v me="$me" -v consumed_file="$consumed_file" -v consume="$consume" '
     function trim(s) { sub(/^[ \t\r\n]+/,"",s); sub(/[ \t\r\n]+$/,"",s); return s }
@@ -136,14 +136,14 @@ __tmsg_check() {
         for (i = 0; i < new_count; i++) print new_ids[i] >> consumed_file
       }
     }
-  ' "$TEAMSHIP_MESSAGES_PATH"
+  ' "$ANYSPACE_MESSAGES_PATH"
 }
 
 # Write an RPC request and block on its response file.
 __tmsg_rpc() {
   __tmsg_require_env || return 1
   local action="$1"; shift
-  local rpc_dir="${TEAMSHIP_TEAM_DIR}/.rpc"
+  local rpc_dir="${ANYSPACE_TEAM_DIR}/.rpc"
   mkdir -p "$rpc_dir"
   local id ts
   id="$(__tmsg_uuid)"
@@ -155,7 +155,7 @@ __tmsg_rpc() {
   printf '%s' "$payload" > "${req}.tmp"
   mv "${req}.tmp" "$req"
 
-  local timeout="${TEAMSHIP_RPC_TIMEOUT:-15}"
+  local timeout="${ANYSPACE_RPC_TIMEOUT:-15}"
   local elapsed=0
   while [ ! -f "$res" ]; do
     sleep 0.2
@@ -187,7 +187,7 @@ __tmsg_pane() {
       *) printf 'tmsg pane %s: unknown arg %s\n' "$sub" "$1" >&2; return 2 ;;
     esac
   done
-  local from="${TEAMSHIP_AGENT_LABEL}"
+  local from="${ANYSPACE_AGENT_LABEL}"
   # Hand-rolled JSON to avoid a jq dep — quote the few user strings we use.
   local q_label q_role q_body q_from
   q_label="${label//\\/\\\\}"; q_label="${q_label//\"/\\\"}"
@@ -203,14 +203,14 @@ __tmsg_pane() {
 
 __tmsg_roster() {
   __tmsg_require_env || return 1
-  if [ -f "${TEAMSHIP_BOARD_PATH:-}" ]; then
-    awk '/^## Roster/{flag=1; next} /^## /{flag=0} flag' "$TEAMSHIP_BOARD_PATH"
+  if [ -f "${ANYSPACE_BOARD_PATH:-}" ]; then
+    awk '/^## Roster/{flag=1; next} /^## /{flag=0} flag' "$ANYSPACE_BOARD_PATH"
   fi
 }
 
 __tmsg_board() {
   __tmsg_require_env || return 1
-  [ -f "${TEAMSHIP_BOARD_PATH:-}" ] && cat "$TEAMSHIP_BOARD_PATH"
+  [ -f "${ANYSPACE_BOARD_PATH:-}" ] && cat "$ANYSPACE_BOARD_PATH"
 }
 
 tmsg() {

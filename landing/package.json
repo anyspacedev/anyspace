@@ -1,9 +1,9 @@
 {
-  "name": "teamship-landing",
+  "name": "anyspace-landing",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Teamship marketing landing page",
+  "description": "AnySpace marketing landing page",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

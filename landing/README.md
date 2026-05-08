@@ -1,6 +1,6 @@
-# Teamship landing
+# AnySpace landing
 
-Marketing site for Teamship. Astro 5, zero-JS by default (small inline scripts only for OS detection, sticky-nav, billing toggle).
+Marketing site for AnySpace. Astro 5, zero-JS by default (small inline scripts only for OS detection, sticky-nav, billing toggle).
 
 ## Develop
 
@@ -28,7 +28,7 @@ Output is fully static — drop `dist/` on any static host (Cloudflare Pages, Ne
 - Pricing prices and copy in `src/components/Pricing.astro`
 - GitHub URL in `Nav.astro`, `Hero.astro`, `Footer.astro`
 - Footer links (`/docs`, `/blog`, `/privacy`, etc.) — point at real routes when they exist
-- `site` URL in `astro.config.mjs` — change `https://teamship.app` to the real domain so canonical/OG URLs render correctly
+- `site` URL in `astro.config.mjs` — change `https://anyspace.dev` to the real domain so canonical/OG URLs render correctly
 
 ## Structure
 

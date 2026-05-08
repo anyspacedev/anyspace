@@ -64,7 +64,7 @@ export async function runQuickSuggest(opts: {
   if (!creds.ok) {
     if (creds.reason === "needs-signin" || creds.reason === "no-token") {
       openLoginGuide("ai-explain");
-      throw new Error("Sign in to Teamship Cloud first");
+      throw new Error("Sign in to AnySpace Cloud first");
     }
     throw new Error("AI not configured (Settings → AI)");
   }

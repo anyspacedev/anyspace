@@ -47,5 +47,5 @@ export async function getAuthToken(): Promise<string | null> {
   }
 }
 
-export const TEAMSHIP_CLOUD_URL: string =
-  (import.meta.env.VITE_TEAMSHIP_CLOUD_URL as string | undefined) ?? "";
+export const ANYSPACE_CLOUD_URL: string =
+  (import.meta.env.VITE_ANYSPACE_CLOUD_URL as string | undefined) ?? "";

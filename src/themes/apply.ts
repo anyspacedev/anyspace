@@ -36,7 +36,7 @@ function hex6(value: string): string {
   return v.length === 3 ? v.split("").map((c) => c + c).join("") : v;
 }
 
-/** Build a Monaco theme definition from a Teamship theme. */
+/** Build a Monaco theme definition from a AnySpace theme. */
 export function monacoThemeFor(theme: Theme): {
   name: string;
   base: "vs" | "vs-dark";
@@ -45,7 +45,7 @@ export function monacoThemeFor(theme: Theme): {
   colors: Record<string, string>;
 } {
   return {
-    name: `teamship-${theme.id}`,
+    name: `anyspace-${theme.id}`,
     base: theme.kind === "dark" ? "vs-dark" : "vs",
     inherit: true,
     rules: [

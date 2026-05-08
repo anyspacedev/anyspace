@@ -13,10 +13,10 @@ export type ElementCapture = {
 };
 
 export type PickerMessage =
-  | { src: "teamship"; type: "picker:start" }
-  | { src: "teamship"; type: "picker:stop" }
-  | { src: "teamship"; type: "picker:selected"; payload: ElementCapture }
-  | { src: "teamship"; type: "picker:cancelled" };
+  | { src: "anyspace"; type: "picker:start" }
+  | { src: "anyspace"; type: "picker:stop" }
+  | { src: "anyspace"; type: "picker:selected"; payload: ElementCapture }
+  | { src: "anyspace"; type: "picker:cancelled" };
 
 function describeParent(p: ElementCapture["parents"][number]): string {
   let s = p.tag;

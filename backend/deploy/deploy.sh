@@ -11,16 +11,16 @@ uv sync --no-dev
 echo "[2/4] alembic upgrade head"
 uv run alembic upgrade head
 
-UNIT=/etc/systemd/system/teamship-backend.service
-if [[ ! -f "$UNIT" ]] || ! cmp -s deploy/teamship-backend.service "$UNIT"; then
+UNIT=/etc/systemd/system/anyspace-backend.service
+if [[ ! -f "$UNIT" ]] || ! cmp -s deploy/anyspace-backend.service "$UNIT"; then
     echo "[3/4] installing systemd unit"
-    sudo cp deploy/teamship-backend.service "$UNIT"
+    sudo cp deploy/anyspace-backend.service "$UNIT"
     sudo systemctl daemon-reload
-    sudo systemctl enable teamship-backend
+    sudo systemctl enable anyspace-backend
 fi
 
 echo "[4/4] systemctl restart"
-sudo systemctl restart teamship-backend
+sudo systemctl restart anyspace-backend
 
 # Wait until /healthz reports recognizer_ready=true (model load can take ~1s).
 echo -n "waiting for /healthz "
@@ -36,5 +36,5 @@ done
 
 echo
 echo "FAIL: backend did not become ready in 30s. Recent logs:"
-sudo journalctl -u teamship-backend -n 30 --no-pager
+sudo journalctl -u anyspace-backend -n 30 --no-pager
 exit 1

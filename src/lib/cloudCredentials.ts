@@ -1,16 +1,16 @@
 /**
  * Shared resolver for AI / Super Agent network credentials.
  *
- * Centralizes the "is this preset Teamship Cloud? then mint a Clerk JWT and
- * resolve VITE_TEAMSHIP_CLOUD_URL at call time, otherwise validate the BYO
+ * Centralizes the "is this preset AnySpace Cloud? then mint a Clerk JWT and
+ * resolve VITE_ANYSPACE_CLOUD_URL at call time, otherwise validate the BYO
  * config and pass it through" branch that would otherwise live inline at
  * every chat-completion call site.
  */
 
-import { TEAMSHIP_CLOUD_URL, getAuthToken, isSignedIn } from "./auth";
+import { ANYSPACE_CLOUD_URL, getAuthToken, isSignedIn } from "./auth";
 
 import type { AiSettings } from "../stores/aiStore";
-import { TEAMSHIP_CLOUD_DEFAULT_MODEL } from "../stores/aiStore";
+import { ANYSPACE_CLOUD_DEFAULT_MODEL } from "../stores/aiStore";
 
 export type CredFallback = {
   endpoint: string;
@@ -28,8 +28,8 @@ export type ResolvedCreds =
 /**
  * Resolve runtime credentials for a chat-completion request.
  *
- * - `presetId === "teamship-cloud"`: requires sign-in, mints a fresh Clerk
- *   JWT (skipCache), and resolves the endpoint from `TEAMSHIP_CLOUD_URL`.
+ * - `presetId === "anyspace-cloud"`: requires sign-in, mints a fresh Clerk
+ *   JWT (skipCache), and resolves the endpoint from `ANYSPACE_CLOUD_URL`.
  * - Anything else: returns `fallback` if all three fields are non-empty,
  *   otherwise reports `missing-config` so the caller can surface a hint.
  */
@@ -37,8 +37,8 @@ export async function resolveAiCreds(
   presetId: AiSettings["presetId"],
   fallback: CredFallback,
 ): Promise<ResolvedCreds> {
-  if (presetId === "teamship-cloud") {
-    if (!TEAMSHIP_CLOUD_URL) {
+  if (presetId === "anyspace-cloud") {
+    if (!ANYSPACE_CLOUD_URL) {
       return { ok: false, reason: "no-cloud-url" };
     }
     if (!isSignedIn()) {
@@ -50,9 +50,9 @@ export async function resolveAiCreds(
     }
     return {
       ok: true,
-      endpoint: TEAMSHIP_CLOUD_URL,
+      endpoint: ANYSPACE_CLOUD_URL,
       apiKey: token,
-      model: fallback.model || TEAMSHIP_CLOUD_DEFAULT_MODEL,
+      model: fallback.model || ANYSPACE_CLOUD_DEFAULT_MODEL,
     };
   }
 

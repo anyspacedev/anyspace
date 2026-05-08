@@ -20,7 +20,7 @@ const DEFAULT_SYSTEM_PROMPT =
  *  Any other value pins Super Agent to a specific provider regardless of AI. */
 export type SuperAgentPresetId =
   | "inherit"
-  | "teamship-cloud"
+  | "anyspace-cloud"
   | "openai"
   | "groq"
   | "openrouter"

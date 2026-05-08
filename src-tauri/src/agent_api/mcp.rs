@@ -1,5 +1,5 @@
-// In-process MCP server for Teamship preview tools, served over Streamable
-// HTTP at /mcp. Replaces the standalone `teamship-mcp` stdio binary — same
+// In-process MCP server for AnySpace preview tools, served over Streamable
+// HTTP at /mcp. Replaces the standalone `anyspace-mcp` stdio binary — same
 // `#[tool_router]` ergonomics, same tool surface, but each tool calls the
 // frontend bridge (`round_trip`) directly instead of self-looping HTTP.
 //
@@ -27,19 +27,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
-pub struct Teamship {
+pub struct AnySpace {
     ctx: AppCtx,
     // Read by the #[tool_handler] macro at dispatch time; rustc's dead-code
     // analysis can't see through the macro expansion.
     #[allow(dead_code)]
-    tool_router: ToolRouter<Teamship>,
+    tool_router: ToolRouter<AnySpace>,
 }
 
-impl Teamship {
+impl AnySpace {
     pub fn new(ctx: AppCtx) -> Self {
         Self {
             ctx,
-            tool_router: Teamship::tool_router(),
+            tool_router: AnySpace::tool_router(),
         }
     }
 }
@@ -125,7 +125,7 @@ fn map_err(err: (axum::http::StatusCode, String)) -> McpError {
 }
 
 #[tool_router]
-impl Teamship {
+impl AnySpace {
     #[tool(
         description = "Open or refocus the live preview pane next to this terminal. \
                        Pass projectPath to auto-detect a dev server, or url for a specific page."
@@ -296,11 +296,11 @@ impl Teamship {
 }
 
 #[tool_handler]
-impl ServerHandler for Teamship {
+impl ServerHandler for AnySpace {
     fn get_info(&self) -> ServerInfo {
         // ServerInfo / Implementation are #[non_exhaustive]; mutate defaults.
         let mut info = ServerInfo::default();
-        info.server_info.name = "teamship".into();
+        info.server_info.name = "anyspace".into();
         info.server_info.version = env!("CARGO_PKG_VERSION").into();
         info.capabilities = ServerCapabilities::builder().enable_tools().build();
         info
@@ -312,9 +312,9 @@ impl ServerHandler for Teamship {
 /// (`Authorization: Bearer <token>`). `StreamableHttpService` enforces its own
 /// `allowed_hosts` default `["localhost", "127.0.0.1", "::1"]`, which matches
 /// our 127.0.0.1 bind.
-pub fn build_service(ctx: AppCtx) -> StreamableHttpService<Teamship, LocalSessionManager> {
+pub fn build_service(ctx: AppCtx) -> StreamableHttpService<AnySpace, LocalSessionManager> {
     StreamableHttpService::new(
-        move || Ok(Teamship::new(ctx.clone())),
+        move || Ok(AnySpace::new(ctx.clone())),
         Arc::new(LocalSessionManager::default()),
         StreamableHttpServerConfig::default(),
     )

@@ -25,7 +25,7 @@ pub struct TeamInitArgs {
     pub board_markdown: String,
 }
 
-/// Materialize `<projectPath>/.teamship/teams/<teamId>/` with empty BOARD/MESSAGES files
+/// Materialize `<projectPath>/.anyspace/teams/<teamId>/` with empty BOARD/MESSAGES files
 /// and the shared tmsg.sh script. Idempotent: existing BOARD content is preserved.
 #[tauri::command]
 pub fn team_init(args: TeamInitArgs) -> Result<TeamPaths, String> {
@@ -86,7 +86,7 @@ fn init_team_dir(team_id: &str, project_path: &str, board_markdown: &str) -> any
 
 fn shared_tmsg_bin_dir() -> anyhow::Result<PathBuf> {
     let dir = std::env::temp_dir()
-        .join("teamship-shell-integration")
+        .join("anyspace-shell-integration")
         .join("bin");
     std::fs::create_dir_all(&dir).context("create tmsg bin dir")?;
     Ok(dir)

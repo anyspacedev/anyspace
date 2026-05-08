@@ -1,7 +1,7 @@
 """Tauri auto-updater manifest endpoint.
 
 The desktop binary already points at
-    https://updates.teamship.app/{{target}}/{{arch}}/{{current_version}}
+    https://updates.anyspace.dev/{{target}}/{{arch}}/{{current_version}}
 (per src-tauri/tauri.conf.json). We must respond with either:
 
   - 204 No Content        — client treats as "up to date"

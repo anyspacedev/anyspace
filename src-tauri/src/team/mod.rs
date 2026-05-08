@@ -28,8 +28,8 @@ impl Default for TeamManager {
 }
 
 /// tmsg shell helper, sourced by the OSC 133 integration when
-/// $TEAMSHIP_TEAM_TMSG points at a copy of this script on disk.
+/// $ANYSPACE_TEAM_TMSG points at a copy of this script on disk.
 pub const TMSG_SCRIPT: &str = include_str!("tmsg.sh");
 
 /// Sentinel directory under each team's project_path.
-pub const TEAM_DIR_PREFIX: &str = ".teamship/teams";
+pub const TEAM_DIR_PREFIX: &str = ".anyspace/teams";

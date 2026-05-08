@@ -35,7 +35,7 @@ PLAN.md
 README.md
 
 # systemd unit is for the host install, not the container
-deploy/teamship-backend.service
+deploy/anyspace-backend.service
 
 # Misc
 *.log

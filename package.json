@@ -1,9 +1,9 @@
 {
-  "name": "teamship",
+  "name": "anyspace",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Teamship — orchestrate AI agents across multi-pane workspaces",
+  "description": "AnySpace — orchestrate AI agents across multi-pane workspaces",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -5,7 +5,7 @@ let inflight: Promise<AgentApiInfo> | null = null;
 
 /**
  * Fetch the loopback API URL + bearer token once and cache. Code-Agent
- * launchers (solo + team) read this to inject TEAMSHIP_API_URL/TOKEN into
+ * launchers (solo + team) read this to inject ANYSPACE_API_URL/TOKEN into
  * every spawned terminal's child env. Idempotent.
  */
 export async function ensureAgentApi(): Promise<AgentApiInfo> {
@@ -28,13 +28,13 @@ export function getCachedAgentApi(): AgentApiInfo | null {
 
 /**
  * Build the env block we merge into a Code Agent's PTY spawn. The launcher
- * is responsible for setting TEAMSHIP_PANE_ID + TEAMSHIP_TAB_ID after it
+ * is responsible for setting ANYSPACE_PANE_ID + ANYSPACE_TAB_ID after it
  * knows which pane the agent will live in.
  */
 export function agentApiEnv(): Record<string, string> {
   if (!cached) return {};
   return {
-    TEAMSHIP_API_URL: cached.url,
-    TEAMSHIP_API_TOKEN: cached.token,
+    ANYSPACE_API_URL: cached.url,
+    ANYSPACE_API_TOKEN: cached.token,
   };
 }

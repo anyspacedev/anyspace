@@ -57,7 +57,7 @@ function NoClerkBridge() {
   return null;
 }
 
-/** Wraps ClerkProvider so Clerk's UI follows the active Teamship theme:
+/** Wraps ClerkProvider so Clerk's UI follows the active AnySpace theme:
  * dark themes apply Clerk's `dark` baseTheme, light themes use the default,
  * and `colorPrimary` always tracks the theme's accent. */
 function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
@@ -80,7 +80,7 @@ function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
 if (!PUBLISHABLE_KEY) {
-  // No Clerk key configured — render without auth. The Teamship Cloud STT
+  // No Clerk key configured — render without auth. The AnySpace Cloud STT
   // preset surfaces a clear "sign in required" toast at call time; every
   // other feature is unaffected.
   root.render(

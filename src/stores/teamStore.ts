@@ -6,7 +6,7 @@ import type { TeamRole } from "../lib/teamRoles";
 let dbPromise: Promise<Database> | null = null;
 function getDb(): Promise<Database> {
   if (!dbPromise) {
-    dbPromise = Database.load("sqlite:teamship.db");
+    dbPromise = Database.load("sqlite:anyspace.db");
   }
   return dbPromise;
 }
@@ -175,7 +175,7 @@ export const useTeamStore = create<TeamState>((set) => ({
     };
     // team_dir is stored later (after team_init), but the column is NOT NULL; seed
     // with the conventional path so the row is valid even if we crash before init.
-    const seededDir = `${input.projectPath.replace(/\/$/, "")}/.teamship/teams/${team.id}`;
+    const seededDir = `${input.projectPath.replace(/\/$/, "")}/.anyspace/teams/${team.id}`;
     team.teamDir = seededDir;
 
     await db.execute(

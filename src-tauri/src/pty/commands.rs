@@ -14,7 +14,7 @@ pub struct SpawnArgs {
     pub env: HashMap<String, String>,
     pub cols: u16,
     pub rows: u16,
-    /// Frontend-supplied pane id; surfaced to children as `TEAMSHIP_PANE_ID`
+    /// Frontend-supplied pane id; surfaced to children as `ANYSPACE_PANE_ID`
     /// so the bundled MCP server can identify its caller.
     pub pane_id: Option<String>,
     pub tab_id: Option<String>,
@@ -35,16 +35,16 @@ pub async fn pty_spawn(
     // teamLauncher's per-pane stamping continues to override these.
     let mut env = args.env;
     if let Some(api) = app.try_state::<AgentApiState>() {
-        env.entry("TEAMSHIP_API_URL".into())
+        env.entry("ANYSPACE_API_URL".into())
             .or_insert_with(|| format!("http://127.0.0.1:{}", api.port));
-        env.entry("TEAMSHIP_API_TOKEN".into())
+        env.entry("ANYSPACE_API_TOKEN".into())
             .or_insert_with(|| api.token.clone());
     }
     if let Some(pane_id) = args.pane_id {
-        env.entry("TEAMSHIP_PANE_ID".into()).or_insert(pane_id);
+        env.entry("ANYSPACE_PANE_ID".into()).or_insert(pane_id);
     }
     if let Some(tab_id) = args.tab_id {
-        env.entry("TEAMSHIP_TAB_ID".into()).or_insert(tab_id);
+        env.entry("ANYSPACE_TAB_ID".into()).or_insert(tab_id);
     }
 
     let session = PtySession::spawn(app, &id, args.cwd, env, args.cols, args.rows, on_data)

@@ -53,7 +53,7 @@ export function Sidebar() {
           T
         </div>
         <div className="brand-text" data-tauri-drag-region="">
-          <div className="brand-name" data-tauri-drag-region="">Teamship</div>
+          <div className="brand-name" data-tauri-drag-region="">AnySpace</div>
           <div className="brand-sub" data-tauri-drag-region="">{theme.name}</div>
         </div>
       </div>

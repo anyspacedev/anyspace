@@ -12,7 +12,7 @@ npm run tauri:build          # bundle .deb / .AppImage / .dmg / .msi (host-depen
 npx tsc --noEmit             # frontend typecheck (CI gate)
 npx vite build               # frontend production bundle into dist/
 cd src-tauri && cargo check  # Rust typecheck (faster than build)
-cd src-tauri && cargo build  # full debug build → src-tauri/target/debug/teamship
+cd src-tauri && cargo build  # full debug build → src-tauri/target/debug/anyspace
 ```
 
 **System floor:** Tauri 2 needs `glib-2.0 >= 2.70` (Debian 12 / Ubuntu 22.04+), Rust ≥ 1.77, Node ≥ 20.
@@ -47,7 +47,7 @@ Commands that need to read settings, build proxy-aware HTTP clients, or emit eve
 
 ### OSC 133 is auto-injected, not opt-in
 
-`src-tauri/src/shell_integration/scripts.rs` writes a bash/zsh integration script to `$TMPDIR/teamship-shell-integration/integration.sh` on first PTY spawn. The script is sourced via the `BASH_ENV` env var that `pty_spawn` sets on every child process — every shell session emits OSC 133 A/B/C/D sequences without user opt-in.
+`src-tauri/src/shell_integration/scripts.rs` writes a bash/zsh integration script to `$TMPDIR/anyspace-shell-integration/integration.sh` on first PTY spawn. The script is sourced via the `BASH_ENV` env var that `pty_spawn` sets on every child process — every shell session emits OSC 133 A/B/C/D sequences without user opt-in.
 
 Frontend parses those sequences in `src/components/terminal/osc133.ts` (`registerOscHandler(133, …)`) and overlays absolute-positioned `<div>` markers on top of xterm via `CommandBlocks.tsx`. The overlay reads `terminal.buffer.active.baseY + cursorY` to anchor blocks to absolute scrollback rows — the position-syncing math in `Terminal.tsx`'s `updateGeom` is load-bearing.
 
@@ -82,11 +82,11 @@ Forgetting any one leaves dead branches; TS catches the union but not the icon/l
 - `mode: "current-tab"` — calls `splitPane(tabId, paneId, direction, preset)` to add a sibling terminal pane to an existing layout. `splitPane`'s optional `preset: PanePreset` is what lets the new pane carry `pendingCommand`/`spawnEnv`/`spawnCwd`/`title` from the start.
 
 Internal sequence in either mode:
-1. `agent_launch` (Rust) writes task body + system prompt to `/tmp/teamship-tasks/task-<uuid>.md`, substitutes `{task_file}` in the agent's command template, returns `{ command, taskFile, env }`.
+1. `agent_launch` (Rust) writes task body + system prompt to `/tmp/anyspace-tasks/task-<uuid>.md`, substitutes `{task_file}` in the agent's command template, returns `{ command, taskFile, env }`.
 2. Frontend stashes `{ pendingCommand, spawnEnv, spawnCwd, title }` in the new terminal pane's payload (via `newTab` presets or `splitPane`'s preset).
 3. `Terminal.tsx`'s `useEffect` sees `pendingCommand`, waits 600ms for the shell prompt to settle, then writes the command + `\n` to the PTY and clears `pendingCommand`.
 
-The `TEAMSHIP_TASK_FILE` env var is **only** set if you wire it via the agent's stored `envJson` field — `agent_launch` returns it in `env` but the current spawn path doesn't merge that into `pty_spawn`'s env. Either substitute via `{task_file}` in the command, or extend the spawn path to pass env through.
+The `ANYSPACE_TASK_FILE` env var is **only** set if you wire it via the agent's stored `envJson` field — `agent_launch` returns it in `env` but the current spawn path doesn't merge that into `pty_spawn`'s env. Either substitute via `{task_file}` in the command, or extend the spawn path to pass env through.
 
 `EPHEMERAL_KEYS` in `workspaceStore.ts` strips per-session/UI keys (`sessionId`, `pendingCommand`, `pickerActive`) from the persisted snapshot. Add to that set for any new payload key that should not survive a restart.
 
@@ -118,7 +118,7 @@ Out of scope for the proxy: the `<iframe>` in `PreviewPane`, the `tauri-plugin-u
 
 The `tasks` table column is `column_name`, not `column`. SQLite tolerates `column` as an identifier in some contexts but it's a reserved word and `tauri-plugin-sql`'s parser bails. The `Task["column"]` TS field stays `column` — `kanbanStore.ts` translates with `rowToTask`.
 
-Migrations live in `src-tauri/migrations/*.sql` and are registered in `src-tauri/src/kanban/db.rs` via `MigrationKind::Up`. They run automatically on `Database.load("sqlite:teamship.db")`.
+Migrations live in `src-tauri/migrations/*.sql` and are registered in `src-tauri/src/kanban/db.rs` via `MigrationKind::Up`. They run automatically on `Database.load("sqlite:anyspace.db")`.
 
 **Migrations are immutable once shipped.** `tauri-plugin-sql` records each migration's checksum; editing an applied SQL file makes the DB refuse to load on next launch. Always add a new numbered migration (`004_*.sql`, `005_*.sql`, …) instead of mutating an existing one.
 
@@ -139,7 +139,7 @@ The parent (Tauri scheme) and the preview iframe (`http://localhost:<port>`) are
 1. **Iframe-side script** at `src-tauri/src/preview/picker_script.js` — injected into *every* frame at `document_start` via `tauri::plugin::Builder::js_init_script_on_all_frames(...)` registered as an inline plugin in `src-tauri/src/lib.rs`. This is the only iframe-script-injection mechanism in the repo; reuse the same plugin (or add another) before reaching for srcdoc/proxy hacks.
 2. **Parent controller** in `PreviewPane.tsx` — toggles `pickerActive`, sends `postMessage` commands to `iframe.contentWindow`, and listens for replies filtered by `e.source === iframeRef.current?.contentWindow` to avoid cross-pane bleed.
 
-The message envelope is `{ src: "teamship", type: "picker:start" | "picker:stop" | "picker:selected" | "picker:cancelled", payload? }` (typed in `src/lib/elementContext.ts`). Keep `src: "teamship"` on any new commands you add through this channel — the iframe script and parent listener both filter on it.
+The message envelope is `{ src: "anyspace", type: "picker:start" | "picker:stop" | "picker:selected" | "picker:cancelled", payload? }` (typed in `src/lib/elementContext.ts`). Keep `src: "anyspace"` on any new commands you add through this channel — the iframe script and parent listener both filter on it.
 
 The script also re-runs on every iframe `load`, so `PreviewPane.onIframeLoad` re-sends `picker:start` when the toggle is still on after a hard reload. Element capture walks the React fiber for `_debugSource` to attach a source-file location when available.
 
@@ -174,7 +174,7 @@ The mobile pane (`src-tauri/src/mobile/`, `src/lib/mobile.ts`) is **stage-1 skel
 
 Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next to `TemplatePickerTrigger` in the tab bar) collects goal + project dir + roster (role/label/AI program per agent) + skills + attachments and calls `useTeamStore.create()` → `launchTeam(teamId)` (`src/lib/teamLauncher.ts`). The launcher reuses `agent_launch` per agent, batches the resulting `PanePreset[]` into a single `newTab(N, name, presets, projectPath)` call, and persists `tab_id` + per-agent `pane_id` back to the `team_agents` table.
 
-**Coordination is file-based.** `team_init` materializes `<projectPath>/.teamship/teams/<teamId>/` containing:
+**Coordination is file-based.** `team_init` materializes `<projectPath>/.anyspace/teams/<teamId>/` containing:
 
 - `BOARD.md` — roster + task breakdown + status, edited by agents (especially the Coordinator)
 - `MESSAGES.md` — append-only fenced markdown blocks; the canonical inter-agent log
@@ -182,7 +182,7 @@ Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next
 - `.rpc/` — request/response files for `tmsg pane …` calls
 - `.consumed/<labelSlug>.txt` — per-agent ledger of message IDs the agent has acknowledged via `tmsg check --consume`
 
-**`tmsg` is a shell function**, not a binary. Embedded as `src-tauri/src/team/tmsg.sh` (via `include_str!`) and written to `$TMPDIR/teamship-shell-integration/tmsg.sh` on every team launch; the existing OSC 133 integration sources it conditionally when `$TEAMSHIP_TEAM_TMSG` is set in a pane's env. Subcommands:
+**`tmsg` is a shell function**, not a binary. Embedded as `src-tauri/src/team/tmsg.sh` (via `include_str!`) and written to `$TMPDIR/anyspace-shell-integration/tmsg.sh` on every team launch; the existing OSC 133 integration sources it conditionally when `$ANYSPACE_TEAM_TMSG` is set in a pane's env. Subcommands:
 
 - `tmsg send --to <Label|@all|@operator> [--type message|status|escalation|done] --body "…"` — append a fenced block to `MESSAGES.md` (flock-protected).
 - `tmsg check [--consume]` — print messages addressed to me or `@all` not yet in my `.consumed` file.
@@ -202,9 +202,9 @@ Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next
 
 **Restart resume**: `App.tsx`'s mount effect awaits `hydrateWorkspace()` → `loadKanban()` → `useTeamStore.load()`, then calls `resumeTeam(teamId)` for every active team whose `tab_id` matches a live tab. `resumeTeam` re-renders prompt files (so role/skill changes between releases propagate), re-derives the `pendingCommand`, and writes it back into the existing pane payloads via `setPanePayload`. The Terminal effect at `Terminal.tsx:438` re-fires when `pendingCommand` flips from undefined to a string, even if `sessionId` was already set — so re-injecting after PTY spawn still runs the agent CLI. The team-RPC subscription is also re-established here.
 
-**`tmsg.sh` paths and team data are gitignorable.** `.teamship/` is in this repo's own `.gitignore`. The directory is intentionally inside the working tree so agents can read it with their normal file tools.
+**`tmsg.sh` paths and team data are gitignorable.** `.anyspace/` is in this repo's own `.gitignore`. The directory is intentionally inside the working tree so agents can read it with their normal file tools.
 
-**Auto-archive on tab close.** `App.tsx` subscribes to `useWorkspaceStore` and calls `useTeamStore.archive(teamId)` whenever a team's `tabId` disappears from `tabs`. This stops the watchers, marks `teams.status = 'archived'`, and prevents resume from trying to revive a dead tab. The team's `.teamship/teams/<id>/` files stay on disk; reactivating from the Teams view re-launches a fresh tab against them.
+**Auto-archive on tab close.** `App.tsx` subscribes to `useWorkspaceStore` and calls `useTeamStore.archive(teamId)` whenever a team's `tabId` disappears from `tabs`. This stops the watchers, marks `teams.status = 'archived'`, and prevents resume from trying to revive a dead tab. The team's `.anyspace/teams/<id>/` files stay on disk; reactivating from the Teams view re-launches a fresh tab against them.
 
 **Teams view (`src/components/team/TeamsView.tsx`)** is a sidebar nav target between Kanban and Agents. Lists active + archived teams with per-row actions: Open (focus existing tab), Launch (active without live tab → fresh tab), Reactivate (archived → active), Rename (double-click team name), Archive. `useTeamStore.reactivate(teamId)` clears stale `tab_id` and per-agent `pane_id` before relaunch, so the next `launchTeam` writes a fresh layout.
 

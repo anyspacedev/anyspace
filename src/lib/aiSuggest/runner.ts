@@ -16,7 +16,7 @@ export class AiSuggestNotConfiguredError extends Error {
 export class AiSuggestAuthRequiredError extends Error {
   code = "needs-signin" as const;
   constructor() {
-    super("Sign in to Teamship Cloud to use AI suggestions.");
+    super("Sign in to AnySpace Cloud to use AI suggestions.");
     this.name = "AiSuggestAuthRequiredError";
   }
 }

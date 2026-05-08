@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = "sqlite:///./data/teamship.db"
+    database_url: str = "sqlite:///./data/anyspace.db"
     model_cache_dir: Path = Path("./data/models")
 
     log_level: str = "info"
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     max_body_bytes: int = 25 * 1024 * 1024
 
     cors_allow_origins: str = (
-        "tauri://localhost,https://teamship.app,https://www.teamship.app"
+        "tauri://localhost,https://anyspace.dev,https://www.anyspace.dev"
     )
 
     # Sherpa-onnx model archive on Hugging Face.

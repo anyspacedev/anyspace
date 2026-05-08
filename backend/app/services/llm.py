@@ -3,7 +3,7 @@
 The desktop client speaks OpenAI dialect; we don't transform the request
 shape. We do:
   1. Resolve the requested model alias via `MODEL_ALLOW_LIST`. Aliases let
-     us decouple the client-facing name ("teamship-default") from the
+     us decouple the client-facing name ("anyspace-default") from the
      upstream model ("gpt-4o-mini") so we can swap providers without a
      client release.
   2. Forward the body with the server-held key. SSE bytes pass through
@@ -31,10 +31,10 @@ class LlmModelNotAllowedError(ValueError):
     """Raised for an unknown/disallowed model alias from the client."""
 
 
-# Client-facing alias → upstream model id. Keep `teamship-default` first so
+# Client-facing alias → upstream model id. Keep `anyspace-default` first so
 # clients that send it (as the new default model name) get a sensible target.
 MODEL_ALLOW_LIST: dict[str, str] = {
-    "teamship-default": "",  # resolved at call time to settings.llm_default_model
+    "anyspace-default": "",  # resolved at call time to settings.llm_default_model
     "gpt-4o-mini": "gpt-4o-mini",
     "gpt-4o": "gpt-4o",
     "claude-3-5-sonnet": "claude-3-5-sonnet-latest",
@@ -49,7 +49,7 @@ def resolve_model(client_model: str) -> str:
             f"model {client_model!r} is not in the allow-list",
         )
     upstream = MODEL_ALLOW_LIST[client_model]
-    if not upstream:  # "teamship-default" sentinel
+    if not upstream:  # "anyspace-default" sentinel
         return get_settings().llm_default_model
     return upstream
 

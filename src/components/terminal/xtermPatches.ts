@@ -16,7 +16,7 @@ const EMPTY_DIMENSIONS = Object.freeze({
   }),
 });
 
-const PATCHED = Symbol.for("teamship.xterm.renderService.patched");
+const PATCHED = Symbol.for("anyspace.xterm.renderService.patched");
 
 type RenderServiceLike = {
   _renderer?: { value?: { dimensions?: unknown } };

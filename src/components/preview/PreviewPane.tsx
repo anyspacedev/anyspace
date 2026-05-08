@@ -196,7 +196,7 @@ export function PreviewPane({ pane, tabId }: Props) {
       // The iframe just (re)loaded — re-send the start message so the freshly
       // injected picker script wakes up in the new document.
       iframeRef.current?.contentWindow?.postMessage(
-        { src: "teamship", type: "picker:start" },
+        { src: "anyspace", type: "picker:start" },
         "*",
       );
     }
@@ -213,7 +213,7 @@ export function PreviewPane({ pane, tabId }: Props) {
     const onMessage = (e: MessageEvent) => {
       if (e.source !== iframeRef.current?.contentWindow) return;
       const msg = e.data as PickerMessage | undefined;
-      if (!msg || msg.src !== "teamship") return;
+      if (!msg || msg.src !== "anyspace") return;
       if (msg.type === "picker:selected") {
         setPickerActive(false);
         setCapture(msg.payload);
@@ -230,7 +230,7 @@ export function PreviewPane({ pane, tabId }: Props) {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
     win.postMessage(
-      { src: "teamship", type: pickerActive ? "picker:start" : "picker:stop" },
+      { src: "anyspace", type: pickerActive ? "picker:start" : "picker:stop" },
       "*",
     );
   }, [pickerActive]);

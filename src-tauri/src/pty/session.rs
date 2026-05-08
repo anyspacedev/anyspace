@@ -77,14 +77,14 @@ impl PtySession {
             cmd.env(k, v);
         }
         // Path to the OSC 133 hook script — sourced by every wrapper rc.
-        cmd.env("TEAMSHIP_SHELL_INTEGRATION", &integration);
+        cmd.env("ANYSPACE_SHELL_INTEGRATION", &integration);
         // BASH_ENV still helps non-interactive bash subshells emit blocks too.
         cmd.env("BASH_ENV", &integration);
         if let Some(w) = zsh_wrapper {
             cmd.env("ZDOTDIR", w);
         }
         if let Some(u) = zsh_user_zdotdir {
-            cmd.env("TEAMSHIP_USER_ZDOTDIR", u);
+            cmd.env("ANYSPACE_USER_ZDOTDIR", u);
         }
 
         let child = pair

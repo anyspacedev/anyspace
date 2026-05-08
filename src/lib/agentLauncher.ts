@@ -34,7 +34,7 @@ export async function launchAgent(input: LaunchAgentInput): Promise<string | nul
   if (!agent) return null;
 
   // Make sure the loopback API is reachable before we promise the agent that
-  // $TEAMSHIP_API_URL works. ensureAgentApi is cached, so this is a no-op
+  // $ANYSPACE_API_URL works. ensureAgentApi is cached, so this is a no-op
   // after the first call.
   await ensureAgentApi().catch(() => null);
 
@@ -95,7 +95,7 @@ function collectLeafIds(layout: LayoutNode): string[] {
 
 /**
  * After newTab/splitPane, find the freshly-created terminal pane(s) and
- * patch TEAMSHIP_PANE_ID + TEAMSHIP_TAB_ID into their spawnEnv. React
+ * patch ANYSPACE_PANE_ID + ANYSPACE_TAB_ID into their spawnEnv. React
  * batches state updates within an event handler, so this is observed by
  * Terminal.tsx the first time it mounts for the new pane.
  */
@@ -117,8 +117,8 @@ function stampPaneApiEnv(
       ...(pane.payload ?? {}),
       spawnEnv: {
         ...existingEnv,
-        TEAMSHIP_PANE_ID: paneId,
-        TEAMSHIP_TAB_ID: tabId,
+        ANYSPACE_PANE_ID: paneId,
+        ANYSPACE_TAB_ID: tabId,
       },
     });
   }

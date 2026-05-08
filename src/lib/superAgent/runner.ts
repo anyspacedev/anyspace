@@ -43,7 +43,7 @@ type AccToolCall = {
 /** Resolve runtime credentials for Super Agent.
  *
  *  - `presetId === "inherit"` → fall back to the AI section: use AI's
- *    presetId (so a Teamship Cloud AI also drives Super Agent) and the
+ *    presetId (so a AnySpace Cloud AI also drives Super Agent) and the
  *    AI section's endpoint/key/model.
  *  - Anything else → Super Agent's own preset wins; fields fall back
  *    individually onto the AI section when Super Agent's are blank
@@ -312,7 +312,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
       await store.appendMessage({
         sessionId,
         role: "assistant",
-        content: "Sign in to Teamship Cloud to continue — or switch provider in Settings → Super Agent.",
+        content: "Sign in to AnySpace Cloud to continue — or switch provider in Settings → Super Agent.",
       });
       return;
     }
@@ -331,7 +331,7 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
   for (let i = 0; i < (sa.maxToolCallsPerTurn || 25) + 1; i++) {
     // Re-resolve every iteration so a long ReAct chain doesn't outlive the
     // Clerk JWT TTL. For BYO providers this is a no-op (returns the stored
-    // key); for Teamship Cloud it mints a fresh token.
+    // key); for AnySpace Cloud it mints a fresh token.
     const turnCreds = await resolveSuperAgentCreds();
     if (!turnCreds.ok) {
       await store.appendMessage({

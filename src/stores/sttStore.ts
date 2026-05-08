@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { settingsGet, settingsSet, sttHotkeySet, sttTranscribe } from "../lib/tauri";
-import { TEAMSHIP_CLOUD_URL, getAuthToken, isSignedIn } from "../lib/auth";
+import { ANYSPACE_CLOUD_URL, getAuthToken, isSignedIn } from "../lib/auth";
 import {
   cancelRecording,
   isRecording,
@@ -24,7 +24,7 @@ export type SttSettings = {
   apiKey: string;
   model: string;
   language: string; // empty = auto-detect
-  presetId: "groq" | "openai" | "elevenlabs" | "teamship-cloud" | "custom";
+  presetId: "groq" | "openai" | "elevenlabs" | "anyspace-cloud" | "custom";
   // KeyboardEvent.code of the hold-to-talk hotkey. Apple-built keyboards have
   // no Right Control key, so the default differs by platform; user can rebind
   // in Settings.
@@ -262,12 +262,12 @@ export const useSttStore = create<SttState>((set, get) => ({
     clearDismissTimer();
 
     const presetId = get().settings.presetId;
-    if (presetId === "teamship-cloud") {
+    if (presetId === "anyspace-cloud") {
       if (!isSignedIn()) {
-        console.warn("[stt] startListening blocked — Teamship Cloud requires sign-in");
+        console.warn("[stt] startListening blocked — AnySpace Cloud requires sign-in");
         set({
           phase: "error",
-          message: "Sign in to use Teamship Cloud — Settings → Speech to text",
+          message: "Sign in to use AnySpace Cloud — Settings → Speech to text",
           analyser: null,
         });
         scheduleDismiss(set, 4000);
@@ -391,16 +391,16 @@ export const useSttStore = create<SttState>((set, get) => ({
     const provider: "openai" | "elevenlabs" =
       settings.presetId === "elevenlabs" ? "elevenlabs" : "openai";
 
-    // Teamship Cloud uses the OpenAI-shaped endpoint with a Clerk JWT
+    // AnySpace Cloud uses the OpenAI-shaped endpoint with a Clerk JWT
     // injected in place of an API key. Mint it fresh per call (Clerk
     // tokens TTL ~60s; never persist).
     let endpoint = settings.endpoint;
     let apiKey = settings.apiKey;
-    if (settings.presetId === "teamship-cloud") {
+    if (settings.presetId === "anyspace-cloud") {
       if (!isSignedIn()) {
         set({
           phase: "error",
-          message: "Sign in to use Teamship Cloud (Settings → Account)",
+          message: "Sign in to use AnySpace Cloud (Settings → Account)",
           analyser: null,
         });
         scheduleDismiss(set, 2500);
@@ -416,7 +416,7 @@ export const useSttStore = create<SttState>((set, get) => ({
         scheduleDismiss(set, 2500);
         return;
       }
-      endpoint = TEAMSHIP_CLOUD_URL;
+      endpoint = ANYSPACE_CLOUD_URL;
       apiKey = token;
     }
     try {

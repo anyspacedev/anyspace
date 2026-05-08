@@ -90,11 +90,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_sql::Builder::default()
-            .add_migrations("sqlite:teamship.db", kanban::db::migrations())
+            .add_migrations("sqlite:anyspace.db", kanban::db::migrations())
             .build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
-            tauri::plugin::Builder::<tauri::Wry>::new("teamship-preview-picker")
+            tauri::plugin::Builder::<tauri::Wry>::new("anyspace-preview-picker")
                 .js_init_script_on_all_frames(PREVIEW_PICKER_SCRIPT)
                 .build(),
         )
@@ -189,5 +189,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Teamship");
+        .expect("error while running AnySpace");
 }

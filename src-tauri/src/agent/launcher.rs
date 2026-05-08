@@ -8,13 +8,13 @@ const AGENT_API_HINT: &str = r#"## Code Agent Preview API
 
 A loopback HTTP server lets you drive the live preview pane and capture
 screenshots without operator clicks. These env vars are set automatically
-when running inside Teamship:
+when running inside AnySpace:
 
-- `$TEAMSHIP_API_URL`   — base URL (e.g. http://127.0.0.1:NNNN)
-- `$TEAMSHIP_API_TOKEN` — bearer token, send as `Authorization: Bearer <token>`
-- `$TEAMSHIP_PANE_ID`   — your own pane id, send as `X-Pane-Id: <pane-id>`
+- `$ANYSPACE_API_URL`   — base URL (e.g. http://127.0.0.1:NNNN)
+- `$ANYSPACE_API_TOKEN` — bearer token, send as `Authorization: Bearer <token>`
+- `$ANYSPACE_PANE_ID`   — your own pane id, send as `X-Pane-Id: <pane-id>`
 
-If `$TEAMSHIP_API_URL` is unset, the API is unavailable and you should
+If `$ANYSPACE_API_URL` is unset, the API is unavailable and you should
 fall back to operator-assisted workflows.
 
 ### Common operations
@@ -23,11 +23,11 @@ Open / refocus the live preview alongside this terminal:
 
 ```sh
 curl -sX POST \
-  -H "Authorization: Bearer $TEAMSHIP_API_TOKEN" \
-  -H "X-Pane-Id: $TEAMSHIP_PANE_ID" \
+  -H "Authorization: Bearer $ANYSPACE_API_TOKEN" \
+  -H "X-Pane-Id: $ANYSPACE_PANE_ID" \
   -H "content-type: application/json" \
   -d "{\"projectPath\":\"$PWD\"}" \
-  "$TEAMSHIP_API_URL/v1/preview/open"
+  "$ANYSPACE_API_URL/v1/preview/open"
 ```
 
 Screenshot the preview after making UI changes; the response's `path`
@@ -35,11 +35,11 @@ points at a PNG you can feed to your own image-Read tool to inspect:
 
 ```sh
 curl -sX POST \
-  -H "Authorization: Bearer $TEAMSHIP_API_TOKEN" \
-  -H "X-Pane-Id: $TEAMSHIP_PANE_ID" \
+  -H "Authorization: Bearer $ANYSPACE_API_TOKEN" \
+  -H "X-Pane-Id: $ANYSPACE_PANE_ID" \
   -H "content-type: application/json" \
   -d '{}' \
-  "$TEAMSHIP_API_URL/v1/preview/screenshot"
+  "$ANYSPACE_API_URL/v1/preview/screenshot"
 ```
 
 Drive the preview programmatically (same auth headers):
@@ -69,7 +69,7 @@ pub fn build_invocation(
     task_body: &str,
     system_prompt: &str,
 ) -> Result<AgentInvocation> {
-    let dir = std::env::temp_dir().join("teamship-tasks");
+    let dir = std::env::temp_dir().join("anyspace-tasks");
     std::fs::create_dir_all(&dir).context("create task dir")?;
     let task_file = dir.join(format!("task-{}.md", uuid::Uuid::new_v4()));
     let contents = format!(

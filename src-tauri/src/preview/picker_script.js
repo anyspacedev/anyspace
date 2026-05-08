@@ -1,11 +1,11 @@
-// Teamship preview element picker — runs in every frame at document_start.
+// AnySpace preview element picker — runs in every frame at document_start.
 // Listens for postMessage commands from the parent window and reports the
 // element the user clicks back via postMessage. Cross-origin safe.
 (() => {
-  if (typeof window === "undefined" || window.__teamshipPicker) return;
-  const SRC = "teamship";
-  const OVERLAY_ID = "__teamship_picker_overlay__";
-  const HINT_ID = "__teamship_picker_hint__";
+  if (typeof window === "undefined" || window.__anyspacePicker) return;
+  const SRC = "anyspace";
+  const OVERLAY_ID = "__anyspace_picker_overlay__";
+  const HINT_ID = "__anyspace_picker_hint__";
   const MAX_HTML = 2048;
   const MAX_TEXT = 120;
   const MAX_PARENTS = 3;
@@ -351,5 +351,5 @@
   }
 
   window.addEventListener("message", onMessage);
-  window.__teamshipPicker = { activate, deactivate };
+  window.__anyspacePicker = { activate, deactivate };
 })();

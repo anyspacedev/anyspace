@@ -24,8 +24,8 @@ import {
   type TeamCustomRole,
 } from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
-import { TEAMSHIP_CLOUD_URL } from "../../lib/auth";
-import { TeamshipCloudAccount } from "../auth/TeamshipCloudAccount";
+import { ANYSPACE_CLOUD_URL } from "../../lib/auth";
+import { AnySpaceCloudAccount } from "../auth/AnySpaceCloudAccount";
 import { SettingsSearch } from "./SettingsSearch";
 import { TestAiConnection } from "./TestConnection";
 
@@ -268,7 +268,7 @@ export function Settings() {
             <div className="settings-section-head">
               <h2 className="settings-section-title">About</h2>
               <div className="settings-section-sub">
-                Teamship 0.1.0 — multi-pane terminal multiplexer with command
+                AnySpace 0.1.0 — multi-pane terminal multiplexer with command
                 blocks, Monaco editor, live preview, and Kanban-driven AI agent
                 launcher.
               </div>
@@ -500,12 +500,12 @@ const STT_PRESETS: Record<
   SttSettings["presetId"],
   { endpoint: string; model: string; label: string }
 > = {
-  "teamship-cloud": {
-    // Endpoint resolved at call time from VITE_TEAMSHIP_CLOUD_URL so
+  "anyspace-cloud": {
+    // Endpoint resolved at call time from VITE_ANYSPACE_CLOUD_URL so
     // a stale value never persists across releases.
     endpoint: "",
     model: "sense-voice-int8",
-    label: "Teamship Cloud (beta)",
+    label: "AnySpace Cloud (beta)",
   },
   groq: {
     endpoint: "https://api.groq.com/openai/v1",
@@ -585,7 +585,7 @@ function SttSettingsSection() {
   const settings = useSttStore((s) => s.settings);
   const update = useSttStore((s) => s.updateSettings);
   const [revealKey, setRevealKey] = useState(false);
-  const isTeamshipCloud = settings.presetId === "teamship-cloud";
+  const isAnySpaceCloud = settings.presetId === "anyspace-cloud";
 
   return (
     <div className="settings-section">
@@ -632,11 +632,11 @@ function SttSettingsSection() {
           </select>
         </label>
 
-        {isTeamshipCloud ? (
+        {isAnySpaceCloud ? (
           <>
             <div className="stt-field">
               <span className="stt-field-label">Account</span>
-              <TeamshipCloudAccount />
+              <AnySpaceCloudAccount />
             </div>
             <div className="stt-field">
               <span className="stt-field-label">
@@ -645,7 +645,7 @@ function SttSettingsSection() {
               </span>
               <input
                 type="url"
-                value={TEAMSHIP_CLOUD_URL || "(not configured for this build)"}
+                value={ANYSPACE_CLOUD_URL || "(not configured for this build)"}
                 readOnly
                 spellCheck={false}
               />
@@ -726,11 +726,11 @@ const AI_PRESETS: Record<
   AiSettings["presetId"],
   { endpoint: string; model: string; label: string }
 > = {
-  "teamship-cloud": {
-    // Endpoint resolved at call time from VITE_TEAMSHIP_CLOUD_URL.
+  "anyspace-cloud": {
+    // Endpoint resolved at call time from VITE_ANYSPACE_CLOUD_URL.
     endpoint: "",
-    model: "teamship-default",
-    label: "Teamship Cloud (beta)",
+    model: "anyspace-default",
+    label: "AnySpace Cloud (beta)",
   },
   openai: {
     endpoint: "https://api.openai.com/v1",
@@ -754,7 +754,7 @@ function AiSettingsSection() {
   const settings = useAiStore((s) => s.settings);
   const update = useAiStore((s) => s.updateSettings);
   const [revealKey, setRevealKey] = useState(false);
-  const isTeamshipCloud = settings.presetId === "teamship-cloud";
+  const isAnySpaceCloud = settings.presetId === "anyspace-cloud";
 
   return (
     <div className="settings-section">
@@ -793,11 +793,11 @@ function AiSettingsSection() {
           </select>
         </label>
 
-        {isTeamshipCloud ? (
+        {isAnySpaceCloud ? (
           <>
             <div className="stt-field">
               <span className="stt-field-label">Account</span>
-              <TeamshipCloudAccount />
+              <AnySpaceCloudAccount />
             </div>
             <div className="stt-field">
               <span className="stt-field-label">
@@ -806,7 +806,7 @@ function AiSettingsSection() {
               </span>
               <input
                 type="url"
-                value={TEAMSHIP_CLOUD_URL || "(not configured for this build)"}
+                value={ANYSPACE_CLOUD_URL || "(not configured for this build)"}
                 readOnly
                 spellCheck={false}
               />
@@ -816,7 +816,7 @@ function AiSettingsSection() {
               <input
                 type="text"
                 value={settings.model}
-                placeholder="teamship-default"
+                placeholder="anyspace-default"
                 onChange={(e) => void update({ model: e.target.value })}
                 spellCheck={false}
               />
@@ -880,7 +880,7 @@ function AiSettingsSection() {
           />
         </label>
 
-        {!isTeamshipCloud && (
+        {!isAnySpaceCloud && (
           <TestAiConnection
             endpoint={settings.endpoint}
             apiKey={settings.apiKey}
@@ -1004,12 +1004,12 @@ function SuperAgentSettingsSection() {
 
   const hasKey = Boolean(settings.apiKey || ai.apiKey);
   const isInherit = settings.presetId === "inherit";
-  const isTeamshipCloud = settings.presetId === "teamship-cloud";
-  const aiIsTeamshipCloud = ai.presetId === "teamship-cloud";
-  const effectiveEndpoint = isTeamshipCloud
-    ? TEAMSHIP_CLOUD_URL
-    : isInherit && aiIsTeamshipCloud
-      ? TEAMSHIP_CLOUD_URL
+  const isAnySpaceCloud = settings.presetId === "anyspace-cloud";
+  const aiIsAnySpaceCloud = ai.presetId === "anyspace-cloud";
+  const effectiveEndpoint = isAnySpaceCloud
+    ? ANYSPACE_CLOUD_URL
+    : isInherit && aiIsAnySpaceCloud
+      ? ANYSPACE_CLOUD_URL
       : settings.endpoint || ai.endpoint;
   const effectiveModel = settings.model || ai.model;
 
@@ -1033,12 +1033,12 @@ function SuperAgentSettingsSection() {
               const id = e.target.value as typeof settings.presetId;
               if (id === "inherit" || id === "custom") {
                 void update({ presetId: id });
-              } else if (id === "teamship-cloud") {
+              } else if (id === "anyspace-cloud") {
                 void update({
                   presetId: id,
                   endpoint: "",
                   apiKey: "",
-                  model: "teamship-default",
+                  model: "anyspace-default",
                 });
               } else {
                 const preset = AI_PRESETS[id];
@@ -1051,7 +1051,7 @@ function SuperAgentSettingsSection() {
             }}
           >
             <option value="inherit">Inherit from AI section</option>
-            <option value="teamship-cloud">Teamship Cloud (beta)</option>
+            <option value="anyspace-cloud">AnySpace Cloud (beta)</option>
             <option value="openai">OpenAI</option>
             <option value="groq">Groq</option>
             <option value="openrouter">OpenRouter</option>
@@ -1059,11 +1059,11 @@ function SuperAgentSettingsSection() {
           </select>
         </label>
 
-        {isTeamshipCloud ? (
+        {isAnySpaceCloud ? (
           <>
             <div className="stt-field">
               <span className="stt-field-label">Account</span>
-              <TeamshipCloudAccount />
+              <AnySpaceCloudAccount />
             </div>
             <div className="stt-field">
               <span className="stt-field-label">
@@ -1072,7 +1072,7 @@ function SuperAgentSettingsSection() {
               </span>
               <input
                 type="url"
-                value={TEAMSHIP_CLOUD_URL || "(not configured for this build)"}
+                value={ANYSPACE_CLOUD_URL || "(not configured for this build)"}
                 readOnly
                 spellCheck={false}
               />
@@ -1082,7 +1082,7 @@ function SuperAgentSettingsSection() {
               <input
                 type="text"
                 value={settings.model}
-                placeholder="teamship-default"
+                placeholder="anyspace-default"
                 onChange={(e) => void update({ model: e.target.value })}
                 spellCheck={false}
               />
@@ -1197,7 +1197,7 @@ function SuperAgentSettingsSection() {
         </label>
       </div>
 
-      {!isTeamshipCloud && !(isInherit && aiIsTeamshipCloud) && (
+      {!isAnySpaceCloud && !(isInherit && aiIsAnySpaceCloud) && (
         <TestAiConnection
           endpoint={effectiveEndpoint}
           apiKey={settings.apiKey || ai.apiKey}
@@ -1282,10 +1282,10 @@ function CodeAgentApiSettingsSection() {
   // terminal pane's exported env, so each `claude` instance picks up the
   // pane / tab id of the terminal it's running in.
   const mcpAddCmd =
-    'claude mcp add --transport http teamship "${TEAMSHIP_API_URL}/mcp" \\\n' +
-    '  --header "Authorization: Bearer ${TEAMSHIP_API_TOKEN}" \\\n' +
-    '  --header "X-Pane-Id: ${TEAMSHIP_PANE_ID}" \\\n' +
-    '  --header "X-Tab-Id: ${TEAMSHIP_TAB_ID}"';
+    'claude mcp add --transport http anyspace "${ANYSPACE_API_URL}/mcp" \\\n' +
+    '  --header "Authorization: Bearer ${ANYSPACE_API_TOKEN}" \\\n' +
+    '  --header "X-Pane-Id: ${ANYSPACE_PANE_ID}" \\\n' +
+    '  --header "X-Tab-Id: ${ANYSPACE_TAB_ID}"';
 
   const copy = async (label: string, text: string) => {
     try {
@@ -1304,8 +1304,8 @@ function CodeAgentApiSettingsSection() {
         <div className="settings-section-sub">
           Loopback HTTP server that lets Code Agents in terminal panes (Claude Code, Codex, Aider…)
           drive the live preview and capture screenshots without operator clicks. Each Code-Agent
-          terminal gets <code>$TEAMSHIP_API_URL</code>, <code>$TEAMSHIP_API_TOKEN</code>, and{" "}
-          <code>$TEAMSHIP_PANE_ID</code> in its env.
+          terminal gets <code>$ANYSPACE_API_URL</code>, <code>$ANYSPACE_API_TOKEN</code>, and{" "}
+          <code>$ANYSPACE_PANE_ID</code> in its env.
         </div>
       </div>
       <div className="stt-fields">
@@ -1341,7 +1341,7 @@ function CodeAgentApiSettingsSection() {
           <span className="stt-field-hint">
             Persisted to <code>app_config_dir/agent_api.json</code> (mode 0600 on Unix). Rotation
             invalidates long-lived agent shells — they will need to re-import{" "}
-            <code>$TEAMSHIP_API_TOKEN</code> after the next app restart.
+            <code>$ANYSPACE_API_TOKEN</code> after the next app restart.
           </span>
           <div style={{ marginTop: 6 }}>
             <button
@@ -1355,7 +1355,7 @@ function CodeAgentApiSettingsSection() {
             </button>
             {rotated && (
               <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.8 }}>
-                New token written. Restart Teamship to apply.
+                New token written. Restart AnySpace to apply.
               </span>
             )}
           </div>
@@ -1380,8 +1380,8 @@ function CodeAgentApiSettingsSection() {
           </div>
           <span className="stt-field-hint">
             Paste this into a Code-Agent terminal pane (where{" "}
-            <code>$TEAMSHIP_API_URL</code> / <code>$TEAMSHIP_API_TOKEN</code> /{" "}
-            <code>$TEAMSHIP_PANE_ID</code> / <code>$TEAMSHIP_TAB_ID</code> are already exported).
+            <code>$ANYSPACE_API_URL</code> / <code>$ANYSPACE_API_TOKEN</code> /{" "}
+            <code>$ANYSPACE_PANE_ID</code> / <code>$ANYSPACE_TAB_ID</code> are already exported).
             Claude Code re-resolves the <code>${"${VAR}"}</code> references on each startup, so any
             terminal where you run <code>claude</code> sends its own pane and tab id.
           </span>

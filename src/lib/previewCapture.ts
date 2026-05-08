@@ -5,7 +5,7 @@ import { screenshotCaptureWindowRegion, type ScreenshotResult } from "./tauri";
  * Pure capture: maps the iframe's CSS rect into physical pixels relative to
  * the OS window's top-left, then calls the Rust screenshot command. The
  * Rust side captures the window's compositor surface (xcap Window API), so
- * this works whether Teamship is foreground, occluded, or on a different
+ * this works whether AnySpace is foreground, occluded, or on a different
  * desktop / Space — no setFocus dance, no race against the agent calling
  * preview_screenshot while the operator is in another app.
  *

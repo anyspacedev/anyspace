@@ -141,7 +141,7 @@ export function AgentManager() {
           <div className="hint">
             Spawned in a terminal pane when Run Task fires.{" "}
             <code>{"{task_file}"}</code> expands to the rendered task body
-            on disk; <code>$TEAMSHIP_TASK_FILE</code> is set in the agent's env
+            on disk; <code>$ANYSPACE_TASK_FILE</code> is set in the agent's env
             for tools that prefer reading from an env var.
           </div>
         </div>

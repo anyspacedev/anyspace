@@ -1,7 +1,7 @@
 [project]
-name = "teamship-backend"
+name = "anyspace-backend"
 version = "0.1.0"
-description = "Teamship backend — phase 1: cloud transcription + skeleton for users/billing"
+description = "AnySpace backend — phase 1: cloud transcription + skeleton for users/billing"
 requires-python = ">=3.11,<3.13"
 dependencies = [
     # Web

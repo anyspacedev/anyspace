@@ -261,7 +261,7 @@ export async function clipboardSaveBlob(bytes: Uint8Array, ext: string): Promise
 export type ScreenshotResult = { path: string; dataUrl: string };
 
 /** Capture a rectangle in window-local physical pixels (origin = OS window's
- *  top-left, including chrome). Works while Teamship is occluded / behind
+ *  top-left, including chrome). Works while AnySpace is occluded / behind
  *  another app — the capture comes from the window's compositor surface,
  *  not the screen. Replaces the old monitor-based screenshotCaptureRegion. */
 export async function screenshotCaptureWindowRegion(args: {
@@ -347,7 +347,7 @@ export type TeamRpcEvent = {
   payload: string;
 };
 
-// === Agent API (loopback HTTP server backing $TEAMSHIP_API_URL) ===
+// === Agent API (loopback HTTP server backing $ANYSPACE_API_URL) ===
 export type AgentApiInfo = {
   url: string;
   token: string;

@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Teamship uses your microphone for hold-to-talk dictation in the terminal and editor.</string>
+    <string>AnySpace uses your microphone for hold-to-talk dictation in the terminal and editor.</string>
 </dict>
 </plist>
