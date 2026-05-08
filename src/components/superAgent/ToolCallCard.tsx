@@ -23,22 +23,20 @@ export function ToolCallCard({
   call: ToolCall;
   result?: ToolResult;
 }) {
-  const [argsOpen, setArgsOpen] = useState(false);
-  const [resultOpen, setResultOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const status = result?.status ?? "running";
   const argsJson = JSON.stringify(call.arguments, null, 2);
-  const argsPreview = argsJson.length > 80 ? argsJson.slice(0, 80) + "…" : argsJson;
-  const resultPreview = result?.resultText
-    ? result.resultText.length > 200
-      ? result.resultText.slice(0, 200) + "…"
-      : result.resultText
-    : "";
 
   return (
     <div className={`sa-toolcard sa-toolcard-${status}`}>
-      <div className="sa-toolcard-head">
-        <Icon name="play" size={11} />
+      <button
+        type="button"
+        className="sa-toolcard-head"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <Icon name={open ? "chevron-down" : "chevron-right"} size={11} />
         <span className="sa-toolcard-name">{call.name}</span>
         <span className={`sa-toolcard-status sa-toolcard-status-${status}`}>
           {STATUS_LABEL[status]}
@@ -46,26 +44,20 @@ export function ToolCallCard({
         {result?.durationMs != null && (
           <span className="sa-toolcard-duration">{result.durationMs} ms</span>
         )}
-      </div>
-      <button
-        type="button"
-        className="sa-toolcard-args-toggle"
-        onClick={() => setArgsOpen((v) => !v)}
-        aria-expanded={argsOpen}
-      >
-        <span>args</span>
-        <code>{argsOpen ? argsJson : argsPreview}</code>
       </button>
-      {result?.resultText && (
-        <button
-          type="button"
-          className="sa-toolcard-result-toggle"
-          onClick={() => setResultOpen((v) => !v)}
-          aria-expanded={resultOpen}
-        >
-          <span>result</span>
-          <code>{resultOpen ? result.resultText : resultPreview}</code>
-        </button>
+      {open && (
+        <>
+          <div className="sa-toolcard-row">
+            <span>args</span>
+            <code>{argsJson}</code>
+          </div>
+          {result?.resultText && (
+            <div className="sa-toolcard-row">
+              <span>result</span>
+              <code>{result.resultText}</code>
+            </div>
+          )}
+        </>
       )}
       {status === "queued" && (
         <div className="sa-toolcard-actions">

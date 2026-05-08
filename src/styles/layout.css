@@ -5579,7 +5579,17 @@ body.screenshot-dragging {
   display: flex;
   align-items: center;
   gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: inherit;
+  width: 100%;
 }
+.sa-toolcard-head:hover .sa-toolcard-name { color: var(--accent, var(--fg)); }
 .sa-toolcard-name {
   font-family: var(--font-mono);
   font-weight: 600;
@@ -5603,26 +5613,15 @@ body.screenshot-dragging {
   font-family: var(--font-mono);
   color: var(--fg-muted);
 }
-.sa-toolcard-args-toggle,
-.sa-toolcard-result-toggle {
+.sa-toolcard-row {
   display: grid;
   grid-template-columns: 50px 1fr;
   gap: 6px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  padding: 0;
   color: var(--fg-muted);
-  cursor: pointer;
   font-size: var(--font-size-xs);
   align-items: baseline;
 }
-.sa-toolcard-args-toggle:hover,
-.sa-toolcard-result-toggle:hover {
-  color: var(--fg);
-}
-.sa-toolcard-args-toggle code,
-.sa-toolcard-result-toggle code {
+.sa-toolcard-row code {
   font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
