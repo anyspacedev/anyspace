@@ -1,12 +1,11 @@
 import { create } from "zustand";
 import { settingsGet, settingsSet } from "../lib/tauri";
-import { useSttStore } from "./sttStore";
 
 export type AiSettings = {
   endpoint: string;
   apiKey: string;
   model: string;
-  presetId: "openai" | "groq" | "openrouter" | "custom";
+  presetId: "teamship-cloud" | "openai" | "groq" | "openrouter" | "custom";
   systemPrompt: string;
 };
 
@@ -15,11 +14,18 @@ const DEFAULT_SYSTEM_PROMPT =
   "concisely. If the command failed, suggest a likely fix. Keep replies short " +
   "and use plain text — no markdown formatting.";
 
+/** Default model the cloud route maps onto its upstream LLM. Keep in sync with
+ *  the backend model allow-list in `backend/app/services/llm.py`. */
+export const TEAMSHIP_CLOUD_DEFAULT_MODEL = "teamship-default";
+
+/** First-run defaults for fresh installs. Existing users keep their stored
+ *  config — see `load()`. The endpoint is left empty here because Teamship
+ *  Cloud resolves it at call time from `VITE_TEAMSHIP_CLOUD_URL`. */
 const DEFAULT_SETTINGS: AiSettings = {
-  endpoint: "https://api.openai.com/v1",
+  endpoint: "",
   apiKey: "",
-  model: "gpt-4o-mini",
-  presetId: "openai",
+  model: TEAMSHIP_CLOUD_DEFAULT_MODEL,
+  presetId: "teamship-cloud",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };
 
@@ -43,16 +49,7 @@ export const useAiStore = create<AiState>((set, get) => ({
         set({ settings: { ...DEFAULT_SETTINGS, ...stored }, loaded: true });
         return;
       }
-      // First run: borrow the STT API key as a sensible default so the
-      // user doesn't retype it. Wait for STT to finish loading so the
-      // seed isn't an empty string from racing the parallel load.
-      const stt = useSttStore.getState();
-      if (!stt.loaded) await stt.load();
-      const sttKey = useSttStore.getState().settings.apiKey;
-      set({
-        settings: { ...DEFAULT_SETTINGS, apiKey: sttKey },
-        loaded: true,
-      });
+      set({ settings: DEFAULT_SETTINGS, loaded: true });
     } catch {
       set({ loaded: true });
     }

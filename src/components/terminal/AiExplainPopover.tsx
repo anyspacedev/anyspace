@@ -4,6 +4,8 @@ import { aiChat } from "../../lib/tauri";
 import { useAiStore } from "../../stores/aiStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
+import { resolveAiCreds } from "../../lib/cloudCredentials";
+import { openLoginGuide } from "../../stores/loginGuideStore";
 import type { CommandBlock } from "./osc133";
 
 type Phase =
@@ -30,40 +32,52 @@ export function AiExplainPopover({ block, output, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!settings.endpoint || !settings.apiKey || !settings.model) {
-      setPhase({
-        state: "err",
-        message:
-          "AI provider isn't configured. Set endpoint, API key, and model first.",
-        needsConfig: true,
-      });
-      return;
-    }
     const cmd = block.command ?? "(unknown command)";
     const exit = block.exitCode != null ? `\n\nexit ${block.exitCode}` : "";
     const userMessage = `Explain this command and its output:\n\n$ ${cmd}\n\n${output}${exit}`;
-    void aiChat({
-      endpoint: settings.endpoint,
-      apiKey: settings.apiKey,
-      model: settings.model,
-      systemPrompt: settings.systemPrompt,
-      userMessage,
-    })
-      .then((text) => {
+    (async () => {
+      const creds = await resolveAiCreds(settings.presetId, {
+        endpoint: settings.endpoint,
+        apiKey: settings.apiKey,
+        model: settings.model,
+      });
+      if (cancelled) return;
+      if (!creds.ok) {
+        if (creds.reason === "needs-signin" || creds.reason === "no-token") {
+          openLoginGuide("ai-explain");
+          onClose();
+          return;
+        }
+        setPhase({
+          state: "err",
+          message:
+            "AI provider isn't configured. Set endpoint, API key, and model first.",
+          needsConfig: true,
+        });
+        return;
+      }
+      try {
+        const text = await aiChat({
+          endpoint: creds.endpoint,
+          apiKey: creds.apiKey,
+          model: creds.model,
+          systemPrompt: settings.systemPrompt,
+          userMessage,
+        });
         if (!cancelled) setPhase({ state: "ok", text });
-      })
-      .catch((e: unknown) => {
+      } catch (e) {
         if (!cancelled) {
           setPhase({
             state: "err",
             message: e instanceof Error ? e.message : String(e),
           });
         }
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [block.id, block.command, block.exitCode, output, settings]);
+  }, [block.id, block.command, block.exitCode, output, settings, onClose]);
 
   // Esc + click-outside dismiss.
   useEffect(() => {

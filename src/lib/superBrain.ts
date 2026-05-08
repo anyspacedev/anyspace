@@ -9,6 +9,8 @@ import { useAiStore } from "../stores/aiStore";
 import { aiChat, ptyWrite } from "./tauri";
 import { getTerminalContext, type TerminalContext } from "../components/terminal/terminalRegistry";
 import { toast } from "../stores/toastStore";
+import { resolveAiCreds } from "./cloudCredentials";
+import { openLoginGuide } from "../stores/loginGuideStore";
 
 const SUPER_BRAIN_SYSTEM_PROMPT =
   "You are a paired engineer driving a terminal. Given the user's last " +
@@ -54,13 +56,22 @@ export async function runQuickSuggest(opts: {
   const ctx = getTerminalContext(opts.paneId);
   if (!ctx) throw new Error("no completed command block on that pane");
   const ai = useAiStore.getState().settings;
-  if (!ai.endpoint || !ai.apiKey || !ai.model) {
-    throw new Error("AI not configured (Settings → AI)");
-  }
-  const reply = await aiChat({
+  const creds = await resolveAiCreds(ai.presetId, {
     endpoint: ai.endpoint,
     apiKey: ai.apiKey,
     model: ai.model,
+  });
+  if (!creds.ok) {
+    if (creds.reason === "needs-signin" || creds.reason === "no-token") {
+      openLoginGuide("ai-explain");
+      throw new Error("Sign in to Teamship Cloud first");
+    }
+    throw new Error("AI not configured (Settings → AI)");
+  }
+  const reply = await aiChat({
+    endpoint: creds.endpoint,
+    apiKey: creds.apiKey,
+    model: creds.model,
     systemPrompt: SUPER_BRAIN_SYSTEM_PROMPT,
     userMessage: buildUserMessage(ctx),
   });
@@ -78,6 +89,7 @@ export type SuperBrainStatus =
   | "no-tab"
   | "no-targets"
   | "ai-not-configured"
+  | "needs-signin"
   | "missing-pane"
   | "non-terminal"
   | "no-context"
@@ -120,16 +132,23 @@ export async function runSuperBrain(tabId: string): Promise<SuperBrainResult> {
 
   const ai = useAiStore.getState().settings;
   console.log("[superBrain] ai settings", {
+    presetId: ai.presetId,
     endpoint: ai.endpoint,
     model: ai.model,
     hasApiKey: !!ai.apiKey,
   });
-  if (!ai.endpoint || !ai.apiKey || !ai.model) {
-    console.warn("[superBrain] AI not configured — skipping", {
-      hasEndpoint: !!ai.endpoint,
-      hasApiKey: !!ai.apiKey,
-      hasModel: !!ai.model,
-    });
+  const creds = await resolveAiCreds(ai.presetId, {
+    endpoint: ai.endpoint,
+    apiKey: ai.apiKey,
+    model: ai.model,
+  });
+  if (!creds.ok) {
+    if (creds.reason === "needs-signin" || creds.reason === "no-token") {
+      console.warn("[superBrain] sign-in required — opening Login Guide");
+      openLoginGuide("ai-explain");
+      return { status: "needs-signin", results: [] };
+    }
+    console.warn("[superBrain] AI not configured — skipping", { reason: creds.reason });
     return { status: "ai-not-configured", results: [] };
   }
 
@@ -160,11 +179,11 @@ export async function runSuperBrain(tabId: string): Promise<SuperBrainResult> {
         outputLength: ctx.output.length,
       });
       try {
-        console.log("[superBrain] calling aiChat", { paneId, endpoint: ai.endpoint, model: ai.model });
+        console.log("[superBrain] calling aiChat", { paneId, endpoint: creds.endpoint, model: creds.model });
         const reply = await aiChat({
-          endpoint: ai.endpoint,
-          apiKey: ai.apiKey,
-          model: ai.model,
+          endpoint: creds.endpoint,
+          apiKey: creds.apiKey,
+          model: creds.model,
           systemPrompt: SUPER_BRAIN_SYSTEM_PROMPT,
           userMessage: buildUserMessage(ctx),
         });
@@ -207,6 +226,7 @@ export function toastSuperBrainResult(result: SuperBrainResult): void {
     useWorkspaceStore.getState().setView("settings");
 
   if (result.status === "no-tab") return; // not a user-actionable error
+  if (result.status === "needs-signin") return; // Login Guide modal handles it
   if (result.status === "no-targets") {
     toast.warn(
       "Suggest with AI: no target pane",

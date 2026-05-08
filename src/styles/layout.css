@@ -4083,6 +4083,37 @@ button.mode-chip--info:hover {
   justify-content: flex-start;
 }
 
+/* ===== Login Guide modal ===== */
+
+.modal.login-guide {
+  width: min(440px, 90vw);
+}
+.login-guide-sub {
+  margin: 0 0 var(--pad-md) 0;
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+.login-guide-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-sm);
+  align-items: stretch;
+}
+.login-guide-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+.login-guide-warn {
+  padding: var(--pad-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
 /* ===== Preview element picker ===== */
 
 .icon-btn-active {

@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # small clock skew).
     clerk_jwt_leeway_sec: int = 30
 
+    # /v1/chat/completions proxy. The desktop client calls our endpoint with
+    # an OpenAI-shaped body; we resolve the model alias against an allow-list
+    # and stream the upstream provider's response straight back.
+    llm_upstream_base: str = ""        # e.g. https://api.openai.com/v1
+    llm_upstream_key: str = ""
+    llm_default_model: str = "gpt-4o-mini"
+    llm_request_timeout_sec: float = 120.0
+
     @property
     def clerk_jwks_url(self) -> str:
         return f"{self.clerk_frontend_api.rstrip('/')}/.well-known/jwks.json"

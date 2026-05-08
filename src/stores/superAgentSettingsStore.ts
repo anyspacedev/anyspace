@@ -16,7 +16,20 @@ const DEFAULT_SYSTEM_PROMPT =
   "Prefer reading before writing. When you take an action, briefly explain why. " +
   "Tool calls are executed in trust mode — be deliberate and never run destructive commands without confirmation in chat.";
 
+/** "inherit" — fall back to the AI section's preset/endpoint/key/model.
+ *  Any other value pins Super Agent to a specific provider regardless of AI. */
+export type SuperAgentPresetId =
+  | "inherit"
+  | "teamship-cloud"
+  | "openai"
+  | "groq"
+  | "openrouter"
+  | "custom";
+
 export type SuperAgentSettings = {
+  /** Provider selector. "inherit" keeps the historical fallback chain
+   *  (`sa.endpoint || ai.endpoint`). Anything else takes precedence. */
+  presetId: SuperAgentPresetId;
   /** Inherits from settings.ai by default; overrides only if non-empty. */
   endpoint: string;
   apiKey: string;
@@ -38,6 +51,7 @@ export type SuperAgentSettings = {
 };
 
 const DEFAULT_SETTINGS: SuperAgentSettings = {
+  presetId: "inherit",
   endpoint: "",
   apiKey: "",
   model: "",

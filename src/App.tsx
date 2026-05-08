@@ -20,6 +20,7 @@ import { startAgentApiBridge } from "./lib/agentApiBridge";
 import { dispatchDropToPane } from "./components/terminal/terminalRegistry";
 import { TabBar } from "./components/workspace/TabBar";
 import { AccountStatus } from "./components/auth/AccountStatus";
+import { LoginGuideModal } from "./components/auth/LoginGuideModal";
 import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
@@ -287,6 +288,7 @@ export default function App() {
       <QuickOpen />
       <SttBubble />
       <ScreenshotStack />
+      <LoginGuideModal />
       <Toaster />
     </div>
   );

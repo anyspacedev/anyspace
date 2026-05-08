@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from .logging import configure_logging, log
-from .routers import account, billing, health, transcribe, updates, webhooks
+from .routers import account, billing, chat, health, transcribe, updates, webhooks
 from .services.asr import build_recognizer
 from .settings import get_settings
 
@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(updates.router)
     app.include_router(transcribe.router)
+    app.include_router(chat.router)
     app.include_router(account.router)
     app.include_router(billing.router)
     app.include_router(webhooks.router)

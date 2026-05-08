@@ -1,5 +1,7 @@
 import { aiChat } from "../tauri";
 import { useAiStore } from "../../stores/aiStore";
+import { resolveAiCreds } from "../cloudCredentials";
+import { openLoginGuide } from "../../stores/loginGuideStore";
 
 export class AiSuggestNotConfiguredError extends Error {
   code = "not-configured" as const;
@@ -8,6 +10,14 @@ export class AiSuggestNotConfiguredError extends Error {
       "AI is not configured — set endpoint / API key / model in Settings → AI before using AI suggestions.",
     );
     this.name = "AiSuggestNotConfiguredError";
+  }
+}
+
+export class AiSuggestAuthRequiredError extends Error {
+  code = "needs-signin" as const;
+  constructor() {
+    super("Sign in to Teamship Cloud to use AI suggestions.");
+    this.name = "AiSuggestAuthRequiredError";
   }
 }
 
@@ -38,12 +48,22 @@ export async function runAiSuggest<T>({
 }: AiSuggestArgs<T>): Promise<T> {
   const ai = useAiStore.getState().settings;
   console.log(`[suggestWithAi:${surface}] check`, {
+    presetId: ai.presetId,
     hasEndpoint: !!ai.endpoint,
     hasKey: !!ai.apiKey,
     hasModel: !!ai.model,
     model: ai.model,
   });
-  if (!ai.endpoint || !ai.apiKey || !ai.model) {
+  const creds = await resolveAiCreds(ai.presetId, {
+    endpoint: ai.endpoint,
+    apiKey: ai.apiKey,
+    model: ai.model,
+  });
+  if (!creds.ok) {
+    if (creds.reason === "needs-signin" || creds.reason === "no-token") {
+      openLoginGuide("ai-explain");
+      throw new AiSuggestAuthRequiredError();
+    }
     throw new AiSuggestNotConfiguredError();
   }
 
@@ -51,9 +71,9 @@ export async function runAiSuggest<T>({
   console.log(`[suggestWithAi:${surface}] aiChat`, { msglen: userMessage.length });
 
   const reply = await aiChat({
-    endpoint: ai.endpoint,
-    apiKey: ai.apiKey,
-    model: ai.model,
+    endpoint: creds.endpoint,
+    apiKey: creds.apiKey,
+    model: creds.model,
     systemPrompt,
     userMessage,
   });

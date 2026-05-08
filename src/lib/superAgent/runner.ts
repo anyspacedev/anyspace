@@ -30,6 +30,8 @@ import {
   type ToolResult,
 } from "../../stores/superAgentStore";
 import { buildToolsPayload, findTool, type ToolName, TOOLS } from "./tools";
+import { resolveAiCreds, type ResolvedCreds } from "../cloudCredentials";
+import { openLoginGuide } from "../../stores/loginGuideStore";
 
 type AccToolCall = {
   index: number;
@@ -38,14 +40,23 @@ type AccToolCall = {
   argsText: string;
 };
 
-function endpointArgs() {
+/** Resolve runtime credentials for Super Agent.
+ *
+ *  - `presetId === "inherit"` → fall back to the AI section: use AI's
+ *    presetId (so a Teamship Cloud AI also drives Super Agent) and the
+ *    AI section's endpoint/key/model.
+ *  - Anything else → Super Agent's own preset wins; fields fall back
+ *    individually onto the AI section when Super Agent's are blank
+ *    (preserving the historic "override only if non-empty" behavior). */
+async function resolveSuperAgentCreds(): Promise<ResolvedCreds> {
   const ai = useAiStore.getState().settings;
   const sa = useSuperAgentSettingsStore.getState().settings;
-  return {
+  const presetId = sa.presetId === "inherit" ? ai.presetId : sa.presetId;
+  return resolveAiCreds(presetId, {
     endpoint: sa.endpoint || ai.endpoint,
     apiKey: sa.apiKey || ai.apiKey,
     model: sa.model || ai.model,
-  };
+  });
 }
 
 async function pathToDataUrl(path: string, mediaType: string): Promise<string | null> {
@@ -291,8 +302,20 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
   const sa = useSuperAgentSettingsStore.getState().settings;
   const session = store.sessions.find((s) => s.id === sessionId);
   const systemPrompt = session?.systemPromptOverride ?? sa.systemPrompt;
-  const { endpoint, apiKey, model } = endpointArgs();
-  if (!endpoint || !apiKey || !model) {
+  // Up-front check so we fail fast (and open the Login Guide once) before
+  // entering the ReAct loop. We re-resolve before each iteration below so
+  // long chains don't outlive the Clerk JWT's ~60s TTL.
+  const initial = await resolveSuperAgentCreds();
+  if (!initial.ok) {
+    if (initial.reason === "needs-signin" || initial.reason === "no-token") {
+      openLoginGuide("super-agent");
+      await store.appendMessage({
+        sessionId,
+        role: "assistant",
+        content: "Sign in to Teamship Cloud to continue — or switch provider in Settings → Super Agent.",
+      });
+      return;
+    }
     await store.appendMessage({
       sessionId,
       role: "assistant",
@@ -306,6 +329,22 @@ export async function sendUserMessage(sessionId: string, text: string): Promise<
   // Multi-turn loop — keep going until the assistant returns a plain message
   // or we hit the configured cap (so a runaway model can't burn tokens forever).
   for (let i = 0; i < (sa.maxToolCallsPerTurn || 25) + 1; i++) {
+    // Re-resolve every iteration so a long ReAct chain doesn't outlive the
+    // Clerk JWT TTL. For BYO providers this is a no-op (returns the stored
+    // key); for Teamship Cloud it mints a fresh token.
+    const turnCreds = await resolveSuperAgentCreds();
+    if (!turnCreds.ok) {
+      await store.appendMessage({
+        sessionId,
+        role: "assistant",
+        content:
+          turnCreds.reason === "needs-signin" || turnCreds.reason === "no-token"
+            ? "Sign-in expired mid-chat — sign in again to continue."
+            : "AI configuration changed mid-chat. Open Settings to re-configure.",
+      });
+      return;
+    }
+    const { endpoint, apiKey, model } = turnCreds;
     const messages = await buildHistory(sessionId, systemPrompt);
     const tools = enabled.size > 0 ? buildToolsPayload(enabled) : undefined;
 

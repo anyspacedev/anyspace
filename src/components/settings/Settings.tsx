@@ -24,9 +24,8 @@ import {
   type TeamCustomRole,
 } from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
-import { useAuthStore } from "../../stores/authStore";
 import { TEAMSHIP_CLOUD_URL } from "../../lib/auth";
-import { SignInButton, SignOutButton } from "@clerk/clerk-react";
+import { TeamshipCloudAccount } from "../auth/TeamshipCloudAccount";
 import { SettingsSearch } from "./SettingsSearch";
 import { TestAiConnection } from "./TestConnection";
 
@@ -582,53 +581,6 @@ function HotkeyField({
   );
 }
 
-function TeamshipCloudAccount() {
-  const ready = useAuthStore((s) => s.ready);
-  const signedIn = useAuthStore((s) => s.signedIn);
-  const email = useAuthStore((s) => s.email);
-  const clerkConfigured = useAuthStore((s) => s.clerkConfigured);
-
-  if (!clerkConfigured) {
-    return (
-      <div className="stt-tc-account stt-tc-account-muted">
-        This build wasn't compiled with a Clerk key — Teamship Cloud is
-        unavailable. Pick another provider.
-      </div>
-    );
-  }
-  if (!ready) {
-    return (
-      <div className="stt-tc-account stt-tc-account-muted">
-        Checking sign-in…
-      </div>
-    );
-  }
-  if (signedIn) {
-    return (
-      <div className="stt-tc-account">
-        <span>
-          Signed in as <strong>{email ?? "your account"}</strong>
-        </span>
-        <SignOutButton>
-          <button type="button" className="btn btn-ghost">
-            Sign out
-          </button>
-        </SignOutButton>
-      </div>
-    );
-  }
-  return (
-    <div className="stt-tc-account">
-      <span>Sign in to use Teamship Cloud — no API key required.</span>
-      <SignInButton mode="modal">
-        <button type="button" className="btn btn-primary">
-          Sign in
-        </button>
-      </SignInButton>
-    </div>
-  );
-}
-
 function SttSettingsSection() {
   const settings = useSttStore((s) => s.settings);
   const update = useSttStore((s) => s.updateSettings);
@@ -774,6 +726,12 @@ const AI_PRESETS: Record<
   AiSettings["presetId"],
   { endpoint: string; model: string; label: string }
 > = {
+  "teamship-cloud": {
+    // Endpoint resolved at call time from VITE_TEAMSHIP_CLOUD_URL.
+    endpoint: "",
+    model: "teamship-default",
+    label: "Teamship Cloud (beta)",
+  },
   openai: {
     endpoint: "https://api.openai.com/v1",
     model: "gpt-4o-mini",
@@ -796,6 +754,7 @@ function AiSettingsSection() {
   const settings = useAiStore((s) => s.settings);
   const update = useAiStore((s) => s.updateSettings);
   const [revealKey, setRevealKey] = useState(false);
+  const isTeamshipCloud = settings.presetId === "teamship-cloud";
 
   return (
     <div className="settings-section">
@@ -834,49 +793,82 @@ function AiSettingsSection() {
           </select>
         </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">Endpoint</span>
-          <input
-            type="url"
-            value={settings.endpoint}
-            placeholder="https://api.openai.com/v1"
-            onChange={(e) => void update({ endpoint: e.target.value })}
-            spellCheck={false}
-          />
-        </label>
+        {isTeamshipCloud ? (
+          <>
+            <div className="stt-field">
+              <span className="stt-field-label">Account</span>
+              <TeamshipCloudAccount />
+            </div>
+            <div className="stt-field">
+              <span className="stt-field-label">
+                Endpoint
+                <span className="stt-field-hint"> — managed</span>
+              </span>
+              <input
+                type="url"
+                value={TEAMSHIP_CLOUD_URL || "(not configured for this build)"}
+                readOnly
+                spellCheck={false}
+              />
+            </div>
+            <label className="stt-field">
+              <span className="stt-field-label">Model</span>
+              <input
+                type="text"
+                value={settings.model}
+                placeholder="teamship-default"
+                onChange={(e) => void update({ model: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label className="stt-field">
+              <span className="stt-field-label">Endpoint</span>
+              <input
+                type="url"
+                value={settings.endpoint}
+                placeholder="https://api.openai.com/v1"
+                onChange={(e) => void update({ endpoint: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">API key</span>
-          <div className="stt-field-inline">
-            <input
-              type={revealKey ? "text" : "password"}
-              value={settings.apiKey}
-              placeholder="sk-…"
-              onChange={(e) => void update({ apiKey: e.target.value })}
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={revealKey ? "Hide API key" : "Show API key"}
-              onClick={() => setRevealKey((v) => !v)}
-            >
-              <Icon name={revealKey ? "x" : "dot"} size={14} />
-            </button>
-          </div>
-        </label>
+            <label className="stt-field">
+              <span className="stt-field-label">API key</span>
+              <div className="stt-field-inline">
+                <input
+                  type={revealKey ? "text" : "password"}
+                  value={settings.apiKey}
+                  placeholder="sk-…"
+                  onChange={(e) => void update({ apiKey: e.target.value })}
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={revealKey ? "Hide API key" : "Show API key"}
+                  onClick={() => setRevealKey((v) => !v)}
+                >
+                  <Icon name={revealKey ? "x" : "dot"} size={14} />
+                </button>
+              </div>
+            </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">Model</span>
-          <input
-            type="text"
-            value={settings.model}
-            placeholder="gpt-4o-mini"
-            onChange={(e) => void update({ model: e.target.value })}
-            spellCheck={false}
-          />
-        </label>
+            <label className="stt-field">
+              <span className="stt-field-label">Model</span>
+              <input
+                type="text"
+                value={settings.model}
+                placeholder="gpt-4o-mini"
+                onChange={(e) => void update({ model: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
+          </>
+        )}
 
         <label className="stt-field">
           <span className="stt-field-label">System prompt</span>
@@ -888,11 +880,13 @@ function AiSettingsSection() {
           />
         </label>
 
-        <TestAiConnection
-          endpoint={settings.endpoint}
-          apiKey={settings.apiKey}
-          model={settings.model}
-        />
+        {!isTeamshipCloud && (
+          <TestAiConnection
+            endpoint={settings.endpoint}
+            apiKey={settings.apiKey}
+            model={settings.model}
+          />
+        )}
       </div>
     </div>
   );
@@ -1008,53 +1002,135 @@ function SuperAgentSettingsSection() {
   const activeSessionId = useSuperAgentStore((s) => s.activeSessionId);
   const resetSession = useSuperAgentStore((s) => s.resetSession);
 
-  const effectiveEndpoint = settings.endpoint || ai.endpoint;
-  const effectiveModel = settings.model || ai.model;
   const hasKey = Boolean(settings.apiKey || ai.apiKey);
+  const isInherit = settings.presetId === "inherit";
+  const isTeamshipCloud = settings.presetId === "teamship-cloud";
+  const aiIsTeamshipCloud = ai.presetId === "teamship-cloud";
+  const effectiveEndpoint = isTeamshipCloud
+    ? TEAMSHIP_CLOUD_URL
+    : isInherit && aiIsTeamshipCloud
+      ? TEAMSHIP_CLOUD_URL
+      : settings.endpoint || ai.endpoint;
+  const effectiveModel = settings.model || ai.model;
 
   return (
     <div className="settings-section">
       <div className="settings-section-head">
         <h2 className="settings-section-title">Super Agent</h2>
         <div className="settings-section-sub">
-          The in-app chat agent. Defaults to the AI section's endpoint / API key / model unless
-          you override below. Tools run in trust mode — disable any you don't want the model to call.
+          The in-app chat agent. Defaults to inheriting the AI section's
+          provider — pick a different provider here to pin Super Agent
+          independently. Tools run in trust mode — disable any you don't want
+          the model to call.
         </div>
       </div>
       <div className="stt-fields">
         <label className="stt-field">
-          <span className="stt-field-label">Endpoint override (optional)</span>
-          <input
-            type="text"
-            value={settings.endpoint}
-            placeholder={ai.endpoint || "(uses AI section endpoint)"}
-            onChange={(e) => void update({ endpoint: e.target.value })}
-            spellCheck={false}
-          />
+          <span className="stt-field-label">Provider</span>
+          <select
+            value={settings.presetId}
+            onChange={(e) => {
+              const id = e.target.value as typeof settings.presetId;
+              if (id === "inherit" || id === "custom") {
+                void update({ presetId: id });
+              } else if (id === "teamship-cloud") {
+                void update({
+                  presetId: id,
+                  endpoint: "",
+                  apiKey: "",
+                  model: "teamship-default",
+                });
+              } else {
+                const preset = AI_PRESETS[id];
+                void update({
+                  presetId: id,
+                  endpoint: preset.endpoint,
+                  model: preset.model,
+                });
+              }
+            }}
+          >
+            <option value="inherit">Inherit from AI section</option>
+            <option value="teamship-cloud">Teamship Cloud (beta)</option>
+            <option value="openai">OpenAI</option>
+            <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="custom">Custom</option>
+          </select>
         </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">API key override (optional)</span>
-          <input
-            type="password"
-            value={settings.apiKey}
-            placeholder={hasKey ? "(uses AI section key)" : "sk-…"}
-            onChange={(e) => void update({ apiKey: e.target.value })}
-            spellCheck={false}
-            autoComplete="off"
-          />
-        </label>
+        {isTeamshipCloud ? (
+          <>
+            <div className="stt-field">
+              <span className="stt-field-label">Account</span>
+              <TeamshipCloudAccount />
+            </div>
+            <div className="stt-field">
+              <span className="stt-field-label">
+                Endpoint
+                <span className="stt-field-hint"> — managed</span>
+              </span>
+              <input
+                type="url"
+                value={TEAMSHIP_CLOUD_URL || "(not configured for this build)"}
+                readOnly
+                spellCheck={false}
+              />
+            </div>
+            <label className="stt-field">
+              <span className="stt-field-label">Model</span>
+              <input
+                type="text"
+                value={settings.model}
+                placeholder="teamship-default"
+                onChange={(e) => void update({ model: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label className="stt-field">
+              <span className="stt-field-label">
+                {isInherit ? "Endpoint override (optional)" : "Endpoint"}
+              </span>
+              <input
+                type="text"
+                value={settings.endpoint}
+                placeholder={ai.endpoint || "(uses AI section endpoint)"}
+                onChange={(e) => void update({ endpoint: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
 
-        <label className="stt-field">
-          <span className="stt-field-label">Model override (optional)</span>
-          <input
-            type="text"
-            value={settings.model}
-            placeholder={ai.model || "(uses AI section model)"}
-            onChange={(e) => void update({ model: e.target.value })}
-            spellCheck={false}
-          />
-        </label>
+            <label className="stt-field">
+              <span className="stt-field-label">
+                {isInherit ? "API key override (optional)" : "API key"}
+              </span>
+              <input
+                type="password"
+                value={settings.apiKey}
+                placeholder={hasKey ? "(uses AI section key)" : "sk-…"}
+                onChange={(e) => void update({ apiKey: e.target.value })}
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </label>
+
+            <label className="stt-field">
+              <span className="stt-field-label">
+                {isInherit ? "Model override (optional)" : "Model"}
+              </span>
+              <input
+                type="text"
+                value={settings.model}
+                placeholder={ai.model || "(uses AI section model)"}
+                onChange={(e) => void update({ model: e.target.value })}
+                spellCheck={false}
+              />
+            </label>
+          </>
+        )}
 
         <label className="stt-field">
           <span className="stt-field-label">System prompt</span>
@@ -1121,11 +1197,13 @@ function SuperAgentSettingsSection() {
         </label>
       </div>
 
-      <TestAiConnection
-        endpoint={effectiveEndpoint}
-        apiKey={settings.apiKey || ai.apiKey}
-        model={effectiveModel}
-      />
+      {!isTeamshipCloud && !(isInherit && aiIsTeamshipCloud) && (
+        <TestAiConnection
+          endpoint={effectiveEndpoint}
+          apiKey={settings.apiKey || ai.apiKey}
+          model={effectiveModel}
+        />
+      )}
 
       <div className="settings-section-head" style={{ marginTop: 16 }}>
         <h3 className="settings-section-title" style={{ fontSize: 14 }}>Tools</h3>
