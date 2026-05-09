@@ -65,7 +65,7 @@ export function Terminal({ pane, tabId }: Props) {
     if (!containerRef.current) return;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const term = new XTerm({
-      fontFamily: 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace',
+      fontFamily: '"JetBrains Mono Variable", ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace',
       fontSize: 13,
       lineHeight: 1.2,
       cursorBlink: !reduceMotion,

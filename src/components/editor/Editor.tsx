@@ -86,7 +86,7 @@ export function Editor({ pane, tabId }: Props) {
       automaticLayout: true,
       fontSize: 13,
       fontFamily:
-        'ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace',
+        '"JetBrains Mono Variable", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace',
       minimap: { enabled: false },
       scrollbar: { vertical: "auto", horizontal: "auto" },
       renderWhitespace: "selection",
