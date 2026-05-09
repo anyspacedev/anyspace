@@ -1,0 +1,110 @@
+---
+import Base from "./Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import DocsSidebar from "../components/docs/DocsSidebar.astro";
+import DocsBreadcrumb from "../components/docs/DocsBreadcrumb.astro";
+import DocsPager from "../components/docs/DocsPager.astro";
+import DocsTOC from "../components/docs/DocsTOC.astro";
+import { getCollection } from "astro:content";
+import { groupDocs, flattenDocs, findNeighbors, sectionLabel } from "../lib/docs";
+import type { MarkdownHeading } from "astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  section?: string;
+  currentId?: string | null;
+  headings?: MarkdownHeading[];
+  showPager?: boolean;
+}
+
+const {
+  title,
+  description,
+  section,
+  currentId = null,
+  headings = [],
+  showPager = true,
+} = Astro.props;
+
+const all = (await getCollection("docs")).filter((e) => !e.data.draft);
+const groups = groupDocs(all);
+const flat = flattenDocs(groups);
+const neighbors = currentId ? findNeighbors(flat, currentId) : { prev: null, next: null };
+const breadcrumbSection = section ? sectionLabel(section) : "";
+
+const fullTitle = `${title} — AnySpace Docs`;
+---
+
+<Base title={fullTitle} description={description}>
+  <Nav />
+  <main id="main" class="docs-shell">
+    <div class="container">
+      <div class="docs-grid">
+        <aside class="docs-grid__nav">
+          <DocsSidebar groups={groups} currentId={currentId} />
+        </aside>
+
+        <article class="docs-grid__article">
+          {section && (
+            <header class="mb-6">
+              <DocsBreadcrumb sectionLabel={breadcrumbSection} title={title} />
+            </header>
+          )}
+          <article class="docs-prose">
+            <slot />
+          </article>
+          {showPager && (neighbors.prev || neighbors.next) && (
+            <DocsPager prev={neighbors.prev} next={neighbors.next} />
+          )}
+        </article>
+
+        <aside class="docs-grid__toc">
+          <DocsTOC headings={headings} />
+        </aside>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .docs-shell {
+    padding: 2.5rem 0 5rem;
+  }
+  .docs-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+  @media (min-width: 1024px) {
+    .docs-grid {
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+    .docs-grid__nav {
+      position: sticky;
+      top: 5.5rem;
+      align-self: start;
+      max-height: calc(100vh - 6rem);
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+  }
+  @media (min-width: 1280px) {
+    .docs-grid {
+      grid-template-columns: 220px minmax(0, 1fr) 200px;
+    }
+  }
+  .docs-grid__article {
+    min-width: 0;
+  }
+  .docs-grid__toc {
+    display: none;
+  }
+  @media (min-width: 1280px) {
+    .docs-grid__toc {
+      display: block;
+    }
+  }
+</style>

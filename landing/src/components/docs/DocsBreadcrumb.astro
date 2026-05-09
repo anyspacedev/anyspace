@@ -1,0 +1,19 @@
+---
+interface Props {
+  sectionLabel: string;
+  title: string;
+}
+const { sectionLabel, title } = Astro.props;
+---
+
+<nav aria-label="Breadcrumb" class="text-xs font-mono uppercase tracking-[0.14em] text-fg-dim">
+  <ol class="flex flex-wrap items-center gap-1.5">
+    <li>
+      <a href="/docs" class="transition-colors duration-fast hover:text-fg">Docs</a>
+    </li>
+    <li aria-hidden="true">/</li>
+    <li>{sectionLabel}</li>
+    <li aria-hidden="true">/</li>
+    <li class="text-fg">{title}</li>
+  </ol>
+</nav>

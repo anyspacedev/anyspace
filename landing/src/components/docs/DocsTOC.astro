@@ -1,0 +1,118 @@
+---
+import type { MarkdownHeading } from "astro";
+
+interface Props {
+  headings: MarkdownHeading[];
+}
+const { headings } = Astro.props;
+
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{items.length > 0 && (
+  <nav aria-label="On this page" class="docs-toc">
+    <h4 class="docs-toc__heading">On this page</h4>
+    <ul class="docs-toc__list">
+      {items.map((h) => (
+        <li class:list={["docs-toc__item", h.depth === 3 && "docs-toc__item--sub"]}>
+          <a href={`#${h.slug}`} data-toc-link={h.slug} class="docs-toc__link">
+            {h.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}
+
+<style>
+  .docs-toc {
+    position: sticky;
+    top: 5.5rem;
+    font-size: 0.8125rem;
+  }
+  .docs-toc__heading {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: hsl(var(--fg-dim));
+    margin-bottom: 0.6rem;
+  }
+  .docs-toc__list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border-left: 1px solid hsl(var(--border));
+  }
+  .docs-toc__item--sub {
+    padding-left: 0.85rem;
+  }
+  .docs-toc__link {
+    display: block;
+    padding: 0.25rem 0.75rem;
+    margin-left: -1px;
+    color: hsl(var(--fg-muted));
+    border-left: 1px solid transparent;
+    transition: color 120ms ease, border-color 120ms ease;
+    line-height: 1.4;
+  }
+  .docs-toc__link:hover {
+    color: hsl(var(--fg));
+  }
+  .docs-toc__link[data-active="true"] {
+    color: hsl(var(--fg));
+    border-color: hsl(var(--fg));
+  }
+</style>
+
+<script>
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(".docs-toc__link"));
+  if (links.length) {
+    const article = document.querySelector("article.docs-prose");
+    const targets = article
+      ? Array.from(article.querySelectorAll<HTMLElement>("h2[id], h3[id]"))
+      : [];
+    const linkBySlug = new Map<string, HTMLAnchorElement>();
+    for (const l of links) {
+      const slug = l.getAttribute("data-toc-link");
+      if (slug) linkBySlug.set(slug, l);
+    }
+
+    let active: string | null = null;
+    const setActive = (slug: string | null) => {
+      if (slug === active) return;
+      if (active) linkBySlug.get(active)?.removeAttribute("data-active");
+      if (slug) linkBySlug.get(slug)?.setAttribute("data-active", "true");
+      active = slug;
+    };
+
+    if (targets.length > 0 && "IntersectionObserver" in window) {
+      const visible = new Map<string, number>();
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const id = entry.target.id;
+            if (!id) continue;
+            if (entry.isIntersecting) visible.set(id, entry.intersectionRatio || 0.001);
+            else visible.delete(id);
+          }
+          if (visible.size === 0) return;
+          let topId: string | null = null;
+          let topY = Infinity;
+          for (const id of visible.keys()) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            const y = el.getBoundingClientRect().top;
+            if (y < topY) {
+              topY = y;
+              topId = id;
+            }
+          }
+          setActive(topId);
+        },
+        { rootMargin: "-80px 0px -65% 0px", threshold: [0, 0.5, 1] },
+      );
+      for (const t of targets) io.observe(t);
+    }
+  }
+</script>

@@ -1,0 +1,88 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { getCollection } from "astro:content";
+import { groupDocs } from "../../lib/docs";
+
+export const prerender = true;
+
+const all = (await getCollection("docs")).filter((e) => !e.data.draft);
+const groups = groupDocs(all);
+---
+
+<DocsLayout title="Documentation" description="Everything you need to use AnySpace.">
+  <h1>Documentation</h1>
+  <p>
+    Welcome to the AnySpace docs. This is the operator's manual — a comprehensive walkthrough of
+    every feature, from your first install to advanced multi-agent team setups. If you are new
+    here, start with <a href="/docs/get-started/welcome">Welcome</a> and follow the pager links;
+    otherwise pick a topic below.
+  </p>
+
+  <div class="docs-overview">
+    {groups.map((g) => (
+      <section class="docs-overview__section">
+        <h2 id={g.id}>{g.label}</h2>
+        {g.blurb && <p class="docs-overview__blurb">{g.blurb}</p>}
+        <ul class="docs-overview__list">
+          {g.items.map((entry) => (
+            <li>
+              <a href={`/docs/${entry.id}`} class="docs-overview__card">
+                <span class="docs-overview__card-title">{entry.data.title}</span>
+                {entry.data.description && (
+                  <span class="docs-overview__card-desc">{entry.data.description}</span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </div>
+</DocsLayout>
+
+<style>
+  .docs-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+    margin-top: 2.5rem;
+  }
+  .docs-overview__blurb {
+    color: hsl(var(--fg-muted));
+    margin-top: 0.25rem;
+  }
+  .docs-overview__list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+  @media (min-width: 640px) {
+    .docs-overview__list {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .docs-overview__card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    background: hsl(var(--bg));
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+  .docs-overview__card:hover {
+    border-color: hsl(var(--border-strong));
+    background: hsl(var(--bg-elev));
+  }
+  .docs-overview__card-title {
+    font-weight: 500;
+    color: hsl(var(--fg));
+  }
+  .docs-overview__card-desc {
+    font-size: 0.875rem;
+    color: hsl(var(--fg-muted));
+    line-height: 1.45;
+  }
+</style>

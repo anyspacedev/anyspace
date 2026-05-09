@@ -2,11 +2,15 @@
 import BrandMark from "./BrandMark.astro";
 import ThemeToggle from "./ThemeToggle.tsx";
 
+const pathname = Astro.url.pathname;
+const isDocs = pathname.startsWith("/docs");
+
 const links = [
-  { href: "#cli-workspace", label: "Features" },
-  { href: "#team", label: "Team Mode" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#faq", label: "FAQ" },
+  { href: "/#cli-workspace", label: "Features", match: () => false },
+  { href: "/#team", label: "Team Mode", match: () => false },
+  { href: "/#pricing", label: "Pricing", match: () => false },
+  { href: "/docs", label: "Docs", match: () => isDocs },
+  { href: "/#faq", label: "FAQ", match: () => false },
 ];
 ---
 
@@ -24,7 +28,11 @@ const links = [
       {links.map((l) => (
         <a
           href={l.href}
-          class="text-sm font-medium text-fg-muted transition-colors duration-fast hover:text-fg"
+          aria-current={l.match() ? "page" : undefined}
+          class:list={[
+            "text-sm font-medium transition-colors duration-fast",
+            l.match() ? "text-fg" : "text-fg-muted hover:text-fg",
+          ]}
         >
           {l.label}
         </a>

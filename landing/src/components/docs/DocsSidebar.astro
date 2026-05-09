@@ -1,0 +1,105 @@
+---
+import type { DocGroup } from "../../lib/docs";
+
+interface Props {
+  groups: DocGroup[];
+  currentId: string | null;
+}
+
+const { groups, currentId } = Astro.props;
+---
+
+<nav aria-label="Documentation" class="docs-sidebar">
+  <a
+    href="/docs"
+    class:list={[
+      "docs-sidebar__overview",
+      currentId === null && "docs-sidebar__overview--active",
+    ]}
+  >
+    Overview
+  </a>
+  {groups.map((g) => (
+    <section class="docs-sidebar__section">
+      <h3 class="docs-sidebar__heading">{g.label}</h3>
+      <ul class="docs-sidebar__list">
+        {g.items.map((entry) => (
+          <li>
+            <a
+              href={`/docs/${entry.id}`}
+              class:list={[
+                "docs-sidebar__link",
+                currentId === entry.id && "docs-sidebar__link--active",
+              ]}
+              aria-current={currentId === entry.id ? "page" : undefined}
+            >
+              {entry.data.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</nav>
+
+<style>
+  .docs-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    font-size: 0.875rem;
+  }
+  .docs-sidebar__overview {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    margin-bottom: -0.25rem;
+    color: hsl(var(--fg-muted));
+    border-left: 2px solid transparent;
+    transition: color 120ms ease, border-color 120ms ease;
+    font-weight: 500;
+  }
+  .docs-sidebar__overview:hover {
+    color: hsl(var(--fg));
+  }
+  .docs-sidebar__overview--active {
+    color: hsl(var(--fg));
+    border-color: hsl(var(--fg));
+  }
+  .docs-sidebar__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .docs-sidebar__heading {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: hsl(var(--fg-dim));
+    padding: 0 0.6rem;
+    margin-bottom: 0.25rem;
+  }
+  .docs-sidebar__list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .docs-sidebar__link {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    color: hsl(var(--fg-muted));
+    border-left: 2px solid transparent;
+    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+    border-radius: 0 6px 6px 0;
+    line-height: 1.4;
+  }
+  .docs-sidebar__link:hover {
+    color: hsl(var(--fg));
+    background: hsl(var(--bg-elev));
+  }
+  .docs-sidebar__link--active {
+    color: hsl(var(--fg));
+    border-color: hsl(var(--fg));
+    font-weight: 500;
+  }
+</style>
