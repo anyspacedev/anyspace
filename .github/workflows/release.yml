@@ -219,13 +219,14 @@ jobs:
         working-directory: landing
         run: npm ci
 
-      - name: Deploy landing to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: landing
-          command: deploy
-          preCommands: npm run build
+      - name: Build + deploy landing to Cloudflare Workers
+        working-directory: landing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm run build
+          npx wrangler deploy
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
