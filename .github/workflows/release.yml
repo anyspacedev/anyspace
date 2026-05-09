@@ -71,7 +71,18 @@ jobs:
             libsoup-3.0-dev \
             patchelf
 
-      - run: npm ci
+      - name: Cache node_modules
+        id: node-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          # Per-target key: native modules differ between OSes and arches
+          # (mac arm64 vs mac x64 share runner.os = "macOS"), so include target.
+          key: node-modules-${{ matrix.target }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install JS deps
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Stamp release version into manifests
         shell: bash
@@ -260,7 +271,15 @@ jobs:
           cache: npm
           cache-dependency-path: landing/package-lock.json
 
+      - name: Cache landing node_modules
+        id: landing-node-cache
+        uses: actions/cache@v4
+        with:
+          path: landing/node_modules
+          key: landing-node-modules-${{ runner.os }}-${{ hashFiles('landing/package-lock.json') }}
+
       - name: Install landing deps
+        if: steps.landing-node-cache.outputs.cache-hit != 'true'
         working-directory: landing
         run: npm ci
 
