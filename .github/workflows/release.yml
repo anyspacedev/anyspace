@@ -155,15 +155,12 @@ jobs:
       - name: List release artifacts
         run: ls -la dist-release/
 
-      - name: Configure AWS credentials for R2
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: auto
-          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-
       - name: Upload artifacts to R2
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: 'true'
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           aws s3 cp dist-release/ "s3://${R2_BUCKET}/v${VERSION}/" \
@@ -174,6 +171,10 @@ jobs:
 
       - name: Verify R2 listing
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: 'true'
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           aws s3 ls "s3://${R2_BUCKET}/v${VERSION}/" \
