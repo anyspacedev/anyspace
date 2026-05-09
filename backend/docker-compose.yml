@@ -15,7 +15,10 @@ services:
     container_name: anyspace-backend
     restart: unless-stopped
     ports:
-      - "9100:9100"
+      # Bind to loopback only — nginx is the only consumer. The plain
+      # "9100:9100" form maps to 0.0.0.0 and bypasses UFW because Docker
+      # writes its own iptables rules.
+      - "127.0.0.1:9100:9100"
     environment:
       # --- Network -------------------------------------------------------
       # MUST be 0.0.0.0 inside the container. The pydantic default at
@@ -57,11 +60,11 @@ services:
       # CLERK_WEBHOOK_SIGNING_SECRET: ""
       # CLERK_JWT_LEEWAY_SEC: "30"
 
-    # Optional: mirror values from a host .env. Note that compose's
-    # `environment:` block above wins over `env_file`, which is what
-    # keeps LISTEN_HOST=0.0.0.0 in force.
-    # env_file:
-    #   - ./.env
+    # Mirror Clerk / CORS / TRUSTED_PROXY_IPS from the host .env.
+    # Compose's `environment:` block above wins over `env_file`, which
+    # is what keeps LISTEN_HOST=0.0.0.0 and DATABASE_URL in force.
+    env_file:
+      - ./.env
 
     volumes:
       - anyspace-data:/app/data

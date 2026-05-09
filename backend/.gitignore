@@ -1,6 +1,6 @@
 .venv/
 .uv-cache/
-data/anyspace.db*
+data/*.db*
 data/models/
 __pycache__/
 *.pyc
