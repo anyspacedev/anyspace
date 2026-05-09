@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useThemeStore } from "../../stores/themeStore";
 import { themes } from "../../themes/definitions";
 import type { Theme } from "../../themes/definitions";
@@ -142,6 +143,22 @@ export function Settings() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeId, setActiveId] = useState<string>(SECTION_IDS[0]);
   const [query, setQuery] = useState("");
+  const [appVersion, setAppVersion] = useState<string>("");
+  const gitSha = (import.meta.env.VITE_GIT_SHA as string | undefined) ?? "dev";
+
+  useEffect(() => {
+    let cancelled = false;
+    getVersion()
+      .then((v) => {
+        if (!cancelled) setAppVersion(v);
+      })
+      .catch(() => {
+        if (!cancelled) setAppVersion("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-jump to the first matching section when the user starts a search,
   // so they don't have to scroll past dimmed-out blocks.
@@ -268,9 +285,9 @@ export function Settings() {
             <div className="settings-section-head">
               <h2 className="settings-section-title">About</h2>
               <div className="settings-section-sub">
-                AnySpace 0.1.0 — multi-pane terminal multiplexer with command
-                blocks, Monaco editor, live preview, and Kanban-driven AI agent
-                launcher.
+                AnySpace {appVersion || "…"}{gitSha ? ` (${gitSha})` : ""} —
+                multi-pane terminal multiplexer with command blocks, Monaco
+                editor, live preview, and Kanban-driven AI agent launcher.
               </div>
             </div>
           </div>

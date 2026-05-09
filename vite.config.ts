@@ -1,11 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { execSync } from "node:child_process";
 
 const host = process.env.TAURI_DEV_HOST;
+
+function resolveGitSha(): string {
+  // CI sets VITE_GIT_SHA explicitly so the value matches the release commit
+  // even in shallow checkouts. Locally, fall back to the working-tree HEAD.
+  const fromEnv = process.env.VITE_GIT_SHA;
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim().slice(0, 7);
+  try {
+    return execSync("git rev-parse --short=7 HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return "dev";
+  }
+}
 
 export default defineConfig(async () => ({
   plugins: [react()],
   clearScreen: false,
+  define: {
+    "import.meta.env.VITE_GIT_SHA": JSON.stringify(resolveGitSha()),
+  },
   server: {
     port: 1420,
     strictPort: true,
