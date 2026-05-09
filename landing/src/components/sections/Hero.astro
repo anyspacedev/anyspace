@@ -1,5 +1,6 @@
 ---
 import OrchestratorCanvas from "../islands/OrchestratorCanvas.tsx";
+import { DOWNLOADS } from "../../lib/downloads";
 ---
 
 <section class="relative pt-28 pb-32 sm:pt-36 sm:pb-40">
@@ -53,7 +54,22 @@ import OrchestratorCanvas from "../islands/OrchestratorCanvas.tsx";
       </div>
 
       <p class="mt-5 font-mono text-xs text-fg-dim">
-        macOS · Windows · Linux
+        <a
+          href={DOWNLOADS.macArm64}
+          data-os-alt="macOS"
+          class="underline-offset-4 transition-colors duration-fast hover:text-fg hover:underline"
+        >macOS</a><span aria-hidden="true" data-os-alt-sep> · </span><a
+          href={DOWNLOADS.windowsX64}
+          data-os-alt="Windows"
+          class="underline-offset-4 transition-colors duration-fast hover:text-fg hover:underline"
+        >Windows</a><span aria-hidden="true" data-os-alt-sep> · </span><a
+          href={DOWNLOADS.linuxDeb}
+          data-os-alt="Linux"
+          class="underline-offset-4 transition-colors duration-fast hover:text-fg hover:underline"
+        >Linux</a><span aria-hidden="true" data-os-alt-sep> · </span><a
+          href="#download"
+          class="underline-offset-4 transition-colors duration-fast hover:text-fg hover:underline"
+        >all builds</a>
       </p>
     </div>
 
@@ -74,5 +90,17 @@ import OrchestratorCanvas from "../islands/OrchestratorCanvas.tsx";
     document.querySelectorAll<HTMLElement>("[data-os-label]").forEach((el) => {
       el.textContent = label;
     });
+    // Hide the alt-link (and one adjacent separator) matching the detected OS,
+    // so the row reads as "other platforms". Unknown OS leaves all 3 visible.
+    if (os !== "Unknown") {
+      const matched = document.querySelector<HTMLElement>(`[data-os-alt="${os}"]`);
+      if (matched) {
+        matched.style.display = "none";
+        const next = matched.nextElementSibling as HTMLElement | null;
+        const prev = matched.previousElementSibling as HTMLElement | null;
+        if (next?.hasAttribute("data-os-alt-sep")) next.style.display = "none";
+        else if (prev?.hasAttribute("data-os-alt-sep")) prev.style.display = "none";
+      }
+    }
   </script>
 </section>
