@@ -81,6 +81,18 @@ pub fn write_bash_wrapper_rc() -> Result<String> {
 const BASH_ZSH_INTEGRATION: &str = r##"# AnySpace shell integration (OSC 133)
 # Source-safe in bash and zsh.
 
+# Bail out for non-interactive shells. BASH_ENV pulls this script into every
+# non-interactive bash subshell — e.g. the `bash --norc -ec '...'` command
+# substitutions inside `pyenv init - zsh` — and emitting OSC 133 bytes there
+# leaks them into stdout captured by `$(...)`. The captured output gets
+# eval'd by the parent shell and chokes on the `;` inside the escape
+# sequence ("(eval):N: parse error near ';'"). OSC 133 prompt markers are
+# meaningless outside an interactive prompt anyway.
+case "${-:-}" in
+  *i*) ;;
+  *) return 0 2>/dev/null || exit 0 ;;
+esac
+
 __anyspace_emit() { printf '\033]133;%s\007' "$1"; }
 __anyspace_emit_d() { printf '\033]133;D;%s\007' "$1"; }
 
