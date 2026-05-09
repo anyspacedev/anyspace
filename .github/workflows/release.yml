@@ -75,6 +75,13 @@ jobs:
 
       - name: Build Tauri bundle
         uses: tauri-apps/tauri-action@v0
+        env:
+          # Vite reads these at build time; without them the shipped bundle
+          # falls back to "this build wasn't compiled with a Clerk key" and
+          # AnySpace Cloud STT/AI is unavailable. The Clerk publishable key
+          # is public-by-design but stored as a secret to keep it out of git.
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_ANYSPACE_CLOUD_URL: https://api.anyspace.dev/v1
         with:
           args: --target ${{ matrix.target }}
 
