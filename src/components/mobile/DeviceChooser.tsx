@@ -3,8 +3,9 @@ import type { Pane as PaneType } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { mobileListDevices, type MobileDevice, type MobileTarget } from "../../lib/mobile";
 import { Icon } from "../ui/Icon";
+import { isMacPlatform } from "../../lib/platform";
 
-const IOS_HOST_SUPPORTED = /Mac|iPhone|iPad/.test(navigator.platform || "");
+const IOS_HOST_SUPPORTED = isMacPlatform();
 
 // Device chooser. Lists Android (scrcpy / adb) and iOS (Simulator / idb)
 // devices grouped by target. Polling is fine here — `mobile_list_devices`
@@ -18,9 +19,14 @@ const POLL_MS = 2000;
 
 export function DeviceChooser({ pane, tabId }: { pane: PaneType; tabId: string }) {
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
-  const [target, setTarget] = useState<MobileTarget>(
-    (pane.payload?.target as MobileTarget | undefined) ?? "android",
-  );
+  const [target, setTarget] = useState<MobileTarget>(() => {
+    const raw = pane.payload?.target as MobileTarget | undefined;
+    // Coerce a stale "ios" payload on non-macOS hosts (e.g. moved a workspace
+    // from a Mac to a Windows machine) so we don't render an iOS tab that
+    // can't be selected once we hide it below.
+    if (raw === "ios" && !IOS_HOST_SUPPORTED) return "android";
+    return raw ?? "android";
+  });
   const [devices, setDevices] = useState<MobileDevice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,8 +66,6 @@ export function DeviceChooser({ pane, tabId }: { pane: PaneType; tabId: string }
     });
   };
 
-  const iosUnsupported = target === "ios" && !IOS_HOST_SUPPORTED;
-
   return (
     <div className="mobile-chooser">
       <div className="mobile-chooser-header">
@@ -76,27 +80,18 @@ export function DeviceChooser({ pane, tabId }: { pane: PaneType; tabId: string }
           >
             Android
           </button>
-          <button
-            className={"chooser-tab" + (target === "ios" ? " active" : "")}
-            onClick={() => setTarget("ios")}
-          >
-            iOS
-          </button>
+          {IOS_HOST_SUPPORTED && (
+            <button
+              className={"chooser-tab" + (target === "ios" ? " active" : "")}
+              onClick={() => setTarget("ios")}
+            >
+              iOS
+            </button>
+          )}
         </div>
       </div>
 
-      {iosUnsupported ? (
-        <div className="mobile-chooser-empty">
-          <Icon name="alert-circle" size={20} />
-          <div>
-            <div className="mobile-chooser-empty-title">iOS preview requires macOS</div>
-            <div className="mobile-chooser-empty-hint">
-              Simulator embedding uses ScreenCaptureKit + SimulatorKit, which only run
-              on macOS. Cloud iOS support (Appetize) is on the roadmap.
-            </div>
-          </div>
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="mobile-chooser-empty">
           <Icon name="alert-circle" size={20} />
           <div>

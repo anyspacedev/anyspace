@@ -17,6 +17,25 @@
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
+#[cfg(windows)]
+use std::path::Path;
+
+/// Converts a Windows-native path (`C:\Users\foo\file`) to its WSL view
+/// (`/mnt/c/Users/foo/file`). The `--rcfile` arg we pass to `bash` inside
+/// WSL needs this — bash reads the path inside the Linux filesystem
+/// namespace, where Windows drives are mounted under `/mnt/<lowercase
+/// drive>/`. Returns the original string if the path is not drive-prefixed.
+#[cfg(windows)]
+pub fn to_wsl_path(p: &Path) -> String {
+    let s = p.to_string_lossy();
+    let bytes = s.as_bytes();
+    if bytes.len() >= 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
+        let drive = (bytes[0] as char).to_ascii_lowercase();
+        let rest: String = s[2..].chars().map(|c| if c == '\\' { '/' } else { c }).collect();
+        return format!("/mnt/{drive}{rest}");
+    }
+    s.into_owned()
+}
 
 fn integration_root() -> Result<PathBuf> {
     let dir = std::env::temp_dir().join("anyspace-shell-integration");

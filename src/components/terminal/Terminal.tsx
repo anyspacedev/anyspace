@@ -55,6 +55,7 @@ export function Terminal({ pane, tabId }: Props) {
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const focusedBlockIdRef = useRef<string | null>(null);
   const [explain, setExplain] = useState<{ block: CommandBlock; output: string } | null>(null);
+  const [spawnError, setSpawnError] = useState<{ title: string; body: string; href?: string } | null>(null);
   const theme = useThemeStore((s) => s.current);
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
   const closePane = useWorkspaceStore((s) => s.closePane);
@@ -333,6 +334,15 @@ export function Terminal({ pane, tabId }: Props) {
         });
       })
       .catch((e) => {
+        const msg = String(e);
+        if (msg.includes("WSL_NOT_INSTALLED")) {
+          setSpawnError({
+            title: "WSL is required on Windows",
+            body: "Anyspace runs terminals inside WSL. Open PowerShell as Administrator, run `wsl --install`, then restart Anyspace.",
+            href: "https://learn.microsoft.com/windows/wsl/install",
+          });
+          return;
+        }
         term.writeln(`\x1b[31m[anyspace] failed to spawn pty: ${e}\x1b[0m`);
       });
 
@@ -581,6 +591,27 @@ export function Terminal({ pane, tabId }: Props) {
           output={explain.output}
           onClose={() => setExplain(null)}
         />
+      )}
+      {spawnError && (
+        <div className="terminal-spawn-error" role="alert">
+          <div className="terminal-spawn-error-card">
+            <Icon name="alert-circle" size={20} />
+            <div className="terminal-spawn-error-text">
+              <div className="terminal-spawn-error-title">{spawnError.title}</div>
+              <div className="terminal-spawn-error-body">{spawnError.body}</div>
+              {spawnError.href && (
+                <a
+                  className="terminal-spawn-error-link"
+                  href={spawnError.href}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Learn more →
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       {searchOpen && (
         <div className="terminal-search">

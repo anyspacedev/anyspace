@@ -31,7 +31,7 @@ impl PtySession {
             .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
             .context("openpty failed")?;
 
-        let shell = pick_shell();
+        let shell = pick_shell()?;
 
         // Compute final args + integration env up front so we can mutate args
         // for bash (--rcfile) before handing them to CommandBuilder.
@@ -55,6 +55,11 @@ impl PtySession {
             // bash --rcfile is ignored for login shells, so we drop -l and
             // replay the login init chain inside the wrapper rc file.
             let wrapper = crate::shell_integration::scripts::write_bash_wrapper_rc()?;
+            // On Windows we run bash *inside WSL*, so the wrapper path
+            // (Windows-native) needs to be re-expressed in `/mnt/<drive>/`
+            // form for the Linux-side bash to find it.
+            #[cfg(windows)]
+            let wrapper = crate::shell_integration::scripts::to_wsl_path(Path::new(&wrapper));
             // Long options must precede short ones — `bash -i --rcfile X`
             // makes bash 5.2 bail with `--: invalid option`.
             shell_args = vec!["--rcfile".into(), wrapper, "-i".into()];
@@ -91,6 +96,39 @@ impl PtySession {
         }
         if let Some(u) = zsh_user_zdotdir {
             cmd.env("ANYSPACE_USER_ZDOTDIR", u);
+        }
+
+        // WSL doesn't forward Windows env vars into Linux by default — they
+        // only reach bash if listed in `WSLENV`. The `/p` suffix tells WSL
+        // to translate the value from a Windows path to the matching
+        // `/mnt/<drive>` form. Path-typed keys get `/p`; ID/URL/string keys
+        // are forwarded verbatim. We append to any pre-existing WSLENV so
+        // user-configured forwards survive.
+        #[cfg(windows)]
+        {
+            let path_keys = [
+                "ANYSPACE_SHELL_INTEGRATION",
+                "BASH_ENV",
+                "ANYSPACE_TEAM_BIN_DIR",
+                "ANYSPACE_TEAM_TMSG",
+                "ANYSPACE_TASK_FILE",
+            ];
+            let plain_keys = [
+                "TERM",
+                "COLORTERM",
+                "ANYSPACE_PANE_ID",
+                "ANYSPACE_TAB_ID",
+                "ANYSPACE_API_URL",
+                "ANYSPACE_API_TOKEN",
+            ];
+            let mut parts: Vec<String> = std::env::var("WSLENV")
+                .ok()
+                .filter(|s| !s.is_empty())
+                .into_iter()
+                .collect();
+            parts.extend(path_keys.iter().map(|k| format!("{k}/p")));
+            parts.extend(plain_keys.iter().map(|k| (*k).to_string()));
+            cmd.env("WSLENV", parts.join(":"));
         }
 
         let child = pair
@@ -174,7 +212,7 @@ enum ShellKind {
 }
 
 #[cfg(unix)]
-fn pick_shell() -> ShellChoice {
+fn pick_shell() -> Result<ShellChoice> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
     let kind = match Path::new(&shell)
         .file_name()
@@ -190,14 +228,23 @@ fn pick_shell() -> ShellChoice {
     // Force interactive + login so PROMPT_COMMAND etc. fire. Bash gets
     // overridden later (the spawn path swaps -il for -i --rcfile so the
     // integration wrapper actually loads).
-    ShellChoice { program: shell, args: vec!["-il".into()], kind }
+    Ok(ShellChoice { program: shell, args: vec!["-il".into()], kind })
 }
 
 #[cfg(windows)]
-fn pick_shell() -> ShellChoice {
-    // Prefer ComSpec; fall back to pwsh/powershell/cmd by env hint.
-    if let Ok(comspec) = std::env::var("COMSPEC") {
-        return ShellChoice { program: comspec, args: vec![], kind: ShellKind::Other };
+fn pick_shell() -> Result<ShellChoice> {
+    // Windows requires WSL — cmd.exe and PowerShell can't source the OSC 133
+    // bash/zsh integration script that Super Brain, command blocks, and
+    // tmsg.sh all depend on. Probe the canonical wsl.exe path; if missing,
+    // surface a sentinel error the frontend recognizes (Terminal.tsx renders
+    // an install-prompt overlay instead of falling back to a degraded shell).
+    let wsl = Path::new(r"C:\Windows\System32\wsl.exe");
+    if wsl.exists() {
+        return Ok(ShellChoice {
+            program: "wsl.exe".into(),
+            args: vec!["-e".into(), "bash".into(), "-il".into()],
+            kind: ShellKind::Bash,
+        });
     }
-    ShellChoice { program: "cmd.exe".into(), args: vec![], kind: ShellKind::Other }
+    Err(anyhow::anyhow!("WSL_NOT_INSTALLED"))
 }

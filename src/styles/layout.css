@@ -1821,6 +1821,39 @@ button.mode-chip--info:hover {
   .ai-explain-spinner { animation: none; }
 }
 
+.terminal-spawn-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--bg) 86%, transparent);
+  backdrop-filter: blur(2px);
+  z-index: 30;
+}
+.terminal-spawn-error-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 460px;
+  padding: 16px 18px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+}
+.terminal-spawn-error-card > svg { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+.terminal-spawn-error-title { font-weight: 600; margin-bottom: 6px; }
+.terminal-spawn-error-body { color: var(--fg-dim); font-size: 13px; line-height: 1.5; }
+.terminal-spawn-error-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+.terminal-spawn-error-link:hover { text-decoration: underline; }
+
 .terminal-search {
   position: absolute;
   top: 8px;
