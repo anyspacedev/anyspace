@@ -2,7 +2,7 @@ import type { OSName } from "./detectOS";
 
 // Single source of truth — rewritten by .github/workflows/release.yml on every tag.
 // Keep `LATEST_VERSION = "..."` on its own line; the workflow's sed targets it literally.
-export const LATEST_VERSION = "0.1.0";
+export const LATEST_VERSION = "0.1.0-rc.1";
 
 export const DOWNLOAD_BASE = "https://get.anyspace.dev";
 
