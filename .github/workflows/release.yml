@@ -223,6 +223,7 @@ jobs:
         working-directory: landing
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 6a64935901a8e86c1ac52e765eebd46d
         run: |
           set -euo pipefail
           npm run build
