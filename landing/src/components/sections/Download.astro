@@ -1,0 +1,93 @@
+---
+import { DOWNLOADS, LATEST_VERSION } from "../../lib/downloads";
+
+type Row = { label: string; sub?: string; href: string };
+type Col = { os: "macOS" | "Windows" | "Linux"; rows: Row[] };
+
+const COLS: Col[] = [
+  {
+    os: "macOS",
+    rows: [
+      { label: "Apple Silicon", sub: "M1 / M2 / M3 — .dmg", href: DOWNLOADS.macArm64 },
+      { label: "Intel",         sub: "x86_64 — .dmg",        href: DOWNLOADS.macX64 },
+    ],
+  },
+  {
+    os: "Windows",
+    rows: [
+      { label: "Windows 10/11", sub: "x86_64 — .msi", href: DOWNLOADS.windowsX64 },
+    ],
+  },
+  {
+    os: "Linux",
+    rows: [
+      { label: "Debian / Ubuntu", sub: "x86_64 — .deb",     href: DOWNLOADS.linuxDeb },
+      { label: "AppImage",        sub: "x86_64 — portable", href: DOWNLOADS.linuxAppImg },
+    ],
+  },
+];
+---
+
+<section id="download" class="border-t border-border py-24 sm:py-32">
+  <div class="container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="eyebrow mb-5">Download</div>
+      <h2 class="text-display text-fg">
+        Pick your platform.
+        <span class="text-fg-muted">Install in a minute.</span>
+      </h2>
+      <p class="mx-auto mt-5 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
+        Native installers for macOS, Windows, and Linux. Local-first, no account
+        required to run the app.
+      </p>
+      <p class="mt-4 font-mono text-xs text-fg-dim">
+        Latest · v{LATEST_VERSION}
+      </p>
+    </div>
+
+    <ul class="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-3 lg:grid-cols-3">
+      {COLS.map((c) => (
+        <li class="flex flex-col gap-5 rounded-xl border border-border bg-bg-elev/40 p-8">
+          <div>
+            <h3 class="text-xl font-semibold tracking-tight text-fg">{c.os}</h3>
+          </div>
+          <ul class="flex flex-col gap-2.5">
+            {c.rows.map((r) => (
+              <li>
+                <a
+                  href={r.href}
+                  class="group flex items-center justify-between gap-3 rounded-lg border border-border-strong/70 bg-transparent px-4 py-3 transition-colors duration-fast ease-out hover:bg-bg-elev focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                >
+                  <span class="flex flex-col">
+                    <span class="text-sm font-medium text-fg">{r.label}</span>
+                    {r.sub && (
+                      <span class="font-mono text-[11px] text-fg-dim">{r.sub}</span>
+                    )}
+                  </span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-fg-muted transition-colors group-hover:text-fg" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+
+    <div class="mx-auto mt-10 max-w-3xl rounded-xl border border-border bg-bg-elev/30 p-5 text-sm text-fg-muted">
+      <p class="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-fg-dim">
+        Heads up — early access build is unsigned
+      </p>
+      <p>
+        macOS may show <span class="font-mono text-fg">"AnySpace can't be opened"</span>.
+        Run
+        <code class="rounded bg-bg-elev px-1.5 py-0.5 font-mono text-[12px] text-fg">xattr -d com.apple.quarantine /Applications/AnySpace.app</code>
+        once after install. Windows SmartScreen: click <span class="text-fg">More info → Run anyway</span>.
+        Code-signing lands in a future release.
+      </p>
+    </div>
+  </div>
+</section>

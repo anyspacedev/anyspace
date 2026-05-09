@@ -1,0 +1,240 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (no leading v, e.g. 0.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  R2_ENDPOINT: https://6a64935901a8e86c1ac52e765eebd46d.r2.cloudflarestorage.com
+  R2_BUCKET: anyspace
+  PUBLIC_BASE: https://get.anyspace.dev
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest,   target: aarch64-apple-darwin,     label: mac-arm64 }
+          - { os: macos-13,       target: x86_64-apple-darwin,      label: mac-x64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc,   label: windows-x64 }
+          - { os: ubuntu-22.04,   target: x86_64-unknown-linux-gnu, label: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${VERSION}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            patchelf
+
+      - run: npm ci
+
+      - name: Build Tauri bundle
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: --target ${{ matrix.target }}
+
+      - name: Collect & rename artifacts
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          LABEL: ${{ matrix.label }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          OUT="dist-release"
+          mkdir -p "$OUT"
+          BUNDLE="src-tauri/target/${TARGET}/release/bundle"
+          shopt -s nullglob
+
+          case "$LABEL" in
+            mac-*)
+              for f in "$BUNDLE"/dmg/*.dmg; do
+                cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}.dmg"
+              done
+              ;;
+            windows-*)
+              for f in "$BUNDLE"/msi/*.msi; do
+                cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}.msi"
+              done
+              for f in "$BUNDLE"/nsis/*-setup.exe; do
+                cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}-setup.exe"
+              done
+              ;;
+            linux-*)
+              for f in "$BUNDLE"/deb/*.deb; do
+                cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}.deb"
+              done
+              for f in "$BUNDLE"/appimage/*.AppImage; do
+                cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}.AppImage"
+              done
+              ;;
+          esac
+
+          echo "Collected:"
+          ls -la "$OUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.label }}
+          path: dist-release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to R2 + landing
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout (with bot token for landing commit)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-release/
+          merge-multiple: true
+
+      - name: List release artifacts
+        run: ls -la dist-release/
+
+      - name: Configure AWS credentials for R2
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: auto
+          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+      - name: Upload artifacts to R2
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          aws s3 cp dist-release/ "s3://${R2_BUCKET}/v${VERSION}/" \
+            --recursive \
+            --endpoint-url "${R2_ENDPOINT}" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --checksum-algorithm CRC32
+
+      - name: Verify R2 listing
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          aws s3 ls "s3://${R2_BUCKET}/v${VERSION}/" \
+            --endpoint-url "${R2_ENDPOINT}"
+
+      - name: Bump landing version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Single literal line in downloads.ts — keep the quoted form intact.
+          sed -i -E "s|^export const LATEST_VERSION = \".*\";|export const LATEST_VERSION = \"${VERSION}\";|" \
+            landing/src/lib/downloads.ts
+          # Confirm change took effect.
+          grep -n 'LATEST_VERSION = ' landing/src/lib/downloads.ts
+
+      - name: Commit landing version bump
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet landing/; then
+            echo "No landing changes to commit (already at v${VERSION})."
+            exit 0
+          fi
+          git config user.name 'anyspace-release-bot'
+          git config user.email 'release-bot@anyspace.dev'
+          git add landing/src/lib/downloads.ts
+          git commit -m "Release v${VERSION} [skip ci]"
+          # Push to the default branch — works for both tag-push and dispatch.
+          DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
+          git push origin "HEAD:${DEFAULT_BRANCH}"
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: Install landing deps
+        working-directory: landing
+        run: npm ci
+
+      - name: Deploy landing to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: landing
+          command: deploy
+          preCommands: npm run build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.ver.outputs.version) }}
+          name: AnySpace v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: dist-release/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

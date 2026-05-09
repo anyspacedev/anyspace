@@ -1,6 +1,7 @@
 ---
 import BrandMark from "./BrandMark.astro";
 import { FOOTER_COLS } from "../data/footer";
+import { LATEST_VERSION } from "../lib/downloads";
 const year = new Date().getFullYear();
 ---
 
@@ -43,7 +44,7 @@ const year = new Date().getFullYear();
 
     <div class="mt-14 flex items-center justify-between border-t border-border pt-6 font-mono text-xs text-fg-dim">
       <span>© {year} Rebase LLC · AnySpace</span>
-      <span>v0.1.0</span>
+      <span>v{LATEST_VERSION}</span>
     </div>
   </div>
 </footer>

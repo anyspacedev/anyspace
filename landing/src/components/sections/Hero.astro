@@ -64,8 +64,13 @@ import OrchestratorCanvas from "../islands/OrchestratorCanvas.tsx";
 
   <script>
     import { detectOS, downloadLabel } from "../../lib/detectOS";
+    import { downloadFor } from "../../lib/downloads";
     const os = detectOS();
     const label = downloadLabel(os);
+    const href = downloadFor(os);
+    document.querySelectorAll<HTMLAnchorElement>("[data-os-cta]").forEach((a) => {
+      a.href = href;
+    });
     document.querySelectorAll<HTMLElement>("[data-os-label]").forEach((el) => {
       el.textContent = label;
     });
