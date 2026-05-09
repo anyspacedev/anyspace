@@ -193,6 +193,7 @@ jobs:
       - name: Commit landing version bump
         env:
           VERSION: ${{ steps.ver.outputs.version }}
+          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
         run: |
           set -euo pipefail
           if git diff --quiet landing/; then
@@ -206,9 +207,6 @@ jobs:
           # Push to the default branch — works for both tag-push and dispatch.
           DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
           git push origin "HEAD:${DEFAULT_BRANCH}"
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
-          VERSION: ${{ steps.ver.outputs.version }}
 
       - uses: actions/setup-node@v4
         with:
