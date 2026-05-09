@@ -90,31 +90,20 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          # Bump in-tree (not committed) so the binary, package.json, and
-          # Cargo metadata all report the release version. tauri::generate_context!
-          # bakes tauri.conf.json's version into the binary at compile time, and
+          # Bump in-tree (not committed). tauri::generate_context! bakes
+          # tauri.conf.json's version into the binary at compile time, and
           # @tauri-apps/api/app's getVersion() reads from there at runtime.
+          # We deliberately do NOT bump src-tauri/Cargo.toml: changing the
+          # local crate's package version invalidates its cached object
+          # files (deps still cache fine), but contributes nothing to the
+          # version reported by getVersion(). package.json is bumped so
+          # any tooling that reads it (devtools, sourcemaps) stays consistent.
           node -e "const f='package.json';const p=require('./'+f);p.version=process.env.VERSION;require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
           node -e "const f='src-tauri/tauri.conf.json';const p=require('./'+f);p.version=process.env.VERSION;require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
-          # Cargo.toml: only the [package] version line, not deps.
-          python3 - <<'PY'
-          import os, re, pathlib
-          p = pathlib.Path("src-tauri/Cargo.toml")
-          src = p.read_text()
-          src = re.sub(
-              r'(?ms)(\[package\][^\[]*?\nversion\s*=\s*")[^"]*(")',
-              lambda m: m.group(1) + os.environ["VERSION"] + m.group(2),
-              src,
-              count=1,
-          )
-          p.write_text(src)
-          PY
           echo "--- package.json ---"
           grep -E '"version"' package.json
           echo "--- tauri.conf.json ---"
           grep -E '"version"' src-tauri/tauri.conf.json
-          echo "--- Cargo.toml ---"
-          grep -E '^version' src-tauri/Cargo.toml
 
       - name: Resolve git short sha
         id: gitsha
