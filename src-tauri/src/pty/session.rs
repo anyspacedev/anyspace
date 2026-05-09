@@ -73,6 +73,12 @@ impl PtySession {
         for (k, v) in std::env::vars() {
             cmd.env(k, v);
         }
+        // xterm.js speaks xterm-256color. When Anyspace launches from a .desktop
+        // entry / app launcher / Finder, the parent process often has no TERM
+        // (or an inherited "dumb"/"unknown") — without this, ncurses tools like
+        // top/vim/htop bail with "Error opening terminal: unknown".
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
         for (k, v) in env {
             cmd.env(k, v);
         }
