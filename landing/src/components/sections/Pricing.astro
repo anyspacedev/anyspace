@@ -1,0 +1,78 @@
+---
+import { PLANS } from "../../data/pricing";
+import PricingToggle from "../islands/PricingToggle.tsx";
+---
+
+<section id="pricing" class="border-t border-border py-24 sm:py-32">
+  <div class="container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="eyebrow mb-5">Pricing</div>
+      <h2 class="text-display text-fg">
+        Free for solo work.
+        <span class="text-fg-muted">Pro when AI joins your loop.</span>
+      </h2>
+      <p class="mx-auto mt-5 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
+        Cancel anytime. 30-day money-back on Pro. The full local app is free —
+        paid features unlock once you sign in.
+      </p>
+      <div class="mx-auto mt-7 inline-flex items-center gap-2 rounded-full border border-border bg-bg-elev px-3 py-1.5">
+        <span class="inline-block h-1.5 w-1.5 rounded-full bg-fg" />
+        <span class="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-muted">
+          Currently in Early Access — <span class="text-fg">all plans free for now</span>
+        </span>
+      </div>
+      <div class="mt-7 flex justify-center">
+        <PricingToggle client:load />
+      </div>
+    </div>
+
+    <ul class="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-3 lg:grid-cols-3">
+      {PLANS.map((p) => {
+        const featured = p.featured;
+        const wrapClass = featured
+          ? "relative flex flex-col gap-5 rounded-xl bg-fg p-8 text-bg"
+          : "relative flex flex-col gap-5 rounded-xl border border-border bg-bg-elev/40 p-8";
+        const titleClass = featured ? "text-bg" : "text-fg";
+        const tagClass = featured ? "text-bg/70" : "text-fg-muted";
+        const numClass = featured ? "text-bg" : "text-fg";
+        const suffixClass = featured ? "text-bg/60" : "text-fg-muted";
+        const noteClass = featured ? "text-bg/60" : "text-fg-dim";
+        const ctaClass = featured
+          ? "inline-flex h-11 items-center justify-center rounded-lg bg-bg px-5 text-sm font-medium text-fg transition-colors duration-fast hover:bg-bg/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bg focus-visible:ring-offset-2 focus-visible:ring-offset-fg"
+          : "inline-flex h-11 items-center justify-center rounded-lg border border-border-strong bg-transparent px-5 text-sm font-medium text-fg transition-colors duration-fast hover:bg-bg-elev focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg";
+        const featClass = featured ? "text-bg/85" : "text-fg-muted";
+        const checkClass = featured ? "text-bg" : "text-fg";
+        return (
+          <li class={wrapClass} data-plan={p.id}>
+            {featured && (
+              <span class="absolute -top-3 left-8 rounded-full border border-bg/20 bg-bg px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-fg">
+                Most popular
+              </span>
+            )}
+            <div>
+              <h3 class={`text-xl font-semibold tracking-tight ${titleClass}`}>{p.name}</h3>
+              <p class={`mt-1.5 text-sm ${tagClass}`}>{p.tagline}</p>
+            </div>
+            <div class="flex items-baseline gap-1 font-mono">
+              <span class={`text-xl ${suffixClass}`}>$</span>
+              <span class={`text-5xl font-semibold tracking-tight tabular-nums ${numClass}`} data-price-num>{p.monthly}</span>
+              <span class={`ml-1 text-sm ${suffixClass}`} data-price-suffix>{p.perSeat ? "/seat/mo" : "/mo"}</span>
+            </div>
+            <p class={`-mt-2 min-h-[1.2em] text-xs ${noteClass}`}>{p.annualNote ?? ""}</p>
+            <a href="#" class={ctaClass}>{p.cta}</a>
+            <ul class="mt-2 flex flex-col gap-2.5">
+              {p.features.map((f) => (
+                <li class={`flex items-start gap-2.5 text-sm ${featClass}`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={`mt-1 shrink-0 ${checkClass}`} aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+</section>

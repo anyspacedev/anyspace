@@ -1,0 +1,62 @@
+---
+import KanbanMock from "../islands/KanbanMock.tsx";
+---
+
+<section id="productivity" class="border-t border-border py-24 sm:py-32">
+  <div class="container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="eyebrow mb-5">Built-in</div>
+      <h2 class="text-display text-fg">
+        Built for parallel work.
+      </h2>
+      <p class="mx-auto mt-5 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
+        A native kanban for tracking what your agents are doing, and pane-level
+        broadcast for typing once and running everywhere.
+      </p>
+    </div>
+
+    <div class="mt-16 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="rounded-xl border border-border bg-bg-elev/40 p-6 sm:p-8">
+        <div class="mb-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-muted">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="18" rx="1" />
+            <rect x="14" y="3" width="7" height="10" rx="1" />
+          </svg>
+          Local Kanban
+        </div>
+        <KanbanMock client:visible />
+      </div>
+
+      <div class="rounded-xl border border-border bg-bg-elev/40 p-6 sm:p-8">
+        <div class="mb-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-muted">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          Multi-pane Broadcast
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div class="relative rounded-md border border-border bg-bg p-3 font-mono text-[10px] text-fg-muted">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-fg">claude › task-{i + 1}</span>
+                <span class="rounded border border-border px-1 py-px font-mono text-[8px] uppercase tracking-[0.14em] text-fg">
+                  Live
+                </span>
+              </div>
+              <div class="text-fg-dim">$ npm test</div>
+              <div class="mt-1 inline-block h-2.5 w-[5px] bg-fg align-middle animate-caret" />
+            </div>
+          ))}
+        </div>
+        <p class="mt-6 text-sm text-fg-muted">
+          <span class="text-fg">Type once.</span> Run everywhere selected.
+          Voice dictation fans out to every selected pane in the team tab.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

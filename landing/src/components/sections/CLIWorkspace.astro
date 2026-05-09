@@ -1,0 +1,51 @@
+---
+const tiles = [
+  { name: "Claude Code", id: "claude", glyph: "CC" },
+  { name: "Codex CLI", id: "codex", glyph: "CX" },
+  { name: "Gemini CLI", id: "gemini", glyph: "GM" },
+  { name: "Aider", id: "aider", glyph: "AD" },
+  { name: "Cursor Agent", id: "cursor", glyph: "CR" },
+];
+---
+
+<section id="cli-workspace" class="border-t border-border py-24 sm:py-32">
+  <div class="container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="eyebrow mb-5">USP</div>
+      <h2 class="text-display text-fg">
+        Not a code agent.
+        <span class="text-fg-muted">The workspace for them.</span>
+      </h2>
+      <p class="mx-auto mt-5 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
+        Bring any CLI agent — Claude Code, Codex, Gemini, Aider, or your own.
+        AnySpace is a real PTY, not a sandbox.
+      </p>
+    </div>
+
+    <div class="mx-auto mt-16 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3">
+      {tiles.map((t) => (
+        <div class="group flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-lg border border-border bg-bg-elev/40 p-6 transition-colors duration-fast ease-out hover:border-border-strong hover:bg-bg-elev">
+          <div class="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg font-mono text-sm font-medium text-fg-muted tracking-tight transition-colors duration-fast group-hover:text-fg">
+            {t.glyph}
+          </div>
+          <span class="text-sm font-medium text-fg">{t.name}</span>
+        </div>
+      ))}
+      <div class="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-strong bg-transparent p-6 text-fg-muted transition-colors duration-fast ease-out hover:border-fg/40 hover:text-fg">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span class="text-sm font-medium">Custom CLI</span>
+      </div>
+    </div>
+
+    <div class="mx-auto mt-12 flex max-w-3xl items-center justify-center gap-3 rounded-lg border border-border bg-bg-elev/60 px-5 py-4 text-sm text-fg-muted">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-fg" aria-hidden="true">
+        <polyline points="4 17 10 11 4 5" />
+        <line x1="12" y1="19" x2="20" y2="19" />
+      </svg>
+      <span><span class="text-fg">Real PTY.</span> Not a sandbox. Run any binary, shell, or REPL.</span>
+    </div>
+  </div>
+</section>

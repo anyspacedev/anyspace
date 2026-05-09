@@ -1,11 +1,14 @@
 ---
 import Base from "../layouts/Base.astro";
 import Nav from "../components/Nav.astro";
-import Hero from "../components/Hero.astro";
-import Features from "../components/Features.astro";
-import HowItWorks from "../components/HowItWorks.astro";
-import Pricing from "../components/Pricing.astro";
-import FAQ from "../components/FAQ.astro";
+import Hero from "../components/sections/Hero.astro";
+import CLIWorkspace from "../components/sections/CLIWorkspace.astro";
+import TeamMode from "../components/sections/TeamMode.astro";
+import LocalFirst from "../components/sections/LocalFirst.astro";
+import Productivity from "../components/sections/Productivity.astro";
+import HowItWorks from "../components/sections/HowItWorks.astro";
+import Pricing from "../components/sections/Pricing.astro";
+import FAQ from "../components/sections/FAQ.astro";
 import Footer from "../components/Footer.astro";
 ---
 
@@ -13,7 +16,10 @@ import Footer from "../components/Footer.astro";
   <Nav />
   <main id="main">
     <Hero />
-    <Features />
+    <CLIWorkspace />
+    <TeamMode />
+    <LocalFirst />
+    <Productivity />
     <HowItWorks />
     <Pricing />
     <FAQ />

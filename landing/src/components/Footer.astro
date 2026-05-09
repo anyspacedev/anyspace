@@ -1,145 +1,49 @@
 ---
+import BrandMark from "./BrandMark.astro";
+import { FOOTER_COLS } from "../data/footer";
 const year = new Date().getFullYear();
-
-const cols = [
-  {
-    heading: "Product",
-    links: [
-      { href: "#features", label: "Features" },
-      { href: "#pricing", label: "Pricing" },
-      { href: "#download", label: "Download" },
-      { href: "/changelog", label: "Changelog" },
-    ],
-  },
-  {
-    heading: "Resources",
-    links: [
-      { href: "/docs", label: "Docs" },
-      { href: "/docs/agents", label: "Agent templates" },
-      { href: "/blog", label: "Blog" },
-      { href: "https://github.com", label: "GitHub" },
-    ],
-  },
-  {
-    heading: "Company",
-    links: [
-      { href: "/about", label: "About" },
-      { href: "/contact", label: "Contact" },
-      { href: "/privacy", label: "Privacy" },
-      { href: "/terms", label: "Terms" },
-    ],
-  },
-];
 ---
 
-<footer class="footer">
-  <div class="container footer-grid">
-    <div class="footer-brand">
-      <a href="/" class="brand" aria-label="AnySpace home">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-          <rect width="28" height="28" rx="7" fill="url(#fg)" />
-          <path d="M9 9.5h10M9 14h7M9 18.5h4" stroke="#001520" stroke-width="2" stroke-linecap="round" />
-          <defs>
-            <linearGradient id="fg" x1="0" y1="0" x2="28" y2="28">
-              <stop stop-color="#22d3ee" />
-              <stop offset="1" stop-color="#06b6d4" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <span class="brand-name">AnySpace</span>
-      </a>
-      <p class="footer-tag">
-        Multi-pane workspaces for developers shipping with AI agents.
-      </p>
-    </div>
+<footer class="border-t border-border">
+  <div class="container py-16">
+    <div class="grid grid-cols-2 gap-y-10 gap-x-8 sm:grid-cols-4">
+      <div class="col-span-2 max-w-xs">
+        <a href="/" class="inline-flex items-center gap-2.5" aria-label="AnySpace home">
+          <BrandMark size={24} class="rounded-md" />
+          <span class="text-base font-semibold text-fg">AnySpace</span>
+        </a>
+        <p class="mt-4 text-sm leading-relaxed text-fg-muted">
+          The agentic workspace. Type less, orchestrate more.
+        </p>
+        <a
+          href="mailto:support@anyspace.dev"
+          class="mt-4 inline-flex items-center gap-2 font-mono text-xs text-fg-muted transition-colors duration-fast hover:text-fg"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+          support@anyspace.dev
+        </a>
+      </div>
 
-    {
-      cols.map((c) => (
-        <nav class="footer-col" aria-label={c.heading}>
-          <h4>{c.heading}</h4>
-          <ul>
+      {FOOTER_COLS.map((c) => (
+        <nav aria-label={c.heading} class="flex flex-col gap-3">
+          <h4 class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim">{c.heading}</h4>
+          <ul class="flex flex-col gap-2.5">
             {c.links.map((l) => (
               <li>
-                <a href={l.href}>{l.label}</a>
+                <a href={l.href} class="text-sm text-fg-muted transition-colors duration-fast hover:text-fg">{l.label}</a>
               </li>
             ))}
           </ul>
         </nav>
-      ))
-    }
-  </div>
+      ))}
+    </div>
 
-  <div class="container footer-bottom">
-    <span>© {year} AnySpace. All rights reserved.</span>
-    <span class="footer-version">v0.1.0</span>
+    <div class="mt-14 flex items-center justify-between border-t border-border pt-6 font-mono text-xs text-fg-dim">
+      <span>© {year} AnySpace</span>
+      <span>v0.1.0</span>
+    </div>
   </div>
 </footer>
-
-<style>
-  .footer {
-    padding-block: 64px 32px;
-    border-top: 1px solid var(--border);
-    margin-top: 64px;
-    background: color-mix(in oklab, var(--bg) 90%, black);
-  }
-  .footer-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 40px;
-    margin-bottom: 48px;
-  }
-  @media (min-width: 720px) {
-    .footer-grid {
-      grid-template-columns: 1.4fr 1fr 1fr 1fr;
-    }
-  }
-  .footer-brand {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-width: 320px;
-  }
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 700;
-    font-size: 17px;
-  }
-  .footer-tag {
-    color: var(--fg-muted);
-    font-size: 14px;
-    line-height: 1.6;
-  }
-  .footer-col h4 {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-dim);
-    margin: 0 0 14px;
-  }
-  .footer-col ul {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .footer-col a {
-    color: var(--fg-muted);
-    font-size: 14px;
-    transition: color var(--duration) var(--ease-out);
-  }
-  .footer-col a:hover {
-    color: var(--fg);
-  }
-  .footer-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
-    font-size: 13px;
-    color: var(--fg-dim);
-    font-family: var(--font-mono);
-  }
-</style>

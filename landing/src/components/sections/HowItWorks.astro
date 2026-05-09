@@ -1,0 +1,41 @@
+---
+const steps = [
+  {
+    n: "01",
+    title: "Open your project.",
+    body: "Pick any folder. AnySpace spawns terminals already in the right cwd, with shell integration injected via $BASH_ENV — zero rc-file changes.",
+  },
+  {
+    n: "02",
+    title: "Pick an agent, or write your own.",
+    body: "Templates for Claude Code, Codex, Cursor CLI. Or define a command template with {task_file} substitution and your own system prompt.",
+  },
+  {
+    n: "03",
+    title: "Ship.",
+    body: "Drag a Kanban task to a pane. The agent runs with task context injected. Watch it work, intervene with hold-to-talk, broadcast keystrokes to every selected pane.",
+  },
+];
+---
+
+<section id="how" class="border-t border-border py-24 sm:py-32">
+  <div class="container">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="eyebrow mb-5">How it works</div>
+      <h2 class="text-display text-fg">
+        Three steps from a fresh repo
+        <span class="text-fg-muted">to a shipping agent.</span>
+      </h2>
+    </div>
+
+    <ol class="mt-16 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {steps.map((s) => (
+        <li class="rounded-xl border border-border bg-bg-elev/40 p-7 transition-colors duration-fast hover:border-border-strong">
+          <div class="text-6xl font-medium tracking-tighter text-fg/15 sm:text-7xl">{s.n}</div>
+          <h3 class="mt-6 text-lg font-semibold tracking-tight text-fg">{s.title}</h3>
+          <p class="mt-2.5 text-sm text-fg-muted leading-relaxed">{s.body}</p>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
