@@ -176,6 +176,8 @@ pub fn run() {
             team::commands::team_rpc_drain,
             team::commands::team_write_prompt,
             team::commands::team_compact_messages,
+            team::commands::team_append_message,
+            team::commands::team_read_messages_text,
             // Agent API (drives Preview from terminal-spawned Code Agents)
             agent_api::commands::agent_api_info,
             agent_api::commands::agent_api_reply,

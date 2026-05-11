@@ -1304,6 +1304,16 @@ function CodeAgentApiSettingsSection() {
     '  --header "X-Pane-Id: ${ANYSPACE_PANE_ID}" \\\n' +
     '  --header "X-Tab-Id: ${ANYSPACE_TAB_ID}"';
 
+  // For external clients (Cursor, Claude Desktop, Codex, Windsurf) running
+  // outside a terminal pane, there are no env vars to interpolate — bake the
+  // resolved URL + token directly into the install string. Tools that need
+  // pane context fall back to the active workspace tab.
+  const externalAddCmd =
+    info?.url && info?.token
+      ? `claude mcp add --transport http anyspace "${info.url}/mcp" \\\n` +
+        `  --header "Authorization: Bearer ${info.token}"`
+      : "claude mcp add --transport http anyspace \"<API URL>/mcp\" \\\n  --header \"Authorization: Bearer <token>\"";
+
   const copy = async (label: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -1319,10 +1329,11 @@ function CodeAgentApiSettingsSection() {
       <div className="settings-section-head">
         <h2 className="settings-section-title">Code Agent API</h2>
         <div className="settings-section-sub">
-          Loopback HTTP server that lets Code Agents in terminal panes (Claude Code, Codex, Aider…)
-          drive the live preview and capture screenshots without operator clicks. Each Code-Agent
-          terminal gets <code>$ANYSPACE_API_URL</code>, <code>$ANYSPACE_API_TOKEN</code>, and{" "}
-          <code>$ANYSPACE_PANE_ID</code> in its env.
+          Loopback HTTP MCP server that exposes the live preview, kanban tasks, project knowledge
+          notes, team messages, and terminal context to MCP-aware clients (Claude Code, Cursor,
+          Claude Desktop, Codex, Windsurf, Aider…). Each Code-Agent terminal gets{" "}
+          <code>$ANYSPACE_API_URL</code>, <code>$ANYSPACE_API_TOKEN</code>, and{" "}
+          <code>$ANYSPACE_PANE_ID</code> in its env; external clients can connect without those.
         </div>
       </div>
       <div className="stt-fields">
@@ -1401,6 +1412,32 @@ function CodeAgentApiSettingsSection() {
             <code>$ANYSPACE_PANE_ID</code> / <code>$ANYSPACE_TAB_ID</code> are already exported).
             Claude Code re-resolves the <code>${"${VAR}"}</code> references on each startup, so any
             terminal where you run <code>claude</code> sends its own pane and tab id.
+          </span>
+        </label>
+        <label className="stt-field">
+          <span className="stt-field-label">External clients (Cursor, Claude Desktop, Codex, Windsurf)</span>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <textarea
+              value={externalAddCmd}
+              readOnly
+              spellCheck={false}
+              rows={2}
+              style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12 }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={!info?.token}
+              onClick={() => copy("mcp-external", externalAddCmd)}
+            >
+              {copied === "mcp-external" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <span className="stt-field-hint">
+            Use this from editors that run outside a Code-Agent terminal pane. No pane/tab headers —
+            tools that need workspace context fall back to the currently active tab in AnySpace.
+            The port changes on each app restart; re-run after a restart, or rotate the token to
+            invalidate this install. See <code>/docs/integrations/mcp</code> for the full tool list.
           </span>
         </label>
       </div>

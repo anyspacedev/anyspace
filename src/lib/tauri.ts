@@ -339,6 +339,31 @@ export async function teamCompactMessages(args: {
   return rawInvoke<CompactResult>("team_compact_messages", { args });
 }
 
+export type TeamAppendMessageResult = {
+  id: string;
+  ts: string;
+  path: string;
+  appendedBytes: number;
+};
+
+export async function teamAppendMessage(args: {
+  teamDir: string;
+  id: string;
+  from: string;
+  to: string;
+  type: string;
+  ts: string;
+  body: string;
+}): Promise<TeamAppendMessageResult> {
+  return rawInvoke<TeamAppendMessageResult>("team_append_message", { args });
+}
+
+export async function teamReadMessagesText(teamDir: string): Promise<string> {
+  return rawInvoke<string>("team_read_messages_text", {
+    args: { teamDir },
+  });
+}
+
 export type TeamMessagesEvent = { teamId: string; messagesPath: string };
 export type TeamRpcEvent = {
   teamId: string;

@@ -328,6 +328,156 @@ fn compact_impl(_args: &CompactArgs) -> anyhow::Result<CompactResult> {
     Ok(CompactResult { total: 0, archived: 0, kept: 0 })
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadMessagesArgs {
+    pub team_dir: String,
+}
+
+/// Read `<team_dir>/MESSAGES.md` and return its raw text. Empty string if the
+/// file doesn't exist yet. Goes through the Rust filesystem layer (not
+/// plugin-fs), so it works for projects outside $HOME.
+#[tauri::command]
+pub fn team_read_messages_text(args: ReadMessagesArgs) -> Result<String, String> {
+    let path = Path::new(&args.team_dir).join("MESSAGES.md");
+    match std::fs::read_to_string(&path) {
+        Ok(s) => Ok(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(format!("read {}: {e}", path.display())),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendMessageArgs {
+    pub team_dir: String,
+    pub id: String,
+    pub from: String,
+    pub to: String,
+    /// message | status | escalation | done
+    pub r#type: String,
+    /// ISO timestamp, e.g. "2026-05-11T01:30:00Z"
+    pub ts: String,
+    pub body: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendMessageResult {
+    pub id: String,
+    pub ts: String,
+    pub path: String,
+    pub appended_bytes: usize,
+}
+
+/// Append a single fenced `<!-- msg --> ... <!-- /msg -->` block to
+/// `<team_dir>/MESSAGES.md`, holding the same `.lock` `tmsg.sh` uses. Goes
+/// through the Rust filesystem layer (not plugin-fs), so it works regardless
+/// of where the team project lives — `$HOME/...`, `/tmp/...`, anywhere.
+#[tauri::command]
+pub fn team_append_message(args: AppendMessageArgs) -> Result<AppendMessageResult, String> {
+    append_message_impl(&args).map_err(|e| format!("{e:#}"))
+}
+
+#[cfg(unix)]
+fn append_message_impl(args: &AppendMessageArgs) -> anyhow::Result<AppendMessageResult> {
+    use std::io::Write;
+    use std::os::unix::io::AsRawFd;
+
+    fn esc(s: &str) -> String {
+        s.replace('\\', "\\\\").replace('"', "\\\"")
+    }
+
+    let team_dir = Path::new(&args.team_dir);
+    if !team_dir.is_dir() {
+        anyhow::bail!("team dir is not a directory: {}", team_dir.display());
+    }
+    let messages_path = team_dir.join("MESSAGES.md");
+    let lock_path = team_dir.join(".lock");
+
+    let lock_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&lock_path)
+        .with_context(|| format!("open lock {}", lock_path.display()))?;
+    let fd = lock_file.as_raw_fd();
+    let rc = unsafe { libc::flock(fd, libc::LOCK_EX) };
+    if rc != 0 {
+        anyhow::bail!("flock LOCK_EX failed");
+    }
+
+    let block = format!(
+        "\n<!-- msg id=\"{}\" from=\"{}\" to=\"{}\" type=\"{}\" ts=\"{}\" -->\n{}\n<!-- /msg -->\n",
+        esc(&args.id),
+        esc(&args.from),
+        esc(&args.to),
+        esc(&args.r#type),
+        esc(&args.ts),
+        args.body,
+    );
+
+    let result = (|| -> anyhow::Result<usize> {
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&messages_path)
+            .with_context(|| format!("open {}", messages_path.display()))?;
+        f.write_all(block.as_bytes())
+            .with_context(|| format!("append to {}", messages_path.display()))?;
+        f.flush().ok();
+        Ok(block.len())
+    })();
+
+    let _ = unsafe { libc::flock(fd, libc::LOCK_UN) };
+    drop(lock_file);
+
+    let appended_bytes = result?;
+    Ok(AppendMessageResult {
+        id: args.id.clone(),
+        ts: args.ts.clone(),
+        path: messages_path.to_string_lossy().into_owned(),
+        appended_bytes,
+    })
+}
+
+#[cfg(not(unix))]
+fn append_message_impl(args: &AppendMessageArgs) -> anyhow::Result<AppendMessageResult> {
+    use std::io::Write;
+
+    fn esc(s: &str) -> String {
+        s.replace('\\', "\\\\").replace('"', "\\\"")
+    }
+
+    let team_dir = Path::new(&args.team_dir);
+    if !team_dir.is_dir() {
+        anyhow::bail!("team dir is not a directory: {}", team_dir.display());
+    }
+    let messages_path = team_dir.join("MESSAGES.md");
+    let block = format!(
+        "\n<!-- msg id=\"{}\" from=\"{}\" to=\"{}\" type=\"{}\" ts=\"{}\" -->\n{}\n<!-- /msg -->\n",
+        esc(&args.id),
+        esc(&args.from),
+        esc(&args.to),
+        esc(&args.r#type),
+        esc(&args.ts),
+        args.body,
+    );
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&messages_path)
+        .with_context(|| format!("open {}", messages_path.display()))?;
+    f.write_all(block.as_bytes())
+        .with_context(|| format!("append to {}", messages_path.display()))?;
+    f.flush().ok();
+    Ok(AppendMessageResult {
+        id: args.id.clone(),
+        ts: args.ts.clone(),
+        path: messages_path.to_string_lossy().into_owned(),
+        appended_bytes: block.len(),
+    })
+}
+
 /// Split MESSAGES.md content into its `<!-- msg ... --> ... <!-- /msg -->`
 /// blocks. Anything outside a fenced pair is dropped (the file format is
 /// append-only fenced blocks separated by blank lines).
