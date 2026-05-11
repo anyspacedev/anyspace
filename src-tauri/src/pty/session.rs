@@ -86,12 +86,27 @@ impl PtySession {
                 let wrapper = crate::shell_integration::scripts::write_bash_wrapper_rc()?;
                 // On Windows we run bash *inside WSL*, so the wrapper path
                 // (Windows-native) needs to be re-expressed in `/mnt/<drive>/`
-                // form for the Linux-side bash to find it.
-                #[cfg(windows)]
-                let wrapper = crate::shell_integration::scripts::to_wsl_path(Path::new(&wrapper));
+                // form for the Linux-side bash to find it. The `wsl.exe -e bash`
+                // prefix from pick_shell() must be preserved or wsl.exe itself
+                // tries to interpret `--rcfile` and bails.
                 // Long options must precede short ones — `bash -i --rcfile X`
                 // makes bash 5.2 bail with `--: invalid option`.
-                shell_args = vec!["--rcfile".into(), wrapper, "-i".into()];
+                #[cfg(windows)]
+                {
+                    let wrapper =
+                        crate::shell_integration::scripts::to_wsl_path(Path::new(&wrapper));
+                    shell_args = vec![
+                        "-e".into(),
+                        "bash".into(),
+                        "--rcfile".into(),
+                        wrapper,
+                        "-i".into(),
+                    ];
+                }
+                #[cfg(not(windows))]
+                {
+                    shell_args = vec!["--rcfile".into(), wrapper, "-i".into()];
+                }
             }
 
             let mut c = CommandBuilder::new(shell.program);
