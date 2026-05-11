@@ -8,6 +8,8 @@ updated: 2026-05-09
 
 AnySpace is local-first: settings, tasks, and team coordination files all live on your machine. The pieces that talk to the network are the AI and STT providers you explicitly configure, plus the auto-updater. This page lays out exactly what leaves the device, when, and where to look if you need to verify it.
 
+> Looking for the legal statement? See the [Privacy Policy](/privacy). This page is the technical companion — what bytes go where, file by file.
+
 ## What stays local
 
 - **Settings** — `settings.json` on disk. Never uploaded.

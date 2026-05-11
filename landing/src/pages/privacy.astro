@@ -1,0 +1,267 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const title = "Privacy Policy — AnySpace";
+const description =
+  "How AnySpace collects, uses, and protects your information. Local-first by default; this policy covers the cloud-touching exceptions.";
+const lastUpdated = "May 11, 2026";
+---
+
+<Base title={title} description={description}>
+  <Nav />
+  <main id="main" class="py-16 sm:py-20">
+    <div class="container">
+      <div class="mx-auto max-w-3xl">
+        <aside
+          class="mb-10 rounded-lg border border-border bg-bg-elev px-4 py-3 font-mono text-xs text-fg-muted"
+          role="note"
+          aria-label="Draft notice"
+        >
+          <strong class="text-fg">Draft — pending legal review.</strong>
+          This document is a placeholder so the footer links resolve. It has not
+          been reviewed by counsel and is not yet in force. Final language will
+          replace it before any paid signup or production cloud feature ships.
+        </aside>
+
+        <p class="mb-2 font-mono text-xs uppercase tracking-[0.14em] text-fg-dim">
+          Last updated: {lastUpdated}
+        </p>
+
+        <article class="docs-prose">
+          <h1>Privacy Policy</h1>
+          <p>
+            AnySpace is a desktop workspace for terminals, editors, previews,
+            and AI agents. This Privacy Policy explains what information we
+            collect, how we use it, who we share it with, and the rights you
+            have over it. AnySpace is <strong>local-first by design</strong>:
+            most of what you do in the app stays on your machine and never
+            reaches us. The sections below focus on the pieces that <em>do</em>
+            cross the network.
+          </p>
+
+          <p>
+            For a technical, file-by-file inventory of what AnySpace sends over
+            the network and what it stores locally, see{" "}
+            <a href="/docs/reference/privacy">Privacy &amp; data handling</a>{" "}
+            in the docs. That page is the practical companion to this legal
+            statement.
+          </p>
+
+          <h2>1. Who we are</h2>
+          <p>
+            AnySpace is operated by <strong>Rebase LLC</strong> ("AnySpace",
+            "we", "us"). For privacy questions, contact{" "}
+            <a href="mailto:support@anyspace.dev">support@anyspace.dev</a>.
+          </p>
+          <p>
+            Registered address: <em>[address pending]</em>. State of formation:{" "}
+            <em>[state pending]</em>.
+          </p>
+
+          <h2>2. Scope</h2>
+          <p>This policy covers:</p>
+          <ul>
+            <li>The AnySpace marketing website (this site).</li>
+            <li>The AnySpace desktop application.</li>
+            <li>
+              <strong>AnySpace Cloud</strong>, our optional managed endpoint for
+              AI and speech-to-text requests.
+            </li>
+          </ul>
+          <p>
+            It does <strong>not</strong> cover third-party AI, speech-to-text,
+            or other providers that you configure in the app yourself
+            (OpenAI, Anthropic, Groq, ElevenLabs, etc.). When you point
+            AnySpace at one of those providers, your data goes directly to that
+            provider under their terms, not ours.
+          </p>
+
+          <h2>3. What we collect</h2>
+
+          <h3>Account information (when you sign in)</h3>
+          <p>
+            Authentication is handled by <strong>Clerk</strong>. When you sign
+            in, Clerk processes your email address, password (hashed), and any
+            OAuth provider claims you grant (e.g., Google profile, GitHub
+            username). A minimal copy of your user record is mirrored to our
+            backend so we can associate it with subscriptions and Cloud usage.
+          </p>
+
+          <h3>Billing information (when you purchase a plan)</h3>
+          <p>
+            If and when paid plans are available, billing is handled by a
+            third-party payment processor. We receive the metadata necessary to
+            manage your subscription (plan, status, last four digits of the
+            card, billing email). We do <strong>not</strong> store full card
+            numbers.
+          </p>
+
+          <h3>AnySpace Cloud usage (when you opt in)</h3>
+          <p>
+            If you route AI or speech-to-text requests through AnySpace Cloud,
+            those requests transit our infrastructure. We log request metadata
+            (timestamp, model, token counts, latency, error codes) for billing,
+            abuse prevention, and operational debugging. Request and response
+            payloads are not retained beyond the time required to serve the
+            request, unless we are legally required to preserve them.
+          </p>
+
+          <h3>Site analytics</h3>
+          <p>
+            This website may collect aggregate, non-identifying usage data
+            (page views, referrers, country-level location) to understand how
+            the site is used. We do not run advertising trackers.
+          </p>
+
+          <h3>What we do not collect</h3>
+          <p>
+            AnySpace does not transmit any of the following to us, ever:
+          </p>
+          <ul>
+            <li>Your local settings, kanban tasks, or agent definitions.</li>
+            <li>
+              Your terminal scrollback, command history, or shell session data.
+            </li>
+            <li>Files in your project folders.</li>
+            <li>Screenshots from the screenshot stack or Live Preview.</li>
+            <li>
+              Team-mode coordination files in{" "}
+              <code>&lt;projectFolder&gt;/.anyspace/teams/</code>.
+            </li>
+            <li>
+              Super Agent conversation history (stored only in the local
+              SQLite DB on your machine).
+            </li>
+          </ul>
+          <p>
+            See <a href="/docs/reference/privacy">the technical docs</a> for a
+            full file-by-file breakdown.
+          </p>
+
+          <h2>4. How we use information</h2>
+          <ul>
+            <li>To provide, operate, and improve AnySpace and AnySpace Cloud.</li>
+            <li>To authenticate you and secure your account.</li>
+            <li>To process payments and manage subscriptions.</li>
+            <li>
+              To prevent abuse, fraud, or violations of our{" "}
+              <a href="/terms">Terms of Service</a>.
+            </li>
+            <li>To communicate with you about your account or the service.</li>
+            <li>To comply with legal obligations.</li>
+          </ul>
+
+          <h2>5. Third-party processors</h2>
+          <p>We rely on the following processors to operate AnySpace:</p>
+          <ul>
+            <li>
+              <strong>Clerk</strong> — authentication and identity management.
+            </li>
+            <li>
+              <strong>Cloudflare</strong> — content delivery and edge hosting
+              for this website and AnySpace Cloud.
+            </li>
+            <li>
+              <strong>Payment processor</strong> — billing for paid plans
+              (named here once a processor is selected).
+            </li>
+          </ul>
+          <p>
+            Separately, AI and speech-to-text providers that <em>you</em>{" "}
+            configure in the app — including OpenAI, Anthropic, Groq,
+            ElevenLabs, and any other endpoint you point AnySpace at — are
+            <strong> not our subprocessors</strong>. Your data reaches those
+            providers because you sent it there. Their handling of that data
+            is governed by their own policies.
+          </p>
+
+          <h2>6. Sharing and disclosure</h2>
+          <p>We do not sell your personal information. We share it only:</p>
+          <ul>
+            <li>
+              With the processors listed above, strictly to provide the
+              service.
+            </li>
+            <li>
+              When required by law, court order, or a valid government request.
+            </li>
+            <li>
+              To protect the rights, property, or safety of AnySpace, our
+              users, or the public.
+            </li>
+            <li>
+              In connection with a merger, acquisition, or sale of assets, in
+              which case we will notify affected users.
+            </li>
+          </ul>
+
+          <h2>7. Data retention</h2>
+          <p>
+            We retain account and billing information for as long as your
+            account is active and for a reasonable period afterward to comply
+            with legal, accounting, and audit obligations. AnySpace Cloud
+            request logs are retained for a limited operational window (target:
+            30 days) and then deleted. Anything that stays on your machine
+            stays on your machine until you delete it.
+          </p>
+
+          <h2>8. Your rights</h2>
+          <p>
+            Depending on where you live, you may have rights to access,
+            correct, delete, or export your personal information, to object to
+            or restrict certain processing, and to withdraw consent. These
+            include rights under the EU/UK GDPR and the California Consumer
+            Privacy Act (CCPA/CPRA).
+          </p>
+          <p>
+            To exercise any of these rights, email{" "}
+            <a href="mailto:support@anyspace.dev">support@anyspace.dev</a>. We
+            will respond within the time periods required by applicable law.
+          </p>
+
+          <h2>9. International transfers</h2>
+          <p>
+            AnySpace is operated from the United States. If you access the
+            service from outside the United States, your information will be
+            transferred to, stored, and processed in the United States or
+            another country where we or our processors operate. We rely on
+            appropriate safeguards (such as standard contractual clauses) where
+            required.
+          </p>
+
+          <h2>10. Children</h2>
+          <p>
+            AnySpace is not directed to individuals under 16. We do not
+            knowingly collect personal information from children under 16. If
+            you believe a child has provided us with personal information,
+            contact us and we will delete it.
+          </p>
+
+          <h2>11. Security</h2>
+          <p>
+            We use industry-standard administrative, technical, and physical
+            safeguards to protect personal information. No method of
+            transmission or storage is 100% secure, however, and we cannot
+            guarantee absolute security.
+          </p>
+
+          <h2>12. Changes to this policy</h2>
+          <p>
+            We may update this Privacy Policy from time to time. When we do,
+            we will revise the "Last updated" date at the top. Material changes
+            will be communicated through the app or by email.
+          </p>
+
+          <h2>13. Contact</h2>
+          <p>
+            Questions or requests:{" "}
+            <a href="mailto:support@anyspace.dev">support@anyspace.dev</a>.
+          </p>
+        </article>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>

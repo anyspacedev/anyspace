@@ -1,0 +1,331 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const title = "Terms of Service — AnySpace";
+const description =
+  "The agreement between you and Rebase LLC for use of the AnySpace desktop app, this website, and AnySpace Cloud.";
+const lastUpdated = "May 11, 2026";
+---
+
+<Base title={title} description={description}>
+  <Nav />
+  <main id="main" class="py-16 sm:py-20">
+    <div class="container">
+      <div class="mx-auto max-w-3xl">
+        <aside
+          class="mb-10 rounded-lg border border-border bg-bg-elev px-4 py-3 font-mono text-xs text-fg-muted"
+          role="note"
+          aria-label="Draft notice"
+        >
+          <strong class="text-fg">Draft — pending legal review.</strong>
+          This document is a placeholder so the footer links resolve. It has not
+          been reviewed by counsel and is not yet in force. Final language will
+          replace it before any paid signup or production cloud feature ships.
+        </aside>
+
+        <p class="mb-2 font-mono text-xs uppercase tracking-[0.14em] text-fg-dim">
+          Last updated: {lastUpdated}
+        </p>
+
+        <article class="docs-prose">
+          <h1>Terms of Service</h1>
+          <p>
+            These Terms of Service ("Terms") govern your access to and use of
+            the AnySpace desktop application, the AnySpace website, and
+            AnySpace Cloud (together, the "Service"), operated by{" "}
+            <strong>Rebase LLC</strong> ("AnySpace", "we", "us"). By
+            downloading, installing, or using the Service, you agree to these
+            Terms. If you do not agree, do not use the Service.
+          </p>
+
+          <h2>1. Eligibility</h2>
+          <p>
+            You must be at least 16 years old to use the Service. If you use
+            the Service on behalf of an organization, you represent that you
+            have authority to bind that organization to these Terms, and
+            references to "you" include that organization.
+          </p>
+
+          <h2>2. The Service</h2>
+          <p>The Service consists of:</p>
+          <ul>
+            <li>
+              The <strong>AnySpace desktop app</strong> — a local-first
+              workspace for terminals, editors, previews, and AI agents that
+              runs on your machine.
+            </li>
+            <li>
+              This <strong>website</strong>, including documentation and
+              account management.
+            </li>
+            <li>
+              <strong>AnySpace Cloud</strong> — an optional managed endpoint
+              for AI and speech-to-text requests.
+            </li>
+          </ul>
+          <p>
+            The Service is provided as described in the documentation. We may
+            modify, add, or remove features at any time. We will give
+            reasonable notice of material changes that adversely affect paid
+            plans.
+          </p>
+
+          <h2>3. Your account</h2>
+          <p>
+            Some features require an account. Authentication is provided by
+            Clerk. You are responsible for keeping your credentials secure and
+            for all activity under your account. Notify us promptly at{" "}
+            <a href="mailto:support@anyspace.dev">support@anyspace.dev</a> if
+            you suspect unauthorized access.
+          </p>
+
+          <h2>4. License to use the AnySpace app</h2>
+          <p>
+            Subject to your compliance with these Terms, we grant you a
+            limited, non-exclusive, non-transferable, revocable license to
+            install and use the AnySpace desktop app for your personal or
+            internal business purposes. You may not:
+          </p>
+          <ul>
+            <li>
+              Resell, sublicense, or distribute the app or AnySpace Cloud
+              access to third parties.
+            </li>
+            <li>
+              Reverse engineer, decompile, or disassemble the app except to the
+              extent permitted by applicable law.
+            </li>
+            <li>
+              Remove or alter any proprietary notices or branding within the
+              app.
+            </li>
+            <li>
+              Use the app to build a competing product, or to train a model
+              intended to replicate AnySpace functionality.
+            </li>
+          </ul>
+          <p>
+            If portions of the Service are made available under an open-source
+            license, those portions are governed by that license, which
+            controls over these Terms to the extent of any conflict.
+          </p>
+
+          <h2>5. Your content and data</h2>
+          <p>
+            You retain all rights to the code, files, prompts, and other
+            content you create or process with AnySpace ("Your Content"). We
+            claim no ownership over Your Content. You grant us a limited
+            license to process Your Content only to the extent necessary to
+            provide the Service (for example, routing a Cloud request to an AI
+            model on your behalf).
+          </p>
+          <p>
+            You are solely responsible for Your Content and for ensuring you
+            have the rights to use, process, and share it.
+          </p>
+
+          <h2>6. AI and third-party services</h2>
+          <p>
+            AnySpace integrates with AI providers, speech-to-text providers,
+            payment processors, and other third-party services. Some you
+            configure yourself (e.g., your own OpenAI or Anthropic API key);
+            some are offered through AnySpace Cloud as an optional convenience.
+            <strong>
+              {" "}AnySpace is not responsible for content generated by AI
+              providers, for the accuracy or safety of model outputs, or for
+              the practices of third-party services you configure.
+            </strong>
+            AI outputs can be wrong, biased, or harmful — verify before acting
+            on them, especially in production-sensitive contexts.
+          </p>
+          <p>
+            When you configure a third-party provider in AnySpace, your data
+            travels directly to that provider under their terms, not ours.
+          </p>
+
+          <h2>7. Acceptable use</h2>
+          <p>You agree not to use the Service to:</p>
+          <ul>
+            <li>Violate any law, regulation, or third-party right.</li>
+            <li>
+              Generate, distribute, or store malware, illegal content, or
+              content that infringes intellectual property rights.
+            </li>
+            <li>
+              Attempt to gain unauthorized access to any system, account, or
+              data.
+            </li>
+            <li>
+              Probe, scan, attack, or otherwise interfere with the Service,
+              including by attempting to overwhelm AnySpace Cloud with
+              automated requests beyond plan limits.
+            </li>
+            <li>
+              Abuse AI passthrough — using AnySpace Cloud or any provider
+              integration to circumvent the terms or rate limits of that
+              underlying provider.
+            </li>
+            <li>
+              Use the Service to harass, deceive, or harm others, including
+              through prompt-injection of third parties.
+            </li>
+          </ul>
+          <p>
+            We may suspend or terminate accounts that violate this section,
+            without notice where the violation is serious or ongoing.
+          </p>
+
+          <h2>8. Subscriptions and billing</h2>
+          <p>
+            Some features may require a paid subscription. If you subscribe:
+          </p>
+          <ul>
+            <li>
+              You authorize us and our payment processor to charge your
+              selected payment method for the plan you choose, plus any
+              applicable taxes.
+            </li>
+            <li>
+              Subscriptions renew automatically at the end of each billing
+              period until you cancel.
+            </li>
+            <li>
+              Fees paid are non-refundable except where required by law or
+              expressly stated otherwise at purchase.
+            </li>
+            <li>
+              You can cancel from your account settings; the cancellation
+              takes effect at the end of the current billing period.
+            </li>
+            <li>
+              We may change prices with at least 30 days' notice; changes do
+              not apply to the current billing period.
+            </li>
+          </ul>
+
+          <h2>9. Intellectual property</h2>
+          <p>
+            The Service, including the AnySpace name, logos, documentation,
+            and software (excluding Your Content and any open-source
+            components), is owned by Rebase LLC and is protected by
+            intellectual-property laws. No rights are granted to you except
+            those expressly set out in these Terms.
+          </p>
+
+          <h2>10. Feedback</h2>
+          <p>
+            If you send us suggestions, ideas, or feedback about the Service,
+            we may use them without obligation or compensation to you. You
+            grant us a perpetual, irrevocable, royalty-free license to use,
+            modify, and incorporate that feedback into the Service.
+          </p>
+
+          <h2>11. Disclaimers</h2>
+          <p>
+            <strong>
+              The Service is provided "as is" and "as available", without
+              warranties of any kind, express or implied.
+            </strong>{" "}
+            To the maximum extent permitted by law, we disclaim all implied
+            warranties, including merchantability, fitness for a particular
+            purpose, non-infringement, and any warranties arising out of
+            course of dealing or usage of trade. We do not warrant that the
+            Service will be uninterrupted, error-free, secure, or that AI
+            outputs will be accurate or suitable for your use case.
+          </p>
+
+          <h2>12. Limitation of liability</h2>
+          <p>
+            <strong>
+              To the maximum extent permitted by law, AnySpace and its
+              affiliates will not be liable for any indirect, incidental,
+              special, consequential, exemplary, or punitive damages, or any
+              loss of profits, revenue, data, business, or goodwill, arising
+              out of or related to the Service, even if advised of the
+              possibility of such damages.
+            </strong>
+          </p>
+          <p>
+            Our total aggregate liability for any claim arising out of or
+            related to the Service will not exceed the greater of (a) the
+            amount you paid us for the Service in the 12 months before the
+            claim arose, or (b) one hundred U.S. dollars (US$100).
+          </p>
+          <p>
+            Some jurisdictions do not allow the exclusion or limitation of
+            certain damages, so portions of this section may not apply to you.
+          </p>
+
+          <h2>13. Indemnification</h2>
+          <p>
+            You agree to defend, indemnify, and hold harmless Rebase LLC, its
+            officers, employees, and agents from any claim, demand, loss, or
+            expense (including reasonable attorneys' fees) arising out of (a)
+            Your Content, (b) your use of the Service, or (c) your violation
+            of these Terms or applicable law.
+          </p>
+
+          <h2>14. Termination</h2>
+          <p>
+            You may stop using the Service at any time. We may suspend or
+            terminate your access if you violate these Terms, or if we
+            discontinue the Service. On termination, the licenses granted in
+            these Terms end immediately. Sections that by their nature should
+            survive (including Sections 5, 9, 11, 12, 13, and 16) will
+            survive.
+          </p>
+
+          <h2>15. Changes to these Terms</h2>
+          <p>
+            We may update these Terms from time to time. When we do, we will
+            revise the "Last updated" date and, for material changes, notify
+            you through the app or by email. Continued use of the Service
+            after a change becomes effective constitutes acceptance of the
+            updated Terms.
+          </p>
+
+          <h2>16. Governing law and disputes</h2>
+          <p>
+            These Terms are governed by the laws of the State of{" "}
+            <em>[state pending]</em>, United States, without regard to its
+            conflict-of-laws principles. Any dispute arising out of or
+            relating to these Terms or the Service will be brought exclusively
+            in the state or federal courts located in <em>[venue pending]</em>,
+            and you consent to the personal jurisdiction of those courts.
+          </p>
+
+          <h2>17. Miscellaneous</h2>
+          <ul>
+            <li>
+              <strong>Entire agreement.</strong> These Terms, together with
+              the <a href="/privacy">Privacy Policy</a>, are the entire
+              agreement between you and AnySpace regarding the Service.
+            </li>
+            <li>
+              <strong>Severability.</strong> If any provision is held
+              unenforceable, the remainder will remain in effect.
+            </li>
+            <li>
+              <strong>Waiver.</strong> Our failure to enforce a provision is
+              not a waiver of our right to enforce it later.
+            </li>
+            <li>
+              <strong>Assignment.</strong> You may not assign these Terms
+              without our written consent. We may assign them in connection
+              with a merger, acquisition, or sale of assets.
+            </li>
+          </ul>
+
+          <h2>18. Contact</h2>
+          <p>
+            Questions about these Terms:{" "}
+            <a href="mailto:support@anyspace.dev">support@anyspace.dev</a>.
+          </p>
+        </article>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>
