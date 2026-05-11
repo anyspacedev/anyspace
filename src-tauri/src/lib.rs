@@ -7,6 +7,7 @@ mod clipboard;
 mod fs_ops;
 mod git;
 mod kanban;
+mod knowledge;
 mod mobile;
 mod net;
 mod preview;
@@ -112,6 +113,7 @@ pub fn run() {
         .manage(preview::PreviewManager::new())
         .manage(mobile::MobileManager::new())
         .manage(team::TeamManager::new())
+        .manage(knowledge::KnowledgeManager::new())
         .manage(ai::AiStreamManager::new())
         .invoke_handler(tauri::generate_handler![
             // PTY
@@ -155,6 +157,17 @@ pub fn run() {
             // Workspace persistence
             workspace::commands::workspace_save,
             workspace::commands::workspace_load,
+            // Knowledge (project-local notes + wikilinks)
+            knowledge::commands::knowledge_init,
+            knowledge::commands::knowledge_list,
+            knowledge::commands::knowledge_read,
+            knowledge::commands::knowledge_write,
+            knowledge::commands::knowledge_delete,
+            knowledge::commands::knowledge_search,
+            knowledge::commands::knowledge_graph,
+            knowledge::commands::knowledge_watch_start,
+            knowledge::commands::knowledge_watch_stop,
+            knowledge::commands::knowledge_project_hash,
             // Team mode
             team::commands::team_init,
             team::commands::team_watch_start,

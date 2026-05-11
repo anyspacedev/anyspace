@@ -19,12 +19,13 @@ function displayHotkey(code: string): string {
 }
 
 const NAV_ITEMS: Array<{
-  id: "workspace" | "kanban" | "agents" | "settings";
+  id: "workspace" | "kanban" | "knowledge" | "agents" | "settings";
   label: string;
   icon: IconName;
 }> = [
   { id: "workspace", label: "Workspaces", icon: "layers" },
   { id: "kanban", label: "Tasks", icon: "list-checks" },
+  { id: "knowledge", label: "Knowledge", icon: "network" },
   { id: "agents", label: "Agents", icon: "play" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];

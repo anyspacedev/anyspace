@@ -7,6 +7,7 @@ import "./styles/tokens.css";
 import "./styles/globals.css";
 import "./styles/layout.css";
 import "./styles/clerk.css";
+import "./styles/knowledge.css";
 import "@xterm/xterm/css/xterm.css";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";

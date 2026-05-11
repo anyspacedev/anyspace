@@ -34,6 +34,13 @@ import { addAgentToLiveTeam, launchTeam } from "../teamLauncher";
 import { runQuickSuggest, runSuperBrainTeamBroadcast } from "../superBrain";
 import { parseMessages, type TeamMessage } from "../teamMessages";
 import { renderRolePrompt, type TeamRole } from "../teamRoles";
+import { useKnowledgeStore } from "../../stores/knowledgeStore";
+import {
+  knowledgeList,
+  knowledgeRead,
+  knowledgeSearch,
+  knowledgeWrite,
+} from "../knowledge";
 import {
   appendBoardEntry,
   labelSlug,
@@ -78,7 +85,13 @@ export type ToolName =
   | "remove_team_agent"
   | "set_team_status"
   | "team_pane_focus"
-  | "append_team_board_entry";
+  | "append_team_board_entry"
+  | "save_note"
+  | "get_note"
+  | "list_notes"
+  | "search_notes"
+  | "find_backlinks"
+  | "link_notes";
 
 export type ToolHandlerResult = {
   /** JSON-stringified content the model sees as the tool result. */
@@ -1414,7 +1427,217 @@ export const TOOLS: Tool[] = [
       }
     },
   },
+
+  // ===== Knowledge tools =====
+  // Project-local markdown notes under <projectPath>/.anyspace/knowledge/.
+  // Wikilinks `[[Title]]` resolve by exact slug, case-insensitive title, then
+  // slugified title. Backlinks/graph recomputed on every read — no index drift.
+  {
+    name: "save_note",
+    description:
+      "Create or update a project-local knowledge note. Persists to <projectPath>/.anyspace/knowledge/<slug>.md. Use [[Title]] in body to link other notes.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Human-readable title." },
+        body: { type: "string", description: "Markdown body. Supports [[wikilinks]]." },
+        slug: { type: "string", description: "Optional filename slug. Defaults to slugified title; pass an existing slug to update in place." },
+        tags: { type: "array", items: { type: "string" }, description: "Optional tag list." },
+      },
+      required: ["title", "body"],
+    },
+    handler: async (args) => {
+      const projectPath = resolveKnowledgeProject();
+      if (!projectPath) return bad("no active project — open a workspace tab with a project folder or pick one in the Knowledge view first");
+      const title = arg<string>(args, "title");
+      const body = arg<string>(args, "body");
+      if (!title || typeof title !== "string") return bad("missing title");
+      if (typeof body !== "string") return bad("missing body");
+      const slug = arg<string>(args, "slug");
+      const tagsArg = arg<unknown>(args, "tags");
+      const tags = Array.isArray(tagsArg)
+        ? tagsArg.filter((t): t is string => typeof t === "string")
+        : undefined;
+      try {
+        const note = await knowledgeWrite({ projectPath, title, body, slug, tags });
+        // Refresh the in-memory list so the UI reflects the new note.
+        void useKnowledgeStore.getState().reload();
+        return ok({
+          slug: note.slug,
+          title: note.title,
+          path: `${projectPath}/.anyspace/knowledge/${note.slug}.md`,
+          backlinks: note.backlinks.length,
+          outbound: note.outbound.length,
+        });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "get_note",
+    description:
+      "Read a single note by slug. Returns title, body, tags, timestamps, plus backlinks (other notes that link to this) and outbound refs.",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: { slug: { type: "string", description: "Note slug (filename without .md)." } },
+      required: ["slug"],
+    },
+    handler: async (args) => {
+      const projectPath = resolveKnowledgeProject();
+      if (!projectPath) return bad("no active project");
+      const slug = arg<string>(args, "slug");
+      if (!slug) return bad("missing slug");
+      try {
+        const note = await knowledgeRead(projectPath, slug);
+        return ok(note);
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "list_notes",
+    description:
+      "List notes newest-first. Returns slug, title, updated timestamp, backlinkCount, and a short preview per note.",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: { limit: { type: "number", description: "Max results (default 50)." } },
+      required: [],
+    },
+    handler: async (args) => {
+      const projectPath = resolveKnowledgeProject();
+      if (!projectPath) return bad("no active project");
+      const limit = arg<number>(args, "limit") ?? 50;
+      try {
+        const notes = await knowledgeList(projectPath);
+        return ok({ projectPath, total: notes.length, notes: notes.slice(0, limit) });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "search_notes",
+    description:
+      "Case-insensitive substring search across note titles, bodies, and tags. Returns ranked matches (title > tag > body).",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search string." },
+        limit: { type: "number", description: "Max results (default 20)." },
+      },
+      required: ["query"],
+    },
+    handler: async (args) => {
+      const projectPath = resolveKnowledgeProject();
+      if (!projectPath) return bad("no active project");
+      const query = arg<string>(args, "query");
+      if (typeof query !== "string") return bad("missing query");
+      const limit = arg<number>(args, "limit") ?? 20;
+      try {
+        const matches = await knowledgeSearch(projectPath, query, limit);
+        return ok({ query, count: matches.length, matches });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "find_backlinks",
+    description:
+      "List notes that link to the given slug via [[wikilinks]]. Each result includes a short context snippet around the reference.",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: { slug: { type: "string", description: "Target note slug." } },
+      required: ["slug"],
+    },
+    handler: async (args) => {
+      const projectPath = resolveKnowledgeProject();
+      if (!projectPath) return bad("no active project");
+      const slug = arg<string>(args, "slug");
+      if (!slug) return bad("missing slug");
+      try {
+        const note = await knowledgeRead(projectPath, slug);
+        return ok({ slug, backlinks: note.backlinks });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "link_notes",
+    description:
+      "Append a `[[to_slug]]` reference to the body of `from_slug` if it isn't already present. Idempotent — no-op if the link already exists.",
+    readOnly: false,
+    parameters: {
+      type: "object",
+      properties: {
+        from_slug: { type: "string", description: "Source note slug (the one that will gain a link)." },
+        to_slug: { type: "string", description: "Target note slug." },
+      },
+      required: ["from_slug", "to_slug"],
+    },
+    handler: async (args) => {
+      const projectPath = resolveKnowledgeProject();
+      if (!projectPath) return bad("no active project");
+      const fromSlug = arg<string>(args, "from_slug");
+      const toSlug = arg<string>(args, "to_slug");
+      if (!fromSlug || !toSlug) return bad("missing from_slug or to_slug");
+      if (fromSlug === toSlug) return bad("from_slug and to_slug must differ");
+      try {
+        const [from, to] = await Promise.all([
+          knowledgeRead(projectPath, fromSlug),
+          knowledgeRead(projectPath, toSlug),
+        ]);
+        const slugRe = new RegExp(`\\[\\[\\s*${escapeRegex(to.slug)}\\s*\\]\\]`, "i");
+        const titleRe = new RegExp(`\\[\\[\\s*${escapeRegex(to.title)}\\s*\\]\\]`, "i");
+        if (slugRe.test(from.body) || titleRe.test(from.body)) {
+          return ok({ alreadyLinked: true, fromSlug: from.slug, toSlug: to.slug });
+        }
+        const sep = from.body.endsWith("\n") ? "\n" : "\n\n";
+        const updatedBody = from.body + sep + `See also: [[${to.title}]]\n`;
+        const written = await knowledgeWrite({
+          projectPath,
+          title: from.title,
+          body: updatedBody,
+          slug: from.slug,
+          tags: from.tags,
+        });
+        void useKnowledgeStore.getState().reload();
+        return ok({
+          alreadyLinked: false,
+          fromSlug: written.slug,
+          toSlug: to.slug,
+          appended: `[[${to.title}]]`,
+        });
+      } catch (e) {
+        return bad(e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
 ];
+
+/** Resolve the project path to use for knowledge tools. Prefers the
+ *  Knowledge view's explicit project pick (persisted across restarts), then
+ *  falls back to the active workspace tab's projectPath. */
+function resolveKnowledgeProject(): string | null {
+  const fromKnowledge = useKnowledgeStore.getState().activeProjectPath;
+  if (fromKnowledge) return fromKnowledge;
+  const ws = useWorkspaceStore.getState();
+  const tab = ws.tabs.find((t) => t.id === ws.activeTabId);
+  return tab?.projectPath ?? null;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 
 export function findTool(name: string): Tool | undefined {
   return TOOLS.find((t) => t.name === name);

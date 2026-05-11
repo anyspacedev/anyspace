@@ -38,7 +38,9 @@ export type IconName =
   | "camera"
   | "users-round"
   | "user-round"
-  | "shield";
+  | "shield"
+  | "network"
+  | "link";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -255,4 +257,22 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />,
+  // Three nodes connected by edges — semantic for the Knowledge view's graph.
+  network: (
+    <>
+      <circle cx="5" cy="6" r="2" />
+      <circle cx="19" cy="6" r="2" />
+      <circle cx="12" cy="18" r="2" />
+      <path d="M7 6h10" />
+      <path d="m6.5 8 4.5 8" />
+      <path d="m17.5 8-4.5 8" />
+    </>
+  ),
+  // Chain-link — used to indicate wikilinks / backlinks inline.
+  link: (
+    <>
+      <path d="M10 14a3 3 0 0 0 4.2 0l3-3a3 3 0 1 0-4.2-4.2l-1 1" />
+      <path d="M14 10a3 3 0 0 0-4.2 0l-3 3a3 3 0 1 0 4.2 4.2l1-1" />
+    </>
+  ),
 };

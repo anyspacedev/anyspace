@@ -25,9 +25,11 @@ import { Sidebar } from "./components/workspace/Sidebar";
 import { WorkspaceView } from "./components/workspace/WorkspaceView";
 import { KanbanBoard } from "./components/kanban/Board";
 import { AgentManager } from "./components/agents/AgentManager";
+import { KnowledgeView } from "./components/knowledge/KnowledgeView";
 import { Settings } from "./components/settings/Settings";
 import { useSuperAgentStore } from "./stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "./stores/superAgentSettingsStore";
+import { useKnowledgeStore } from "./stores/knowledgeStore";
 import { useRecentFoldersStore } from "./stores/recentFoldersStore";
 import { useUiHintsStore } from "./stores/uiHintsStore";
 import { StatusBar } from "./components/workspace/StatusBar";
@@ -53,6 +55,7 @@ export default function App() {
   const loadTeamSettings = useTeamSettingsStore((s) => s.load);
   const loadSuperAgent = useSuperAgentStore((s) => s.load);
   const loadSuperAgentSettings = useSuperAgentSettingsStore((s) => s.load);
+  const loadKnowledge = useKnowledgeStore((s) => s.load);
   const loadRecentFolders = useRecentFoldersStore((s) => s.load);
   const loadUiHints = useUiHintsStore((s) => s.load);
 
@@ -90,6 +93,7 @@ export default function App() {
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
+    void loadKnowledge().catch((e) => console.warn("[knowledge] load failed", e));
     void loadRecentFolders().catch((e) => console.warn("[recentFolders] load failed", e));
     void loadUiHints().catch((e) => console.warn("[uiHints] load failed", e));
     // Boot the agent_api bridge before any Code Agent terminal can spawn —
@@ -97,7 +101,7 @@ export default function App() {
     // into the child env.
     void ensureAgentApi().catch((e) => console.warn("[agent_api] info load failed", e));
     void startAgentApiBridge().catch((e) => console.warn("[agent_api] bridge start failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
@@ -269,6 +273,11 @@ export default function App() {
           {view === "kanban" && (
             <div className="view-overlay view-fade" key="kanban">
               <KanbanBoard />
+            </div>
+          )}
+          {view === "knowledge" && (
+            <div className="view-overlay view-fade" key="knowledge">
+              <KnowledgeView />
             </div>
           )}
           {view === "agents" && (

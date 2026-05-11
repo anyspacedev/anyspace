@@ -173,7 +173,7 @@ function presetToPayload(preset: PanePreset): Record<string, unknown> {
 type WorkspaceState = {
   tabs: Tab[];
   activeTabId: string | null;
-  selectedView: "workspace" | "kanban" | "agents" | "settings";
+  selectedView: "workspace" | "kanban" | "knowledge" | "agents" | "settings";
   hydrated: boolean;
 
   setView: (view: WorkspaceState["selectedView"]) => void;
