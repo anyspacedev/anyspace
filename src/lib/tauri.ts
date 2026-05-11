@@ -95,6 +95,54 @@ export async function previewWatchStop(paneId: string): Promise<void> {
   return rawInvoke("preview_watch_stop", { paneId });
 }
 
+// === Browser pane (embedded child WebView) ===
+// Each browser pane owns one child WebView keyed by `paneId`. The frontend
+// drives placement (browserResize is called by a ResizeObserver on the pane
+// host) and visibility (browserHide/Show toggled by the modal-occlusion
+// coordinator). Cookies/storage are isolated per pane via data_directory.
+
+export async function browserCreate(paneId: string, url: string): Promise<void> {
+  return rawInvoke("browser_create", { paneId, url });
+}
+
+export async function browserNavigate(paneId: string, url: string): Promise<void> {
+  return rawInvoke("browser_navigate", { paneId, url });
+}
+
+export async function browserBack(paneId: string): Promise<void> {
+  return rawInvoke("browser_back", { paneId });
+}
+
+export async function browserForward(paneId: string): Promise<void> {
+  return rawInvoke("browser_forward", { paneId });
+}
+
+export async function browserReload(paneId: string): Promise<void> {
+  return rawInvoke("browser_reload", { paneId });
+}
+
+export async function browserResize(args: {
+  paneId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}): Promise<void> {
+  return rawInvoke("browser_resize", args);
+}
+
+export async function browserShow(paneId: string): Promise<void> {
+  return rawInvoke("browser_show", { paneId });
+}
+
+export async function browserHide(paneId: string): Promise<void> {
+  return rawInvoke("browser_hide", { paneId });
+}
+
+export async function browserDestroy(paneId: string): Promise<void> {
+  return rawInvoke("browser_destroy", { paneId });
+}
+
 export type LaunchArgs = {
   agentCommand: string;
   taskId?: string;

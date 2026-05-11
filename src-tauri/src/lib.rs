@@ -3,6 +3,7 @@ use tauri::Manager;
 mod agent;
 mod agent_api;
 mod ai;
+mod browser;
 mod clipboard;
 mod fs_ops;
 mod git;
@@ -111,6 +112,7 @@ pub fn run() {
         )
         .manage(pty::PtyManager::new())
         .manage(preview::PreviewManager::new())
+        .manage(browser::BrowserManager::new())
         .manage(mobile::MobileManager::new())
         .manage(team::TeamManager::new())
         .manage(knowledge::KnowledgeManager::new())
@@ -126,6 +128,16 @@ pub fn run() {
             preview::commands::preview_can_frame,
             preview::commands::preview_watch_start,
             preview::commands::preview_watch_stop,
+            // Browser pane (embedded child WebView)
+            browser::commands::browser_create,
+            browser::commands::browser_navigate,
+            browser::commands::browser_back,
+            browser::commands::browser_forward,
+            browser::commands::browser_reload,
+            browser::commands::browser_resize,
+            browser::commands::browser_show,
+            browser::commands::browser_hide,
+            browser::commands::browser_destroy,
             // Agent
             agent::commands::agent_launch,
             // FS (helpers beyond plugin scope)

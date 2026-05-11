@@ -6,6 +6,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { registerShortcut } from "../../lib/shortcuts";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import { useFocusTrap } from "../../lib/useFocusTrap";
+import { useHideBrowsersWhile } from "../../lib/useHideBrowsersWhile";
 import { Icon } from "../ui/Icon";
 import { ErrorState } from "../ui/ErrorState";
 import { editorFilesFrom } from "../editor/editorPayload";
@@ -13,6 +14,7 @@ import { editorFilesFrom } from "../editor/editorPayload";
 export function QuickOpen() {
   const [open, setOpen] = useState(false);
   useFocusReturn(open);
+  useHideBrowsersWhile(open);
   const [root, setRoot] = useState<string | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [query, setQuery] = useState("");

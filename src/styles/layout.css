@@ -6682,6 +6682,96 @@ body.screenshot-dragging {
   padding: 1px 5px;
 }
 
+/* ===== Browser pane (embedded child WebView) =====
+   Scaffolding for the embedded browser feature. v1 only renders the
+   "deferred" placeholder; the chrome styles below are retained so the
+   future macOS/Windows pass (where Tauri's child-WebView API works)
+   can drop the placeholder and use these. */
+.browser-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+.browser-chrome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.browser-url-form {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 0;
+}
+.browser-url-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}
+.browser-url-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+.browser-url-current {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg-dim);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-host {
+  flex: 1 1 auto;
+  position: relative;
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* Placeholder rendered while the embedded WebView path is deferred on Linux. */
+.browser-pane-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: var(--pad-lg);
+}
+.browser-pane-placeholder-card {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  color: var(--fg);
+}
+.browser-pane-placeholder-card svg {
+  color: var(--accent);
+}
+.browser-pane-placeholder-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.browser-pane-placeholder-body {
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
 /* SSH pane badge in the pane header — sits next to the kind icon to make
    SSH terminals visually distinct from local shells. */
 .pane-ssh-badge {

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import { useNewWorkspacePickerStore, type NewWorkspacePickerMode } from "../../stores/newWorkspacePickerStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
 import { useFocusTrap } from "../../lib/useFocusTrap";
+import { useHideBrowsersWhile } from "../../lib/useHideBrowsersWhile";
 import { TemplatePickerForm } from "./TemplatePicker";
 import { TeamPickerForm } from "./TeamPicker";
 import { TeamRowList } from "../team/TeamRowList";
@@ -32,6 +33,7 @@ export function NewWorkspacePickerHost() {
 
   useFocusReturn(open);
   useFocusTrap(modalRef, open);
+  useHideBrowsersWhile(open);
 
   useEffect(() => {
     if (!open) return;

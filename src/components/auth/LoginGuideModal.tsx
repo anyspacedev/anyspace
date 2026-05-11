@@ -7,6 +7,7 @@ import {
   type LoginGuideFeature,
 } from "../../stores/loginGuideStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useHideBrowsersWhile } from "../../lib/useHideBrowsersWhile";
 
 const COPY: Record<
   LoginGuideFeature,
@@ -34,6 +35,7 @@ export function LoginGuideModal() {
   const clerkConfigured = useAuthStore((s) => s.clerkConfigured);
   const setView = useWorkspaceStore((s) => s.setView);
   const titleId = useId();
+  useHideBrowsersWhile(open);
 
   // Auto-close once Clerk reports a successful sign-in.
   useEffect(() => {

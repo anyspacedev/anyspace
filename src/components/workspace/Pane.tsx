@@ -6,6 +6,7 @@ import { Editor } from "../editor/Editor";
 import { PreviewPane } from "../preview/PreviewPane";
 import { FileBrowser } from "../sidebar/FileBrowser";
 import { MobilePane } from "../mobile/MobilePane";
+import { BrowserPane } from "../browser/BrowserPane";
 import { PaneHeader } from "./PaneHeader";
 import { Icon, type IconName } from "../ui/Icon";
 import { modKey } from "../../lib/shortcuts";
@@ -68,6 +69,7 @@ function PaneBody({ kind, pane, tabId }: { kind: PaneKind; pane: PaneType; tabId
     case "preview": return <PreviewPane pane={pane} tabId={tabId} />;
     case "filebrowser": return <FileBrowser pane={pane} tabId={tabId} />;
     case "mobile": return <MobilePane pane={pane} tabId={tabId} />;
+    case "browser": return <BrowserPane pane={pane} tabId={tabId} />;
     case "empty":
     default:
       return <EmptyPane pane={pane} tabId={tabId} />;
@@ -78,6 +80,9 @@ const QUICK_PICKS: Array<{ kind: PaneKind; label: string; icon: IconName; hint: 
   { kind: "terminal", label: "Terminal", icon: "terminal", hint: "Run a shell" },
   { kind: "editor", label: "Editor", icon: "file-edit", hint: "Edit code" },
   { kind: "preview", label: "Preview", icon: "globe", hint: "Live web preview" },
+  // "browser" intentionally omitted from quick picks until the embedded
+  // child WebView path works on Linux (see BrowserPane.tsx). The kind
+  // remains in the PaneKind union so persisted panes still render.
   { kind: "filebrowser", label: "Files", icon: "folder-tree", hint: "Browse a folder" },
   { kind: "mobile", label: "Mobile", icon: "smartphone", hint: "Android / iOS device" },
 ];

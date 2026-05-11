@@ -349,6 +349,10 @@ const EPHEMERAL_KEYS = new Set([
   "spawnProgram",
   "sshExited",
   "sshAttempt",
+  // Browser: tracks whether the Rust child WebView has been created. The
+  // WebView itself does not survive an app restart, so on resume we must
+  // re-create it — bypass the create-once guard by stripping the flag.
+  "browserCreated",
 ]);
 function stripEphemeral(payload: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!payload) return {};

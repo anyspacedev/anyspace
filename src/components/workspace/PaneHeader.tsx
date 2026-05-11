@@ -14,6 +14,7 @@ const KIND_LABELS: Record<PaneKind, string> = {
   preview: "Preview",
   filebrowser: "Files",
   mobile: "Mobile",
+  browser: "Browser",
   empty: "Empty",
 };
 
@@ -23,6 +24,7 @@ const KIND_ICONS: Record<PaneKind, IconName> = {
   preview: "globe",
   filebrowser: "folder-tree",
   mobile: "smartphone",
+  browser: "globe",
   empty: "square-dashed",
 };
 
@@ -162,7 +164,9 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
         <div className="pane-menu" onMouseLeave={() => setMenuOpen(false)}>
           <div className="pane-menu-section">Change pane kind</div>
           {(Object.keys(KIND_LABELS) as PaneKind[])
-            .filter((k) => k !== "empty")
+            // "browser" excluded until the embedded WebView path works on
+            // Linux; the kind stays in the union so persisted panes render.
+            .filter((k) => k !== "empty" && k !== "browser")
             .map((k) => (
               <button
                 key={k}
