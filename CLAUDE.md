@@ -65,293 +65,239 @@ Default to surfacing uncertainty, not hiding it.
 ## Commands
 
 ```bash
-npm install                  # install JS deps (Cargo handles its own on first build)
-npm run tauri:dev            # dev: Vite on :1420 + cargo run with hot reload
-npm run tauri:build          # bundle .deb / .AppImage / .dmg / .msi (host-dependent)
-
+npm install                  # JS deps (Cargo handles its own)
+npm run tauri:dev            # Vite :1420 + cargo run, hot reload
+npm run tauri:build          # bundle .deb / .AppImage / .dmg / .msi
 npx tsc --noEmit             # frontend typecheck (CI gate)
-npx vite build               # frontend production bundle into dist/
-cd src-tauri && cargo check  # Rust typecheck (faster than build)
-cd src-tauri && cargo build  # full debug build → src-tauri/target/debug/anyspace
+cd src-tauri && cargo check  # Rust typecheck
 ```
 
-**System floor:** Tauri 2 needs `glib-2.0 >= 2.70` (Debian 12 / Ubuntu 22.04+), Rust ≥ 1.77, Node ≥ 20.
-
-`tauri::generate_context!()` reads `src-tauri/icons/*` at **compile time** — those files must exist or `cargo check` panics with "failed to open icon".
+**Floor:** Tauri 2 needs `glib-2.0 >= 2.70` (Debian 12+ / Ubuntu 22.04+), Rust ≥ 1.77, Node ≥ 20. `tauri::generate_context!()` reads `src-tauri/icons/*` at compile time — must exist or `cargo check` panics.
 
 ## Architecture
 
-Tauri v2 desktop app (Rust backend + React 19 / Vite frontend) implementing a multi-pane terminal multiplexer with Warp-style command blocks, Monaco editor, v0.dev-style live preview, and a Kanban-driven AI agent launcher.
+Tauri v2 desktop app (Rust + React 19/Vite) implementing a multi-pane terminal multiplexer with Warp-style command blocks, Monaco editor, v0.dev-style live preview, and a Kanban-driven AI agent launcher.
 
-### IPC contract is the spine
+### IPC contract
 
-Every Rust command in `src-tauri/src/*/commands.rs` has a typed wrapper in `src/lib/tauri.ts`. **Adding a Rust command requires three coordinated changes:**
+Every Rust command in `src-tauri/src/*/commands.rs` has a typed wrapper in `src/lib/tauri.ts`. Adding one requires:
+1. `#[tauri::command]` fn
+2. Register in `tauri::generate_handler![...]` (`src-tauri/src/lib.rs`)
+3. `tauri.ts` wrapper (plus `capabilities/default.json` *only* for plugin commands — project commands are covered by `core:default`)
 
-1. `#[tauri::command]` function in the appropriate module
-2. Register it in `tauri::generate_handler![...]` inside `src-tauri/src/lib.rs`
-3. Grant permission in `src-tauri/capabilities/default.json` *(only required when the command comes from a Tauri plugin — project-defined commands are covered by `core:default`)*, and add a `tauri.ts` wrapper.
-
-Skip any of these and the command silently fails at runtime.
-
-Commands that need to read settings, build proxy-aware HTTP clients, or emit events should take `app: tauri::AppHandle` as their first parameter (Tauri injects it automatically — no frontend change needed). Several commands already follow this convention (`preview_detect`, `preview_can_frame`, `stt_transcribe`, `ai_chat`).
+Skip any and the command silently fails at runtime. Commands needing settings/proxy-aware HTTP/events should take `app: tauri::AppHandle` as the first parameter (Tauri injects it).
 
 ### PTY streaming uses Channels, not events
 
-`tauri::ipc::Channel<Vec<u8>>` carries terminal output from the Rust reader thread to the React side. Each `pty_spawn` call accepts a frontend-allocated `Channel`; Rust spawns a `std::thread` that pumps `portable_pty::Reader` → 4KB chunks → `channel.send`. Don't switch to `app.emit()` for PTY data — it serializes through every listener.
+`tauri::ipc::Channel<Vec<u8>>` carries terminal output. `pty_spawn` accepts a frontend-allocated `Channel`; Rust pumps `portable_pty::Reader` → 4KB chunks → `channel.send` on a `std::thread`. Don't switch to `app.emit()` for PTY data. **Do not** introduce a Node sidecar — `portable-pty` is pure Rust and uses ConPTY on Windows automatically.
 
-`portable-pty` is used instead of `node-pty` (mentioned in marketing copy). It's pure Rust, ships in the binary, and uses ConPTY on Windows automatically. **Do not** introduce a Node sidecar.
+**xterm WebGL cap = 6.** Browsers evict the oldest context past their limit (Chromium ~16, WebKit ~8), spamming console errors. `Terminal.tsx` tracks `activeWebglTerminals` and falls back to the DOM renderer past `MAX_WEBGL_TERMINALS = 6`. Don't raise without testing eviction on Linux/Chromium.
 
-**xterm WebGL is capped at 6.** Browsers limit total active WebGL contexts (Chromium ~16, WebKit ~8) and silently evict the oldest when the limit is hit — which spams console errors and corrupts other terminals. `Terminal.tsx` tracks `activeWebglTerminals` and falls back to xterm's DOM renderer past `MAX_WEBGL_TERMINALS = 6`. Don't raise the cap without testing eviction behavior on Linux/Chromium.
+**Renderer dimensions race.** `terminal._core._renderService.dimensions` crashes if read before first paint. Any reader (block-overlay geom, fit-addon math) must `try/catch` and treat undefined as "not ready" — see `updateGeom` in `Terminal.tsx`. Fit/resize is deferred to `requestAnimationFrame` after `ResizeObserver`.
 
-**Renderer dimensions race.** xterm's `_core._renderService.dimensions` getter crashes if read before the first paint. Any code that touches it (block-overlay geometry, fit-addon math) must `try/catch` and treat undefined as "renderer not ready yet" — see `updateGeom` in `Terminal.tsx`. Fit/resize is also deferred to `requestAnimationFrame` after a `ResizeObserver` fires for the same reason.
+### OSC 133 is auto-injected
 
-### OSC 133 is auto-injected, not opt-in
+`src-tauri/src/shell_integration/scripts.rs` writes a bash/zsh script to `$TMPDIR/anyspace-shell-integration/integration.sh` on first PTY spawn, sourced via `BASH_ENV` — every shell emits OSC 133 A/B/C/D. Frontend parses in `src/components/terminal/osc133.ts`; `CommandBlocks.tsx` overlays absolute-positioned markers anchored to `terminal.buffer.active.baseY + cursorY`. The position-syncing math in `Terminal.tsx`'s `updateGeom` is load-bearing.
 
-`src-tauri/src/shell_integration/scripts.rs` writes a bash/zsh integration script to `$TMPDIR/anyspace-shell-integration/integration.sh` on first PTY spawn. The script is sourced via the `BASH_ENV` env var that `pty_spawn` sets on every child process — every shell session emits OSC 133 A/B/C/D sequences without user opt-in.
+### Layout = recursive split/leaf tree
 
-Frontend parses those sequences in `src/components/terminal/osc133.ts` (`registerOscHandler(133, …)`) and overlays absolute-positioned `<div>` markers on top of xterm via `CommandBlocks.tsx`. The overlay reads `terminal.buffer.active.baseY + cursorY` to anchor blocks to absolute scrollback rows — the position-syncing math in `Terminal.tsx`'s `updateGeom` is load-bearing.
+`LayoutNode = { type:"leaf", paneId } | { type:"split", direction, sizes, children }` in `src/lib/types.ts`. `workspaceStore.ts` mutates the tree — **renormalize `sizes` after removal** or resize handles drift. `buildLayout(paneCount, ids)` synthesizes canonical 1/2/4/6/8/9/12/16 templates. `PaneGrid.tsx` recursively maps to `<PanelGroup>`; the `path: number[]` arg routes resize callbacks via `setSizesAtPath`.
 
-### Layout is a recursive split/leaf tree
-
-`src/lib/types.ts` defines `LayoutNode = { type: "leaf", paneId } | { type: "split", direction, sizes, children }`. The store in `src/stores/workspaceStore.ts` mutates this tree for splits and pane closes — **renormalizing `sizes` after removal** is critical or the resize handles drift. `buildLayout(paneCount, ids)` synthesizes the canonical 1/2/4/6/8/9/12/16 templates.
-
-`PaneGrid.tsx` recursively maps the tree to nested `<PanelGroup>` from `react-resizable-panels`. The `path: number[]` argument tracks the position so resize callbacks can set sizes at the right depth via `setSizesAtPath`.
-
-**Pane drag uses pointer events, not HTML5 drag.** WKWebView and Tauri's WebView swallow native `drop` events on iframe-bearing pages, so pane header drag-to-swap/re-split is implemented manually via `pointerdown` → `setPointerCapture` → `pointermove` → `pointerup`. Don't reach for `draggable` / `ondragstart` here.
+**Pane drag uses pointer events, not HTML5 drag.** WKWebView/Tauri WebView swallow native `drop` on iframe pages — use `pointerdown` → `setPointerCapture` → `pointermove` → `pointerup`. Same for screenshot drag-onto-pane.
 
 ### Panes are portaled into stable hosts
 
-`PaneGrid.tsx` does not render `<Pane />` directly into the layout tree. Each pane gets an owned `<div class="pane-host">` that lives outside the tree; the Pane component is `createPortal`'d into that host once and the layout tree's `PaneSlot` adopts the host via `appendChild`. This is what keeps xterm/PTY state, Monaco view state, and iframe history alive across split/close/swap restructures — the React subtree never unmounts.
-
-Implication: do not move the `createPortal` call inside the tree, do not key panes by index, and do not destroy a host when its slot remounts. The `useEffect` cleanup in `PaneGrid.tsx` that prunes hosts whose pane was deleted is the only legitimate teardown.
+`PaneGrid.tsx` does NOT render `<Pane />` into the layout tree. Each pane has an owned `<div class="pane-host">` outside the tree; `createPortal`'d once, layout's `PaneSlot` adopts via `appendChild`. This keeps xterm/PTY/Monaco/iframe state alive across split/close/swap restructures. Do not move `createPortal` into the tree, do not key by index, do not destroy hosts on slot remount. The `useEffect` cleanup in `PaneGrid.tsx` is the only legitimate teardown.
 
 ### Pane kinds are a closed discriminated union
 
-Adding a new `PaneKind` requires updates in **all** of:
-- `src/lib/types.ts` (the union)
-- `src/components/workspace/Pane.tsx` (the switch in `PaneBody`)
-- `src/components/workspace/PaneHeader.tsx` (`KIND_LABELS` and `KIND_ICONS`)
-
-Forgetting any one leaves dead branches; TS catches the union but not the icon/label maps.
+Adding a `PaneKind` requires updates in **all** of: `src/lib/types.ts` (union), `Pane.tsx` (`PaneBody` switch), `PaneHeader.tsx` (`KIND_LABELS` + `KIND_ICONS`). TS catches the union but not the icon/label maps.
 
 ### Run Task flow
 
-`launchAgent` in `src/lib/agentLauncher.ts` is the single entry point for spawning an agent. It is used by `KanbanBoard.runTask` and by the preview element picker's "Run now" / "Add to Kanban & run" actions. Two modes:
+`launchAgent` (`src/lib/agentLauncher.ts`) is the single agent-spawn entry point. Two modes: `"new-tab"` (fresh tab with one terminal) or `"current-tab"` (calls `splitPane(tabId, paneId, direction, preset)`). Sequence:
 
-- `mode: "new-tab"` — creates a fresh workspace tab with one terminal pane (the original Kanban-style flow).
-- `mode: "current-tab"` — calls `splitPane(tabId, paneId, direction, preset)` to add a sibling terminal pane to an existing layout. `splitPane`'s optional `preset: PanePreset` is what lets the new pane carry `pendingCommand`/`spawnEnv`/`spawnCwd`/`title` from the start.
+1. `agent_launch` writes task+system prompt to `/tmp/anyspace-tasks/task-<uuid>.md`, substitutes `{task_file}`, returns `{ command, taskFile, env }`.
+2. Frontend stashes `{ pendingCommand, spawnEnv, spawnCwd, title }` in the pane payload.
+3. `Terminal.tsx` sees `pendingCommand`, waits 600ms for shell prompt, writes command + `\n`, clears it.
 
-Internal sequence in either mode:
-1. `agent_launch` (Rust) writes task body + system prompt to `/tmp/anyspace-tasks/task-<uuid>.md`, substitutes `{task_file}` in the agent's command template, returns `{ command, taskFile, env }`.
-2. Frontend stashes `{ pendingCommand, spawnEnv, spawnCwd, title }` in the new terminal pane's payload (via `newTab` presets or `splitPane`'s preset).
-3. `Terminal.tsx`'s `useEffect` sees `pendingCommand`, waits 600ms for the shell prompt to settle, then writes the command + `\n` to the PTY and clears `pendingCommand`.
+`ANYSPACE_TASK_FILE` is only set if wired via the agent's `envJson` — the current spawn path doesn't merge `agent_launch`'s returned `env` into `pty_spawn`. Substitute via `{task_file}` in the command, or extend the spawn path.
 
-The `ANYSPACE_TASK_FILE` env var is **only** set if you wire it via the agent's stored `envJson` field — `agent_launch` returns it in `env` but the current spawn path doesn't merge that into `pty_spawn`'s env. Either substitute via `{task_file}` in the command, or extend the spawn path to pass env through.
+`EPHEMERAL_KEYS` in `workspaceStore.ts` strips per-session/UI keys (`sessionId`, `pendingCommand`, `pickerActive`) from the persisted snapshot. Add new payload keys that shouldn't survive restart.
 
-`EPHEMERAL_KEYS` in `workspaceStore.ts` strips per-session/UI keys (`sessionId`, `pendingCommand`, `pickerActive`) from the persisted snapshot. Add to that set for any new payload key that should not survive a restart.
+### Speech-to-text
 
-### Speech-to-text dispatches by active pane
+Hold-to-talk (default `ControlRight` Linux/Windows, `AltRight` macOS — Apple keyboards have no Right Ctrl; rebindable in Settings) records via `getUserMedia` → `MediaRecorder`, POSTs to OpenAI-compatible `/audio/transcriptions` via Rust `stt_transcribe` (uses existing `reqwest` with `multipart`+`json`). Dispatch on snapshotted active pane:
 
-Hold-to-talk (configurable hotkey, window-scoped — default `ControlRight` on Linux/Windows, `AltRight` on Mac since Apple keyboards have no Right Ctrl key; user-rebindable in Settings) records via `getUserMedia` → `MediaRecorder`, posts the audio to an OpenAI-compatible `/audio/transcriptions` endpoint through the Rust `stt_transcribe` command (uses the existing `reqwest` dep with `multipart` + `json` features), then injects text based on the snapshotted active pane:
+- terminal → `ptyWrite` UTF-8 bytes (no `\n` — never auto-execute)
+- editor → `monaco.executeEdits` at current selection
+- else → clipboard + toast
 
-- `terminal` → `ptyWrite` UTF-8 bytes (no `\n` — never auto-execute)
-- `editor` → `monaco.executeEdits` at the current selection
-- everything else → clipboard fallback + toast
+Monaco instances register into `src/components/stt/editorRegistry.ts` on mount. New text-input pane kinds: extend dispatch in `inject.ts`, not the registry. Settings under `"stt"` key (plaintext in `app_config_dir/settings.json`).
 
-Monaco instances register themselves into `src/components/stt/editorRegistry.ts` on mount because the STT injector needs cross-component access without plumbing refs through the workspace tree. If you add another text-input pane kind, extend the dispatch in `inject.ts` and not the registry.
+### AI chat
 
-Settings live under the `"stt"` key via `settings_get/set` — same pattern as theme. Provider/endpoint/model/key are persisted plaintext in `app_config_dir/settings.json`.
-
-### AI chat mirrors STT
-
-`ai_chat` (`src-tauri/src/ai/commands.rs`) powers the *Explain* action on terminal command blocks. It POSTs to a user-configured OpenAI-compatible `/chat/completions` endpoint. Settings live under the `"ai"` key. `aiStore.load()` seeds the API key from STT settings on first run, so it deliberately awaits `useSttStore.load()` if STT hasn't finished hydrating — preserve that ordering when refactoring `App.tsx`'s mount effect.
+`ai_chat` (`src-tauri/src/ai/commands.rs`) powers terminal-block *Explain*. POSTs to OpenAI-compatible `/chat/completions`. Settings under `"ai"` key. `aiStore.load()` seeds API key from STT on first run, so it deliberately awaits `useSttStore.load()` — preserve that ordering in `App.tsx`'s mount effect.
 
 ### Network proxy is centralized
 
-Every outbound `reqwest` call goes through `src-tauri/src/net/mod.rs` — `http_client(&app)` / `http_client_builder(&app)` read the `"proxy"` settings key per call and apply HTTP/SOCKS5 proxy + `NoProxy` rules. Adding another network site means using these helpers, not `reqwest::Client::new()`.
+All outbound `reqwest` calls go through `src-tauri/src/net/mod.rs` — `http_client(&app)` / `http_client_builder(&app)` read the `"proxy"` key per call, apply HTTP/SOCKS5 + `NoProxy`. Use these, not `reqwest::Client::new()`. `localhost,127.0.0.1,::1` always in `NoProxy`. Out of scope: PreviewPane `<iframe>`, `tauri-plugin-updater`, PTY-spawned shells. SOCKS5 needs `reqwest`'s `socks` feature (enabled).
 
-`localhost,127.0.0.1,::1` are always added to `NoProxy` regardless of user config — `preview_detect`'s loopback probes and any local AI/STT endpoints must reach the host directly.
+### SQLite
 
-Out of scope for the proxy: the `<iframe>` in `PreviewPane`, the `tauri-plugin-updater` HTTP client, and shell processes spawned by PTY (those inherit the parent process env). The Settings UI says so. `reqwest`'s `socks` cargo feature is required for SOCKS5 — already enabled.
+`tasks` column is `column_name`, not `column` (reserved word; `tauri-plugin-sql`'s parser bails). TS field stays `column` — `kanbanStore.ts:rowToTask` translates. Migrations in `src-tauri/migrations/*.sql` registered via `MigrationKind::Up` in `kanban/db.rs`, run on `Database.load("sqlite:anyspace.db")`.
 
-### SQLite schema gotcha
-
-The `tasks` table column is `column_name`, not `column`. SQLite tolerates `column` as an identifier in some contexts but it's a reserved word and `tauri-plugin-sql`'s parser bails. The `Task["column"]` TS field stays `column` — `kanbanStore.ts` translates with `rowToTask`.
-
-Migrations live in `src-tauri/migrations/*.sql` and are registered in `src-tauri/src/kanban/db.rs` via `MigrationKind::Up`. They run automatically on `Database.load("sqlite:anyspace.db")`.
-
-**Migrations are immutable once shipped.** `tauri-plugin-sql` records each migration's checksum; editing an applied SQL file makes the DB refuse to load on next launch. Always add a new numbered migration (`004_*.sql`, `005_*.sql`, …) instead of mutating an existing one.
+**Migrations are immutable once shipped.** `tauri-plugin-sql` records checksums; editing an applied SQL file breaks DB load. Always add a new numbered file.
 
 ### Theme system
 
-A `Theme` (`src/themes/definitions.ts`) bundles three palettes: UI tokens (CSS vars), a full xterm.js `ITheme`, and via `monacoThemeFor()` a Monaco theme derived from those tokens. `applyTheme()` writes CSS custom properties to `:root` and stamps `data-theme` / `data-theme-kind`. `Terminal.tsx` and `Editor.tsx` both subscribe to `useThemeStore` and re-apply on change — themes hot-swap without restart.
-
-Adding a theme = one entry in `definitions.ts` — purely data, no code change. The five "foundational" themes (Void, Dracula, Synthwave, Paper, Solar) are listed first; the rest follow in the same array.
+A `Theme` (`src/themes/definitions.ts`) bundles UI tokens (CSS vars), xterm.js `ITheme`, and `monacoThemeFor()` derives Monaco. `applyTheme()` writes CSS custom properties to `:root` and stamps `data-theme`/`data-theme-kind`. `Terminal.tsx` and `Editor.tsx` subscribe to `useThemeStore` — hot-swap without restart. Adding a theme = one entry in `definitions.ts`. Foundational five (Void, Dracula, Synthwave, Paper, Solar) listed first.
 
 ### Live preview
 
-`src/components/preview/PreviewPane.tsx` uses an `<iframe>` (not a Tauri child WebView yet). It works for localhost dev servers because they don't set `X-Frame-Options`. `preview_detect` reads `package.json` to identify the framework, then probes conventional ports — see `src-tauri/src/preview/detector.rs` for the priority lists. `preview_watch_start` spawns a `notify-debouncer-mini` (150ms) that emits `preview:reload:<paneId>` events, consumed by `useEffect` in `PreviewPane`.
+`PreviewPane.tsx` uses an `<iframe>`. Works for localhost dev servers (no `X-Frame-Options`). `preview_detect` reads `package.json`, probes conventional ports per `src-tauri/src/preview/detector.rs`. `preview_watch_start` spawns `notify-debouncer-mini` (150ms) emitting `preview:reload:<paneId>`.
 
-### Preview element picker (cross-origin iframe injection)
+### Preview element picker (cross-origin)
 
-The parent (Tauri scheme) and the preview iframe (`http://localhost:<port>`) are cross-origin, so `iframe.contentDocument` is unreachable. The picker bridges them with two halves:
+Parent (Tauri scheme) and iframe (`http://localhost:<port>`) are cross-origin; `iframe.contentDocument` is unreachable. Two halves:
 
-1. **Iframe-side script** at `src-tauri/src/preview/picker_script.js` — injected into *every* frame at `document_start` via `tauri::plugin::Builder::js_init_script_on_all_frames(...)` registered as an inline plugin in `src-tauri/src/lib.rs`. This is the only iframe-script-injection mechanism in the repo; reuse the same plugin (or add another) before reaching for srcdoc/proxy hacks.
-2. **Parent controller** in `PreviewPane.tsx` — toggles `pickerActive`, sends `postMessage` commands to `iframe.contentWindow`, and listens for replies filtered by `e.source === iframeRef.current?.contentWindow` to avoid cross-pane bleed.
+1. **Iframe-side**: `src-tauri/src/preview/picker_script.js` injected at `document_start` into every frame via `tauri::plugin::Builder::js_init_script_on_all_frames(...)` (inline plugin in `lib.rs`). Only iframe-injection mechanism in the repo — reuse before reaching for srcdoc/proxy hacks.
+2. **Parent**: `PreviewPane.tsx` toggles `pickerActive`, `postMessage`s commands, filters replies by `e.source === iframeRef.current?.contentWindow`.
 
-The message envelope is `{ src: "anyspace", type: "picker:start" | "picker:stop" | "picker:selected" | "picker:cancelled", payload? }` (typed in `src/lib/elementContext.ts`). Keep `src: "anyspace"` on any new commands you add through this channel — the iframe script and parent listener both filter on it.
-
-The script also re-runs on every iframe `load`, so `PreviewPane.onIframeLoad` re-sends `picker:start` when the toggle is still on after a hard reload. Element capture walks the React fiber for `_debugSource` to attach a source-file location when available.
+Envelope `{ src: "anyspace", type: "picker:start"|"picker:stop"|"picker:selected"|"picker:cancelled", payload? }` (typed in `src/lib/elementContext.ts`). Keep `src: "anyspace"` on any new commands. Script re-runs on iframe `load`; `PreviewPane.onIframeLoad` re-sends `picker:start` if toggle still on. Capture walks React fiber for `_debugSource`.
 
 ### Frontend state
 
-Zustand stores in `src/stores/` — `themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`, `aiStore`, `proxyStore`, `screenshotStore` (plus the in-memory-only `paneDragStore`). The persisted ones are not auto-loaded — `App.tsx`'s mount effect explicitly calls each one's `load()`/`hydrate()`. Forgetting to await before reading is a common pitfall (the stores expose `loaded: boolean`). `aiStore.load()` deliberately awaits `useSttStore.load()` first to seed its API key on first run; preserve that ordering.
+Zustand stores in `src/stores/` — `themeStore`, `workspaceStore`, `kanbanStore`, `sttStore`, `aiStore`, `proxyStore`, `screenshotStore` (+ in-memory `paneDragStore`). Persisted stores aren't auto-loaded — `App.tsx`'s mount effect calls each `load()`/`hydrate()`. They expose `loaded: boolean`. `aiStore.load()` awaits `useSttStore.load()` first (seeds API key) — preserve ordering.
 
 ### App shell layout
 
-`App.tsx`'s root is a 2×2 CSS grid (`grid-template-areas: "sidebar titlebar" / "sidebar main"`): the sidebar spans both rows on the left, the tabbar (`app-titlebar`) sits in the top-right cell, and `app-main` (workspace content + status bar) fills the bottom-right cell. There is no `app-body` wrapper — sidebar, titlebar, and main are all direct children of `app-root`. Don't reintroduce a wrapper; it breaks the grid placement.
+`App.tsx` root is a 2×2 CSS grid (`"sidebar titlebar" / "sidebar main"`). Sidebar spans both rows; tabbar (`app-titlebar`) top-right; `app-main` (workspace + status bar) bottom-right. No `app-body` wrapper — don't reintroduce it.
 
-Drag regions are marked with `data-tauri-drag-region` directly on every element that should be part of the OS-level title-bar surface — Tauri 2.10's `drag.js` checks the attribute on the **immediate event target only**, so `"deep"` is **not** honored as a propagation marker in this version. The attribute lives on `.app-titlebar`, `.sidebar-brand`, the inner title-bar containers (`.tabbar`, `.tabbar-title`, `.tabbar-actions`, `.tabbar-tabs-spacer`), and the `.sidebar-brand` children (`.brand-mark`, `.brand-text`, `.brand-name`, `.brand-sub`). Interactive children (`.tab`, `.tab-close`, `.workspace-folder-pill`, the new-workspace button, `.nav-item`) stay attribute-free so their click handlers run normally. **`.tabbar-tabs` itself must NOT carry the attribute** — when the strip overflows, the horizontal scrollbar's mousedown target is `.tabbar-tabs`, and a drag region there hijacks scrollbar drag. The empty post-tabs area is instead an internal sibling `.tabbar-tabs-spacer` (`flex: 1 1 auto`, collapses to 0 on overflow) that carries the drag attribute — that keeps the empty surface draggable without breaking the scrollbar. Tauri 2.10 handles double-click maximize natively (mousedown path on Linux/Windows; mousedown + mouseup with cursor-stationary check on macOS), so no JS dblclick fallback is needed — when adding a new title-bar element, attach `data-tauri-drag-region=""` directly or it will be a dead zone on macOS.
+Drag regions: `data-tauri-drag-region` on the immediate event target only (Tauri 2.10's `drag.js` doesn't honor `"deep"`). Lives on `.app-titlebar`, `.sidebar-brand`, inner containers (`.tabbar`, `.tabbar-title`, `.tabbar-actions`, `.tabbar-tabs-spacer`), and `.sidebar-brand` children. Interactive children (`.tab`, `.tab-close`, `.workspace-folder-pill`, new-workspace button, `.nav-item`) stay attribute-free. **`.tabbar-tabs` must NOT carry it** — overflow scrollbar's mousedown lands there and gets hijacked. The `.tabbar-tabs-spacer` sibling (`flex:1 1 auto`, collapses on overflow) carries the attribute instead. Tauri 2.10 handles double-click maximize natively — no JS dblclick needed. Any new title-bar element needs `data-tauri-drag-region=""` or it's a dead zone on macOS.
 
-On macOS (`titleBarStyle: "Overlay"`, `hiddenTitle: true`), the traffic lights overlay the top-left corner of the sidebar — `[data-platform="macos"] .sidebar-brand` adds top padding to clear them. Don't add `padding-left: 78px` to the titlebar anymore; that was for the old full-width titlebar layout.
+macOS (`titleBarStyle:"Overlay"`, `hiddenTitle:true`): traffic lights overlay sidebar top-left — `[data-platform="macos"] .sidebar-brand` adds top padding. Don't re-add `padding-left:78px` to the titlebar (that was the old full-width layout).
 
 ### Terminal broadcast & Super Brain
 
-Multi-pane selection (`tab.selectedPaneIds`) drives two cooperating flows that both write to terminal PTYs:
+`tab.selectedPaneIds` drives two PTY-writer flows:
 
-- `src/lib/paneBroadcast.ts` — `broadcastBytes(originPaneId, bytes)` mirrors every keystroke from the active terminal to the other selected terminals in the same tab. Single-pane sessions short-circuit early so the registered `onData` wrapper is free when broadcast is off. STT dictation also fans out through this path.
-- `src/lib/superBrain.ts` — for each selected terminal, captures the latest OSC-133 command + output via `getTerminalContext()` (`terminalRegistry`), asks the AI for the next command, and writes the suggestion into the PTY **without a trailing newline**. The user reviews, then a single Enter is broadcast across all selected panes so each runs its tailored draft in parallel. Never auto-execute on the AI's behalf — the no-newline rule and the `sanitize()` stripping of fences/leading `$` exist precisely to prevent prompt-injection from running arbitrary commands.
+- `paneBroadcast.ts:broadcastBytes(originPaneId, bytes)` mirrors keystrokes from active terminal to other selected terminals in the same tab. Single-pane sessions short-circuit. STT dictation also fans out here.
+- `superBrain.ts` per-selected-terminal: captures latest OSC-133 command+output via `getTerminalContext()` (`terminalRegistry`), asks AI for next command, writes draft into PTY **without `\n`**. User reviews; one Enter is broadcast across all selected panes. Never auto-execute — no-newline rule and `sanitize()` (strips fences/leading `$`) prevent prompt-injection.
 
-Both rely on `terminalRegistry`'s per-pane handles. Anything that needs to read terminal context or write into a specific PTY by `paneId` should go through that registry, not by walking the DOM.
+Both go through `terminalRegistry`'s per-pane handles. Read context / write to PTY by `paneId` via the registry, not the DOM.
 
 ### Screenshot stack & mobile pane
 
-`src/components/screenshot/` plus `screenshotStore` implement a clipboard-like stack of captured frames (preview iframe via `capturePreview.ts`, mobile pane via `captureMobile.ts`) that the user drags onto a terminal pane to attach as input. The drop hit-test runs in `App.tsx`'s `onDragDropEvent` — it iterates `[data-pane-id]` rects directly because `elementFromPoint` gets confused by `.pane-drop-hint` and command-block overlays. The drag itself uses native pointer events (not HTML5 drag), same reasoning as pane-header drag.
+`src/components/screenshot/` + `screenshotStore` = clipboard-like stack of captured frames (preview iframe via `capturePreview.ts`, mobile via `captureMobile.ts`) draggable onto a terminal as input. Drop hit-test runs in `App.tsx:onDragDropEvent` and iterates `[data-pane-id]` rects directly (`elementFromPoint` is confused by `.pane-drop-hint` and command-block overlays). Native pointer events (same as pane-header drag).
 
-The mobile pane (`src-tauri/src/mobile/`, `src/lib/mobile.ts`) is **stage-1 skeleton** — `mobile_connect` and friends return "not implemented" until the scrcpy launcher (Android) and ScreenCaptureKit helper (iOS) land. The TS contract is locked so the React side can be wired against a stable shape; adding new mobile commands should match this skeleton-first pattern (Rust returns a typed error, TS wrapper is real).
+Mobile pane (`src-tauri/src/mobile/`, `src/lib/mobile.ts`) is **stage-1 skeleton** — `mobile_connect` etc. return "not implemented" until scrcpy launcher (Android) and ScreenCaptureKit helper (iOS) land. TS contract is locked. Follow skeleton-first pattern when adding mobile commands.
 
 ### Team mode
 
-Multi-agent workspaces live alongside solo workspaces. `TeamPickerTrigger` (next to `TemplatePickerTrigger` in the tab bar) collects goal + project dir + roster (role/label/AI program per agent) + skills + attachments and calls `useTeamStore.create()` → `launchTeam(teamId)` (`src/lib/teamLauncher.ts`). The launcher reuses `agent_launch` per agent, batches the resulting `PanePreset[]` into a single `newTab(N, name, presets, projectPath)` call, and persists `tab_id` + per-agent `pane_id` back to the `team_agents` table.
+Multi-agent workspaces. `TeamPickerTrigger` collects goal + project dir + roster (role/label/AI program per agent) + skills + attachments and calls `useTeamStore.create()` → `launchTeam(teamId)` (`src/lib/teamLauncher.ts`). Launcher reuses `agent_launch` per agent, batches `PanePreset[]` into a single `newTab(N, name, presets, projectPath)`, persists `tab_id` + per-agent `pane_id` in `team_agents`.
 
-**Coordination is file-based.** `team_init` materializes `<projectPath>/.anyspace/teams/<teamId>/` containing:
+**Coordination is file-based.** `team_init` materializes `<projectPath>/.anyspace/teams/<teamId>/`:
+- `BOARD.md` — roster + tasks + status (agent-edited, esp. Coordinator)
+- `MESSAGES.md` — append-only fenced blocks; inter-agent log
+- `.prompts/<labelSlug>.md` — per-agent role+goal+skills bundle, fed as `{task_file}`
+- `.rpc/` — req/res files for `tmsg pane …`
+- `.consumed/<labelSlug>.txt` — per-agent ack ledger for `tmsg check --consume`
 
-- `BOARD.md` — roster + task breakdown + status, edited by agents (especially the Coordinator)
-- `MESSAGES.md` — append-only fenced markdown blocks; the canonical inter-agent log
-- `.prompts/<labelSlug>.md` — per-agent role+goal+skills bundle, fed to the AI CLI as `{task_file}`
-- `.rpc/` — request/response files for `tmsg pane …` calls
-- `.consumed/<labelSlug>.txt` — per-agent ledger of message IDs the agent has acknowledged via `tmsg check --consume`
+**`tmsg` is a shell function**, not a binary. Embedded as `src-tauri/src/team/tmsg.sh` (via `include_str!`), written to `$TMPDIR/anyspace-shell-integration/tmsg.sh` per team launch. OSC 133 integration sources it conditionally when `$ANYSPACE_TEAM_TMSG` is set. Subcommands: `send`, `check [--consume]`, `roster`, `board`, `pane new|close|read|write` (RPC: writes `<.rpc/uuid>.req`, polls for `.res`; `pane new` splits the requester's pane via `teamRpc.ts:handleNew`).
 
-**`tmsg` is a shell function**, not a binary. Embedded as `src-tauri/src/team/tmsg.sh` (via `include_str!`) and written to `$TMPDIR/anyspace-shell-integration/tmsg.sh` on every team launch; the existing OSC 133 integration sources it conditionally when `$ANYSPACE_TEAM_TMSG` is set in a pane's env. Subcommands:
+**Two watchers per team** in `src-tauri/src/team/watcher.rs`, stored in `TeamManager`'s `DashMap<teamId, Vec<Debouncer>>`:
+- MESSAGES.md changes → `team:messages:<teamId>`. Only subscriber is `src/lib/operatorInbox.ts` (the legacy `TeamChatPanel.tsx` was deleted; `read_team_messages` Super Agent tool reads on demand).
+- New `.rpc/<uuid>.req` → `team:rpc:<teamId>` (`teamRpc.ts` dispatches to `getTerminalContext`/`closePane`/`ptyWrite`, calls `team_rpc_reply` to unblock).
 
-- `tmsg send --to <Label|@all|@operator> [--type message|status|escalation|done] --body "…"` — append a fenced block to `MESSAGES.md` (flock-protected).
-- `tmsg check [--consume]` — print messages addressed to me or `@all` not yet in my `.consumed` file.
-- `tmsg roster` / `tmsg board` — convenience readers.
-- `tmsg pane new|close|read|write` — RPC: writes `<.rpc/uuid>.req`, polls for `.res`. `tmsg pane new` splits the requester's pane and inserts a sibling running the same AI program with a fresh role+label (see `teamRpc.ts:handleNew`).
+**Operator inbox.** `operatorInbox.ts` listens per-team, re-reads MESSAGES.md via `parseMessages`, filters `to=@operator || type=escalation`, dedupes against `lastSeenTs[teamId]`, pushes to `useOperatorInboxStore`. `App.tsx`'s mount effect calls `syncOperatorInboxSubscriptions()` after `resumeTeam`; a `useTeamStore.subscribe` re-runs the sync on launch/archive (idempotent). Status-bar `● N @operator` pill clicks → `handoffInboxToSuperAgent` (`src/lib/operatorInboxHandoff.ts`) opens the SA rail, ensures session, appends one `role:"system"` summary, clears the inbox. Initial drain surfaces escalations from when the app was closed; empty MESSAGES.md seeds `lastSeenTs` to newest existing ts so history doesn't replay.
 
-**Two watchers per team**, both in `src-tauri/src/team/watcher.rs` and stored in `TeamManager`'s `DashMap<teamId, Vec<Debouncer>>`:
+**Operator → team panes** (both no-newline by default — operator presses Enter to actually run):
+- *Direct*: multi-select panes and type; `paneBroadcast.ts` fans keystrokes.
+- *Conversational*: Super Agent's `team_broadcast(team_id, text, with_newline?)` and `team_send_to_pane(team_id, text, pane_id?|label?, with_newline?)`. Targeted writes resolve `label` against `useTeamStore.agents[teamId]`.
 
-- MESSAGES.md changes → emit `team:messages:<teamId>`. The only frontend subscriber today is `src/lib/operatorInbox.ts` (see "Operator inbox" below). The legacy `TeamChatPanel.tsx` was deleted — the `read_team_messages` Super Agent tool reads MESSAGES.md on demand instead.
-- New `.rpc/<uuid>.req` files → emit `team:rpc:<teamId>` (`src/lib/teamRpc.ts` dispatches to `getTerminalContext` / `closePane` / `ptyWrite`, calls `team_rpc_reply` to write the `.res` that unblocks the agent).
+**Restart resume**: mount effect awaits `hydrateWorkspace()` → `loadKanban()` → `useTeamStore.load()`, then `resumeTeam(teamId)` for active teams whose `tab_id` matches a live tab. `resumeTeam` re-renders prompts, re-derives `pendingCommand`, writes back via `setPanePayload`. `Terminal.tsx:438` re-fires when `pendingCommand` flips undefined→string, even with `sessionId` already set. Team-RPC subscription re-established.
 
-**Operator inbox.** `src/lib/operatorInbox.ts` per-team listens on `team:messages:<teamId>`, re-reads MESSAGES.md via `parseMessages`, filters `to=@operator || type=escalation`, dedupes against `lastSeenTs[teamId]`, and pushes new pings into `useOperatorInboxStore`. `App.tsx`'s mount effect calls `syncOperatorInboxSubscriptions()` after `resumeTeam`, and a `useTeamStore.subscribe` re-runs the sync on launch/archive (idempotent — already-subscribed teams are skipped). The status-bar `● N @operator` pill renders when `pings.length > 0`; clicking it calls `handoffInboxToSuperAgent` (`src/lib/operatorInboxHandoff.ts`) which opens the SA rail, ensures an active session, and appends a single `role:"system"` message summarizing the unread pings before clearing the inbox. Initial drain on first subscribe surfaces escalations that arrived while the app was closed; if MESSAGES.md has content but no pings, the seed sets `lastSeenTs` to the newest existing ts so the inbox doesn't replay history.
+`.anyspace/` is in `.gitignore` but lives in the working tree so agents read it normally.
 
-**Operator → team panes.** Two parallel paths, both no-newline by default (Super Brain contract; the operator reviews and presses Enter to actually run):
-- *Direct manipulation* — multi-select panes (`tab.selectedPaneIds`) and type. `paneBroadcast.ts` fans every keystroke to selected sibling terminals.
-- *Conversational* — Super Agent's `team_broadcast(team_id, text, with_newline?)` and `team_send_to_pane(team_id, text, pane_id?|label?, with_newline?)` tools. Broadcast wraps `runSuperBrainTeamBroadcast`; targeted writes resolve `label` against `useTeamStore.agents[teamId]` to find the live `paneId`.
+**Auto-archive on tab close.** `App.tsx` subscribes to `useWorkspaceStore`, calls `useTeamStore.archive(teamId)` when team's `tabId` leaves `tabs`. Stops watchers, marks `teams.status='archived'`. Team files stay on disk; reactivation from Teams view re-launches.
 
-**Restart resume**: `App.tsx`'s mount effect awaits `hydrateWorkspace()` → `loadKanban()` → `useTeamStore.load()`, then calls `resumeTeam(teamId)` for every active team whose `tab_id` matches a live tab. `resumeTeam` re-renders prompt files (so role/skill changes between releases propagate), re-derives the `pendingCommand`, and writes it back into the existing pane payloads via `setPanePayload`. The Terminal effect at `Terminal.tsx:438` re-fires when `pendingCommand` flips from undefined to a string, even if `sessionId` was already set — so re-injecting after PTY spawn still runs the agent CLI. The team-RPC subscription is also re-established here.
+**Teams view** (`src/components/team/TeamsView.tsx`) is a sidebar nav between Kanban and Agents. Per-row: Open / Launch / Reactivate / Rename / Archive. `reactivate(teamId)` clears stale `tab_id` and per-agent `pane_id` before relaunch.
 
-**`tmsg.sh` paths and team data are gitignorable.** `.anyspace/` is in this repo's own `.gitignore`. The directory is intentionally inside the working tree so agents can read it with their normal file tools.
-
-**Auto-archive on tab close.** `App.tsx` subscribes to `useWorkspaceStore` and calls `useTeamStore.archive(teamId)` whenever a team's `tabId` disappears from `tabs`. This stops the watchers, marks `teams.status = 'archived'`, and prevents resume from trying to revive a dead tab. The team's `.anyspace/teams/<id>/` files stay on disk; reactivating from the Teams view re-launches a fresh tab against them.
-
-**Teams view (`src/components/team/TeamsView.tsx`)** is a sidebar nav target between Kanban and Agents. Lists active + archived teams with per-row actions: Open (focus existing tab), Launch (active without live tab → fresh tab), Reactivate (archived → active), Rename (double-click team name), Archive. `useTeamStore.reactivate(teamId)` clears stale `tab_id` and per-agent `pane_id` before relaunch, so the next `launchTeam` writes a fresh layout.
-
-**`settings.team` shape** (read/written via `useTeamSettingsStore`, plain JSON in the existing `settings_get/set("team")` slot):
-
+**`settings.team`** (via `useTeamSettingsStore`, JSON in `settings_get/set("team")`):
 ```ts
-{
-  customSkills: { id, label, body }[],         // user-defined skill checkboxes
-  customRoles:  { id, label, accent?, body }[],// user-defined roles
-  templates:    { id, name, goalSeed?, roster, skillIds }[],
-}
+{ customSkills: {id,label,body}[], customRoles: {id,label,accent?,body}[], templates: {id,name,goalSeed?,roster,skillIds}[] }
 ```
+Old keys (`chatPanelWidth`/`chatPanelMode`) ignored silently. No migration needed. Custom role ids prefixed with `custom:` (no collision with `BUILTIN_ROLES`). Use `roleLabel/Accent/PromptBody(role, customRoles)` for either; legacy `ROLE_LABELS`/`ROLE_ACCENTS` still work for built-in-only. New built-in role still requires editing `teamRoles.ts` (BUILTIN_ROLES, BUILTIN_LABELS, BUILTIN_ACCENTS, BUILTIN_BODIES — body map is the easy miss).
 
-Old keys `chatPanelWidth` / `chatPanelMode` may exist in stored JSON from prior versions — the loader's spread + array filtering ignores them silently. No migration needed.
+**Templates** snapshot `{name, goalSeed, roster, skillIds}`. Roster rows store `agentId` hint; if the kanban agent was deleted, apply falls back to first available. Save is a button next to Cancel.
 
-Custom role ids must be unique against `BUILTIN_ROLES` — the picker prefixes them with `custom:` so collisions can't happen. Helpers `roleLabel(role, customRoles)` / `roleAccent(role, customRoles)` / `rolePromptBody(role, customRoles)` resolve either built-in or custom; legacy callers can still use `ROLE_LABELS` / `ROLE_ACCENTS` for built-in-only lookup. Adding a new built-in role still requires editing `teamRoles.ts` (BUILTIN_ROLES, BUILTIN_LABELS, BUILTIN_ACCENTS, BUILTIN_BODIES) — TS catches three of those, the body map is the easy miss.
+**AI-assisted decomposition** (`src/lib/teamDecompose.ts`) calls `aiChat` with strict-JSON system prompt + catalog of built-in roles/programs/skills. Output `{teamName, roster:[{role,label,programHint}], skillIds, notes?}`. Tolerates stray sentences and ```json fences. Picker button fills form; missing `programHint` falls back to first kanban agent.
 
-**Templates** snapshot `{ name, goalSeed, roster, skillIds }`. Roster rows store an `agentId` *hint*; if the kanban agent for that hint was deleted, apply falls back to the first available. Apply happens in-form (no commit until the user hits Launch); Save is a button next to Cancel that prompts for a name.
+**MESSAGES.md compaction.** `team_compact_messages` (`src-tauri/src/team/commands.rs`) holds the same `flock(.lock)` `tmsg.sh` uses, splits at block boundaries, appends oldest to `MESSAGES.archive.md`, atomically replaces MESSAGES.md. Default 500/keep 250. Triggered from `operatorInbox.ts:maybeCompact` (debounced 60s/team). **Unix-only** (Windows = no-op stub); team mode still works on Windows because `tmsg.sh`'s `/usr/bin/flock` holds the lock inside WSL.
 
-**AI-assisted decomposition** (`src/lib/teamDecompose.ts`) calls the existing `aiChat` Rust command with a strict-JSON system prompt and the catalog of built-in roles, kanban programs, and built-in skills as context. Output schema is `{ teamName, roster: [{role, label, programHint}], skillIds, notes? }`. Parser tolerates one or two stray sentences and ```json fences. Picker button next to the Goal label fills name + roster + skills; missing program hints fall back to the first kanban agent. `notes` shows as a form hint so the operator sees the model's rationale.
+**Voice-to-team.** STT `inject.ts:fanToTeamPanes(originPaneId, originSessionId, bytes)` runs after the normal terminal write. If source pane is in a team tab and `tab.selectedPaneIds.length < 2`, dictation fans to other team-pane PTYs (no newline). Explicit multi-select uses `broadcastBytes`; `fanToTeamPanes` short-circuits to avoid double-writes.
 
-**MESSAGES.md compaction.** `team_compact_messages` Rust command (`src-tauri/src/team/commands.rs`) holds the same `flock(.lock)` `tmsg.sh` uses, splits MESSAGES.md at block boundaries, appends the oldest blocks to `MESSAGES.archive.md`, and atomically replaces MESSAGES.md with the recent slice. Threshold defaults to 500/keep 250. Now triggered from `operatorInbox.ts:maybeCompact` after every watcher refresh, debounced 60s per team — the chat panel was the previous trigger. Unix-only — Windows builds get a no-op stub. The `.lock` file is the only place we use `libc::flock`; tmsg.sh's `flock -x 9` and our `LOCK_EX` are the same kernel BSD-flock primitive, so they coordinate even though tmsg uses `/usr/bin/flock`.
-
-**Voice-to-team.** STT `inject.ts` adds `fanToTeamPanes(originPaneId, originSessionId, bytes)` after the normal terminal write. When the source pane belongs to a team tab and `tab.selectedPaneIds.length < 2`, the dictation is fanned into every other team-pane PTY (no newline). With explicit multi-pane selection, `broadcastBytes` already handles fan-out — `fanToTeamPanes` short-circuits to avoid double-writes.
-
-**Resume logging.** `[team.resume] start/skip/done` in `teamLauncher.ts` and `[terminal] pendingCommand armed/firing` in `Terminal.tsx` are the two log lines to grep when verifying a restart-resume — together they tell you whether (a) the team data hydrated, (b) per-agent prompts re-rendered, (c) the 600ms-delayed effect re-fired after sessionId already settled.
+**Resume logging.** Grep `[team.resume] start/skip/done` (`teamLauncher.ts`) and `[terminal] pendingCommand armed/firing` (`Terminal.tsx`) to verify restart resume.
 
 ### Super Agent
 
-Multi-turn AI chat that lives **inside the app** and can call tools to inspect/manipulate the workspace. Distinct from Team mode (external CLIs in PTYs) and from Super Brain v1 (one-shot ⌘⇧B draft writer — preserved unchanged).
+Multi-turn AI chat **inside the app** with tools for inspecting/manipulating the workspace. Distinct from Team mode (external CLIs in PTYs) and Super Brain v1 (one-shot ⌘⇧B — preserved).
 
-**Two surfaces, one runtime:**
-- **Side rail** in the workspace (`SuperAgentPanel mode="rail"`, mounted in `WorkspaceView` when `useSuperAgentStore.panelOpen`). The workspace grid is 1fr + `var(--super-agent-w)` when open. Pointer-drag resize handle on the left edge persists `settings.superAgent.panelWidth` (clamped 240–720).
-- **Full-page view** at `selectedView === "superagent"`, sidebar nav between Teams and Agents (`SuperAgentPanel mode="full"`).
-- **Collapsed pill** (`.sa-collapsed-tab`) renders inside `.workspace-content` when `panelOpen` is false; click expands the rail.
+**Surfaces:**
+- **Side rail** (`SuperAgentPanel mode="rail"`, in `WorkspaceView` when `useSuperAgentStore.panelOpen`). Workspace grid becomes `1fr + var(--super-agent-w)`. Pointer-drag resize on left edge persists `settings.superAgent.panelWidth` (clamped 240–720).
+- **Full-page** at `selectedView === "superagent"` (sidebar nav between Teams and Agents; `mode="full"`).
+- **Collapsed pill** (`.sa-collapsed-tab`) in `.workspace-content` when closed.
 
 **Data model** (migration `005_super_agent.sql`):
-- `super_agent_sessions` — one row per conversation. `system_prompt_override` lets per-session prompts override the Settings default.
-- `super_agent_messages` — per-turn rows keyed by `(session_id, ordinal)`. `role` is `user|assistant|tool|system`. `tool_calls_json` and `tool_results_json` are JSON-encoded arrays — tool messages can hold multiple results (one per tool call from the previous assistant turn).
+- `super_agent_sessions` — one row per conversation; `system_prompt_override` overrides Settings default.
+- `super_agent_messages` — keyed `(session_id, ordinal)`, roles `user|assistant|tool|system`; `tool_calls_json`/`tool_results_json` are JSON arrays.
 
 **Streaming AI** (`src-tauri/src/ai/stream.rs`):
-- `ai_chat_stream(args, on_event)` POSTs to `/chat/completions` with `stream: true`, parses SSE `data: {…}` lines via `reqwest::Response::bytes_stream()` (requires the `stream` feature on the reqwest dep), and emits typed events through a `Channel<StreamEvent>`: `delta { content }` / `tool_call_delta { index, id?, name?, arguments_partial? }` / `done { finish_reason? }` / `error`.
-- **Aborts** are tracked in `ai::AiStreamManager` (DashMap of oneshot senders). `abort_ai_chat_stream(stream_id)` resolves the cancel signal mid-stream.
-- **Fallback**: if streaming returns 4xx, the same module retries one-shot and synthesizes a single `delta` then `done` so the runner code path doesn't branch.
+- `ai_chat_stream(args, on_event)` POSTs `stream:true`, parses SSE via `Response::bytes_stream()` (needs `stream` feature on reqwest), emits typed events through `Channel<StreamEvent>`: `delta{content}` / `tool_call_delta{index,id?,name?,arguments_partial?}` / `done{finish_reason?}` / `error`.
+- **Aborts** in `ai::AiStreamManager` (DashMap of oneshot senders); `abort_ai_chat_stream(stream_id)` resolves mid-stream.
+- **Fallback**: 4xx on stream → retries one-shot, synthesizes a single `delta` + `done` so runner code path doesn't branch.
 
 **ReAct loop** (`src/lib/superAgent/runner.ts`):
-1. Append the user message; persist.
-2. Build history (system prompt + last `memoryWindow` messages + `tools[]` for enabled tools). `role:"system"` messages in history are skipped — the runner always re-injects the current Settings system prompt fresh, so display-only system bubbles (e.g. operator inbox handoff notes) never duplicate or pollute the model context.
-3. `aiChatStream` → tokens stream into a live assistant bubble; tool_call_deltas accumulate by index.
-4. On `done`, parse completed tool calls; for each: short-circuit if disabled, queue if `pauseToolCalls` is on, else execute immediately.
-5. Persist a `tool` role message with all results; loop back to step 2 until the assistant returns plain content with no tool_calls or `maxToolCallsPerTurn` is hit.
+1. Append user message; persist.
+2. Build history (system prompt + last `memoryWindow` messages + `tools[]` for enabled tools). `role:"system"` in history is skipped — runner always re-injects the current Settings system prompt fresh, so display-only system bubbles (e.g. operator inbox handoff) don't duplicate or pollute context.
+3. `aiChatStream` → tokens into live assistant bubble; tool_call_deltas accumulate by index.
+4. On `done`: for each completed tool call, short-circuit if disabled, queue if `pauseToolCalls`, else execute.
+5. Persist `tool` message with all results; loop until plain content (no tool_calls) or `maxToolCallsPerTurn` hit.
 
-**Trust mode** — there's no approval modal. Write tools execute immediately. The audit surface is the inline `ToolCallCard` in the chat. The panel header has a global **pause-tool-calls** toggle (red dot icon when active) that flips queue mode on; queued cards expose Run/Skip buttons that the runner observes via a Zustand subscription. Per-tool **disable** lives in Settings → Super Agent → Tools — disabled tools are stripped from the model's `tools[]` payload AND short-circuit at execution time as `disabled` cards.
+**Trust mode** — no approval modal. Write tools execute immediately. Audit surface = inline `ToolCallCard`. Panel-header global **pause-tool-calls** toggle flips queue mode; queued cards expose Run/Skip observed via Zustand subscribe. Per-tool **disable** in Settings → Super Agent → Tools — stripped from model's `tools[]` AND short-circuited at execution as `disabled` cards.
 
-**Tool registry** (`src/lib/superAgent/tools.ts`): typed `Tool[]` with JSON-schema parameters. Read tools wrap `getTerminalContext` / `fsListDirRecursive` / `gitStatus` / `previewDetect` / store accessors and include `read_team_messages` (on-demand `parseMessages` over MESSAGES.md, newest-first with `since_ts` / `from` / `to` / `type` / `limit` filters). Write tools wrap `ptyWrite` / `useWorkspaceStore.newTab+closePane` / `useKanbanStore.createTask` / direct MESSAGES.md append / `useTeamStore.create + launchTeam`, plus the team-write helpers `team_broadcast` (fan to every team pane via `runSuperBrainTeamBroadcast`) and `team_send_to_pane` (resolve `paneId` directly or via team-agent `label`). The `quick_suggest` tool wraps `runQuickSuggest` (the renamed Super Brain v1 helper) so the chat can suggest "next command" for any pane. New tools are default-enabled — `superAgentSettings.toolEnabled[name] !== false` is the gate, so unknown keys mean "enabled".
+**Tool registry** (`src/lib/superAgent/tools.ts`): typed `Tool[]` with JSON-schema params. Read tools wrap `getTerminalContext`/`fsListDirRecursive`/`gitStatus`/`previewDetect`/stores; includes `read_team_messages` (newest-first `parseMessages` over MESSAGES.md, filters `since_ts`/`from`/`to`/`type`/`limit`). Write tools wrap `ptyWrite`/`newTab+closePane`/`createTask`/MESSAGES.md append/`create+launchTeam`, plus `team_broadcast` (`runSuperBrainTeamBroadcast`) and `team_send_to_pane` (resolves `paneId` directly or via `label`). `quick_suggest` wraps `runQuickSuggest` (renamed Super Brain v1 helper). New tools default-enabled — `toolEnabled[name] !== false` is the gate.
 
-**⌘⇧B is unchanged.** `runSuperBrain(tabId)` keeps the legacy keyboard pipeline (single round-trip via `aiChat`, no chat history, draft into PTY without `\n`). Internally it now delegates to `runQuickSuggest({ paneId, write: true })`. The shortcut wiring in `App.tsx` and `shortcuts.ts` doesn't change.
+**⌘⇧B unchanged.** `runSuperBrain(tabId)` keeps the legacy keyboard pipeline (single `aiChat`, no history, draft into PTY without `\n`). Internally delegates to `runQuickSuggest({paneId, write:true})`. Wiring in `App.tsx`/`shortcuts.ts` unchanged.
 
-**Voice-in.** The Super Agent textarea registers itself in `inputRegistry.ts` (mirrors `editorRegistry`). STT inject's last-resort fallback (`inject.ts`) — after the focused-input / focused-pane checks fail — checks `useSuperAgentStore.panelOpen || selectedView === "superagent"` and writes into the registered textarea via `setRangeText` + dispatched input events (so the controlled React state updates).
+**Voice-in.** Super Agent textarea registers in `inputRegistry.ts` (mirrors `editorRegistry`). STT's last-resort fallback (`inject.ts`) — after focused-input / focused-pane checks fail — checks `useSuperAgentStore.panelOpen || selectedView === "superagent"` and writes via `setRangeText` + dispatched input events (controlled React state updates).
 
-**Settings** are persisted under JSON key `"superAgent"` via `useSuperAgentSettingsStore` (mirrors `aiStore`). Endpoint / API key / model are *optional overrides* — empty strings fall back to the AI section's values, so most operators only configure once. Per-tool toggles default to enabled; flipping off removes from the `tools[]` payload.
+**Settings** persisted under `"superAgent"` via `useSuperAgentSettingsStore`. Endpoint/key/model are *optional overrides* — empty strings fall back to AI section. Per-tool toggles default enabled.
 
-**Streaming caveat for Anthropic-compatible endpoints.** OpenAI's tool-calling JSON shape is what the runner emits in history (`assistant.tool_calls[]` and `tool` role replies keyed by `tool_call_id`). Most OpenAI-compat shims (Groq, OpenRouter, Together) accept this verbatim. Anthropic's native API doesn't — set the endpoint to an OpenAI-compat proxy (e.g. OpenRouter's `anthropic/claude-3.5-sonnet`) rather than `api.anthropic.com/v1` directly.
+**Streaming caveat for Anthropic-compatible endpoints.** Runner emits OpenAI's tool-calling shape (`assistant.tool_calls[]`, `tool` role keyed by `tool_call_id`). OpenAI-compat shims (Groq, OpenRouter, Together) accept verbatim; Anthropic's native API doesn't — use an OpenAI-compat proxy.
 
 ### Windows
 
-Windows is supported but constrained — `cmd.exe` and PowerShell can't source the bash/zsh OSC 133 hook that Super Brain, command blocks, and `tmsg.sh` all depend on, so terminals run **inside WSL**.
+Supported but constrained — `cmd.exe`/PowerShell can't source the bash/zsh OSC 133 hook that Super Brain, command blocks, and `tmsg.sh` depend on, so terminals run **inside WSL**.
 
-`pick_shell()` in `src-tauri/src/pty/session.rs` probes `C:\Windows\System32\wsl.exe`. If present it spawns `wsl.exe -e bash -il`; if missing it returns `Err(anyhow!("WSL_NOT_INSTALLED"))`, which `pty_spawn` forwards to the frontend verbatim. `Terminal.tsx` pattern-matches that string and renders the `WSL is required on Windows` overlay (link to `learn.microsoft.com/windows/wsl/install`) instead of falling back to a degraded shell.
+`pick_shell()` (`src-tauri/src/pty/session.rs`) probes `C:\Windows\System32\wsl.exe`. Present → `wsl.exe -e bash -il`. Missing → `Err(anyhow!("WSL_NOT_INSTALLED"))`, forwarded to frontend; `Terminal.tsx` pattern-matches and renders the WSL-required overlay (link to install docs) instead of a degraded shell.
 
-Two crossings between Windows and Linux file-system / env-var namespaces:
+Two namespace crossings:
+- **`--rcfile` arg**: bash wrapper rc lives at Windows-native temp path; `shell_integration::scripts::to_wsl_path()` rewrites to `/mnt/c/…` under `#[cfg(windows)]`.
+- **`WSLENV`**: env vars don't reach Linux processes by default. Windows branch of `PtySession::spawn` builds `WSLENV` with `/p` for path-typed keys (`ANYSPACE_SHELL_INTEGRATION`, `BASH_ENV`, `ANYSPACE_TEAM_BIN_DIR`, `ANYSPACE_TEAM_TMSG`, `ANYSPACE_TASK_FILE`) and verbatim for ID/URL/string keys (`ANYSPACE_PANE_ID`, `ANYSPACE_TAB_ID`, `ANYSPACE_API_URL`, `ANYSPACE_API_TOKEN`, `TERM`, `COLORTERM`). Existing `WSLENV` preserved by prepend.
 
-- **`--rcfile` arg.** The bash wrapper rc lives at a Windows-native temp path (`C:\Users\…\Temp\anyspace-shell-integration\bashrc-wrapper.sh`). bash inside WSL can't read that path verbatim, so `shell_integration::scripts::to_wsl_path()` rewrites it to `/mnt/c/Users/…/Temp/anyspace-shell-integration/bashrc-wrapper.sh` before it's appended to the command line. Translation only fires under `#[cfg(windows)]`.
-- **`WSLENV`.** Windows env vars don't reach Linux processes by default — they only forward when listed in `WSLENV`. The Windows branch of `PtySession::spawn` builds `WSLENV` with `/p` for path-typed keys (`ANYSPACE_SHELL_INTEGRATION`, `BASH_ENV`, `ANYSPACE_TEAM_BIN_DIR`, `ANYSPACE_TEAM_TMSG`, `ANYSPACE_TASK_FILE` — WSL auto-translates the value) and verbatim entries for ID/URL/string keys (`ANYSPACE_PANE_ID`, `ANYSPACE_TAB_ID`, `ANYSPACE_API_URL`, `ANYSPACE_API_TOKEN`, `TERM`, `COLORTERM`). Pre-existing `WSLENV` in the parent process is preserved by prepending it.
+If WSL distro has `automount` disabled in `/etc/wsl.conf`, `/mnt/c/…` doesn't exist and the bash wrapper rc can't source — OSC 133 no-ops silently. Fix: `automount = true` + `wsl --shutdown`.
 
-If the user's WSL distro has the `automount` option disabled in `/etc/wsl.conf`, `/mnt/c/…` won't exist and the bash wrapper rc can't be sourced — OSC 133 silently no-ops in that case (terminal still works, but Super Brain / command blocks won't fire). Re-enabling `automount = true` and `wsl --shutdown` fixes it.
+Other gates:
+- **iOS preview hidden on non-macOS** (`DeviceChooser.tsx` checks `isMacPlatform()`; Rust `simctl.rs`/`ios_simulator.rs` stub on non-macOS; stale `target:"ios"` payload coerced to `"android"` in the chooser's `useState` initializer).
+- **Android pane works on Windows** with `adb.exe` + `scrcpy(.exe)` on PATH (`mobile/adb.rs` prefers `.exe` under `cfg!(windows)`).
+- **Team mode** runs in WSL so `tmsg.sh` (bash, `flock`, `uuidgen`) works as-is. MESSAGES.md compaction (`#[cfg(unix)] libc::flock`) is no-op on Windows; team mode still works because `/usr/bin/flock` holds the lock inside WSL.
+- **`enable_media_capture`** (WKPreferences private SPI in `lib.rs`) is macOS-only; WebView2 grants media permissions differently — STT works on Windows without it.
+- **STT hotkey default**: `ControlRight` Windows/Linux, `AltRight` macOS — `sttStore.defaultHotkey()` platform-switches.
 
-Other Windows gates already in place:
-
-- **iOS preview is hidden on non-macOS.** `src/components/mobile/DeviceChooser.tsx` only renders the iOS tab when `isMacPlatform()` returns true. `src-tauri/src/mobile/simctl.rs` and `ios_simulator.rs` already stub out to empty/`None` on non-macOS, so a stale `target: "ios"` payload gets coerced to `"android"` in the chooser's `useState` initializer rather than blowing up at the Rust layer.
-- **Android pane works on Windows** if `adb.exe` and `scrcpy` (or `scrcpy.exe`) are on `PATH`. `src-tauri/src/mobile/adb.rs` already prefers `adb.exe` under `cfg!(windows)`.
-- **Team mode** runs inside WSL so `tmsg.sh` (bash-only, uses `flock` + `uuidgen`) works as-is — the user's WSL distro must have those binaries (default on Ubuntu/Debian). MESSAGES.md compaction (`#[cfg(unix)]` `libc::flock`) is a no-op on Windows builds; team mode still works because the lock is held by `tmsg.sh`'s `/usr/bin/flock` inside WSL, not by the Rust host.
-- **`enable_media_capture`** (the WKPreferences private SPI hook in `lib.rs`) is macOS-only; WebView2 grants media permissions through a different mechanism, so STT recording works on Windows without it.
-- **STT hotkey default** is `ControlRight` on Windows/Linux, `AltRight` on macOS — `sttStore.defaultHotkey()` already platform-switches.
-
-Trying to support `cmd.exe` / PowerShell as a fallback shell is a non-goal: any new feature that depends on terminal output should assume bash inside WSL and use the existing OSC 133 / `tmsg` plumbing.
+Supporting `cmd.exe`/PowerShell as fallback is a non-goal: terminal-output-dependent features assume bash-in-WSL with OSC 133 + `tmsg` plumbing.
 
 ### Build artifacts
 
-`src-tauri/gen/` (gitignored) is regenerated by Tauri from `tauri.conf.json` on every build — do not edit. `src-tauri/icons/` are placeholder purple PNGs; replace before any release bundle.
+`src-tauri/gen/` (gitignored) is regenerated by Tauri from `tauri.conf.json` every build — do not edit. `src-tauri/icons/` are placeholder purple PNGs; replace before release.
