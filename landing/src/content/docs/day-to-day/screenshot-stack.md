@@ -2,7 +2,7 @@
 title: Screenshot stack
 description: A clipboard-like column of captured frames you can drag onto a terminal to attach as agent input.
 section: day-to-day
-order: 80
+order: 75
 updated: 2026-05-09
 ---
 
