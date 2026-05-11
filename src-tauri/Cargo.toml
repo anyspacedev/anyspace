@@ -46,6 +46,11 @@ dashmap = "6"
 # here just makes the call sites compile cleanly.
 libc = "0.2"
 
+# OS keychain for SSH host passwords. Backed by libsecret (Linux) /
+# Keychain (macOS) / Credential Manager (Windows). `sync-secret-service`
+# avoids pulling a second tokio runtime on Linux.
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+
 # http probe for preview port detection
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks", "stream"] }
 
@@ -83,6 +88,24 @@ rmcp = { version = "1.6.0", features = ["server", "macros", "transport-streamabl
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", features = ["v2_38"] }
 device_query = "2"
+
+# Direct dependency on the Secret Service D-Bus client so we can bootstrap
+# the user's default collection on first SSH password save. On fresh Debian/
+# XFCE installs the login keyring is never created (no PAM login captures
+# the user's password), so gnome-keyring runs with only an in-memory
+# `session` collection and `Entry::new()` from the `keyring` crate fails
+# with "no result found". Calling `create_collection("Login", "default")`
+# pops `gcr-prompter` once to set a master password, then keychain works.
+# Version pinned to the same minor `keyring` already pulls transitively.
+dbus-secret-service = "4"
+# Raw D-Bus access so we can call `org.freedesktop.DBus.UpdateActivationEnvironment`
+# before triggering the keyring prompter. The session dbus-daemon often
+# starts before the X session sets DISPLAY/XAUTHORITY; without those in
+# its activation env, D-Bus-activated gcr-prompter spawns into the void
+# and gnome-keyring reports the prompt as "dismissed". Propagating the
+# Tauri process's display env to the daemon fixes that. Already in the
+# tree transitively via `dbus-secret-service`.
+dbus = "0.9"
 
 # macOS WKWebView hides navigator.mediaDevices on non-https origins by default.
 # We poke the private WKPreferences keys at startup so the API is exposed; wry's

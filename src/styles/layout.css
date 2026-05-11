@@ -6652,6 +6652,40 @@ body.screenshot-dragging {
   color: var(--danger, #d04747);
   font-size: var(--font-size-sm);
 }
+.ssh-host-form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.ssh-auth-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+  align-self: flex-start;
+}
+.ssh-auth-toggle-btn {
+  background: transparent;
+  border: 0;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  padding: 4px 12px;
+  border-radius: calc(var(--radius-md) - 2px);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.ssh-auth-toggle-btn:hover {
+  color: var(--fg);
+}
+.ssh-auth-toggle-btn.is-active {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
 
 .ssh-settings-summary {
   display: flex;

@@ -460,4 +460,27 @@ export type AgentApiRequestEvent = {
   payload: Record<string, unknown>;
 };
 
+// SSH keychain CRUD. Passwords for stored SSH hosts live in the OS keychain
+// (libsecret on Linux, Keychain on macOS, Credential Manager on Windows),
+// keyed by the host's id. The host record itself only carries a non-secret
+// `authMethod` flag.
+export async function sshPasswordSet(hostId: string, password: string): Promise<void> {
+  return rawInvoke("ssh_password_set", { hostId, password });
+}
+
+export async function sshPasswordGet(hostId: string): Promise<string | null> {
+  return rawInvoke<string | null>("ssh_password_get", { hostId });
+}
+
+export async function sshPasswordDelete(hostId: string): Promise<void> {
+  return rawInvoke("ssh_password_delete", { hostId });
+}
+
+/** Writes a one-shot SSH_ASKPASS script holding the password and returns
+ *  the env vars that should be merged into the ssh child env. The script
+ *  is auto-deleted after a short window. */
+export async function sshAskpassPrepare(password: string): Promise<Record<string, string>> {
+  return rawInvoke<Record<string, string>>("ssh_askpass_prepare", { password });
+}
+
 export { Channel };

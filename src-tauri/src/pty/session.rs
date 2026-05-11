@@ -143,6 +143,10 @@ impl PtySession {
                 "ANYSPACE_TEAM_BIN_DIR",
                 "ANYSPACE_TEAM_TMSG",
                 "ANYSPACE_TASK_FILE",
+                // SSH password auth: ssh inside WSL reads the askpass script
+                // path from this env var, and the script itself lives on the
+                // Windows host's $TMPDIR — `/p` translates `C:\...` to `/mnt/c/...`.
+                "SSH_ASKPASS",
             ];
             let plain_keys = [
                 "TERM",
@@ -151,6 +155,9 @@ impl PtySession {
                 "ANYSPACE_TAB_ID",
                 "ANYSPACE_API_URL",
                 "ANYSPACE_API_TOKEN",
+                // SSH password auth knobs — string-typed, no translation.
+                "SSH_ASKPASS_REQUIRE",
+                "DISPLAY",
             ];
             let mut parts: Vec<String> = std::env::var("WSLENV")
                 .ok()

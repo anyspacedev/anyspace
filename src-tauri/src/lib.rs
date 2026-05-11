@@ -16,6 +16,7 @@ mod pty;
 mod screenshot;
 mod settings;
 mod shell_integration;
+mod ssh;
 mod stt;
 mod team;
 mod workspace;
@@ -194,6 +195,11 @@ pub fn run() {
             agent_api::commands::agent_api_info,
             agent_api::commands::agent_api_reply,
             agent_api::commands::agent_api_rotate_token,
+            // SSH (keychain-backed password auth + askpass helper)
+            ssh::commands::ssh_password_set,
+            ssh::commands::ssh_password_get,
+            ssh::commands::ssh_password_delete,
+            ssh::commands::ssh_askpass_prepare,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -201,6 +207,13 @@ pub fn run() {
             window.open_devtools();
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             enable_media_capture(&window);
+            // Tauri is running inside the user's graphical session, so our
+            // env has DISPLAY/XAUTHORITY set even when the session
+            // dbus-daemon's activation env doesn't. Push them so anything
+            // D-Bus-activated later (gcr-prompter, etc.) can actually open
+            // a window. Best-effort; no-op on macOS/Windows.
+            #[cfg(target_os = "linux")]
+            ssh::commands::propagate_display_env_to_dbus();
             #[cfg(target_os = "macos")]
             stt::hotkey_monitor::install(app.handle().clone());
             #[cfg(target_os = "linux")]

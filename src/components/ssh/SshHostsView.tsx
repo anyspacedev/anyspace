@@ -4,6 +4,8 @@ import { Icon } from "../ui/Icon";
 import { useSshHostsStore, type SshHost } from "../../stores/sshHostsStore";
 import { useWorkspaceStore, type PanePreset } from "../../stores/workspaceStore";
 import { buildSshArgs, formatHostTarget } from "../../lib/sshCommand";
+import { sshAskpassPrepare, sshPasswordGet } from "../../lib/tauri";
+import { toast } from "../../stores/toastStore";
 import { SshHostForm } from "./SshHostForm";
 
 type Mode =
@@ -11,12 +13,38 @@ type Mode =
   | { kind: "edit"; host: SshHost }
   | { kind: "add" };
 
-function connect(host: SshHost) {
+async function connect(host: SshHost) {
   const ws = useWorkspaceStore.getState();
+  let spawnEnv: Record<string, string> | undefined;
+
+  if (host.authMethod === "password") {
+    let password: string | null = null;
+    try {
+      password = await sshPasswordGet(host.id);
+    } catch (e) {
+      toast.error("Couldn't read SSH password", String(e));
+      return;
+    }
+    if (!password) {
+      toast.warn(
+        "No password saved",
+        "Edit this host and enter a password before connecting.",
+      );
+      return;
+    }
+    try {
+      spawnEnv = await sshAskpassPrepare(password);
+    } catch (e) {
+      toast.error("Failed to set up password auth", String(e));
+      return;
+    }
+  }
+
   const preset: PanePreset = {
     kind: "terminal",
     sshHostId: host.id,
     spawnProgram: buildSshArgs(host),
+    spawnEnv,
     title: host.name,
   };
   const activeTab = ws.tabs.find((t) => t.id === ws.activeTabId);
@@ -82,6 +110,11 @@ export function SshHostsView() {
                     <div className="ssh-host-row-name">{host.name}</div>
                     <div className="ssh-host-row-target">
                       {formatHostTarget(host)}
+                      {host.authMethod === "password" && (
+                        <span className="ssh-host-row-tag" title="Password auth (stored in OS keychain)">
+                          password
+                        </span>
+                      )}
                       {host.jumpHost && (
                         <span className="ssh-host-row-tag">via {host.jumpHost}</span>
                       )}
@@ -91,7 +124,7 @@ export function SshHostsView() {
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={() => connect(host)}
+                      onClick={() => void connect(host)}
                     >
                       Connect
                     </button>
