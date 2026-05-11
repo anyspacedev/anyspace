@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useFocusReturn } from "../../lib/useFocusReturn";
@@ -65,9 +65,12 @@ export function TaskEditor({
       projectPath !== (task.projectPath ?? "")
     : title.trim().length > 0 || body.trim().length > 0;
 
-  const tryClose = () => {
+  const tryClose = async () => {
     if (dirty) {
-      const ok = window.confirm("Discard changes?");
+      const ok = await confirmDialog("Discard changes?", {
+        title: "Discard?",
+        kind: "warning",
+      });
       if (!ok) return;
     }
     onClose();

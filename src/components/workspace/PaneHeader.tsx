@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSshHostsStore } from "../../stores/sshHostsStore";
 import { formatHostTarget } from "../../lib/sshCommand";
@@ -167,7 +168,7 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
                 key={k}
                 className={"pane-menu-item" + (k === pane.kind ? " active" : "")}
                 disabled={k === pane.kind}
-                onClick={() => {
+                onClick={async () => {
                   if (k === pane.kind) return;
                   // Terminal panes own a live PTY and command-block history;
                   // switching away ends the session. Confirm so a misclick
@@ -176,8 +177,9 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
                     pane.kind === "terminal" &&
                     Boolean(pane.payload?.sessionId);
                   if (hasState) {
-                    const ok = window.confirm(
+                    const ok = await confirmDialog(
                       `Replace this Terminal pane with ${KIND_LABELS[k]}? The PTY session and scrollback will be discarded.`,
+                      { title: "Replace pane", kind: "warning" },
                     );
                     if (!ok) {
                       setMenuOpen(false);

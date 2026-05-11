@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { Icon } from "../ui/Icon";
 import { useSshHostsStore, type SshHost } from "../../stores/sshHostsStore";
 import { useWorkspaceStore, type PanePreset } from "../../stores/workspaceStore";
@@ -104,10 +105,12 @@ export function SshHostsView() {
                     <button
                       type="button"
                       className="btn btn-danger"
-                      onClick={() => {
-                        if (window.confirm(`Delete SSH host "${host.name}"?`)) {
-                          void removeHost(host.id);
-                        }
+                      onClick={async () => {
+                        const ok = await confirmDialog(
+                          `Delete SSH host "${host.name}"?`,
+                          { title: "Delete host", kind: "warning" },
+                        );
+                        if (ok) void removeHost(host.id);
                       }}
                     >
                       Delete

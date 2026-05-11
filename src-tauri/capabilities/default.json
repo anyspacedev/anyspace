@@ -30,6 +30,7 @@
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
+    "dialog:allow-message",
     "sql:default",
     "sql:allow-load",
     "sql:allow-execute",

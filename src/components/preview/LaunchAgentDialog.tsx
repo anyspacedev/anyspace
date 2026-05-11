@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { launchAgent } from "../../lib/agentLauncher";
 import {
@@ -61,10 +61,13 @@ export function LaunchAgentDialog({ capture, tabId, paneId, defaultCwd, onClose 
   const hasDescription = description.trim().length > 0;
   const canRun = Boolean(agentId) && hasDescription && !busy;
 
-  const tryClose = () => {
+  const tryClose = async () => {
     if (busy) return;
     if (hasDescription) {
-      const ok = window.confirm("Discard your description?");
+      const ok = await confirmDialog("Discard your description?", {
+        title: "Discard?",
+        kind: "warning",
+      });
       if (!ok) return;
     }
     onClose();
