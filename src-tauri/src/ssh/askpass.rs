@@ -11,7 +11,15 @@ use std::time::Duration;
 use uuid::Uuid;
 
 const HEREDOC_TAG: &str = "ANYSPACE_PW_EOF";
-const CLEANUP_DELAY_SECS: u64 = 8;
+// Upper bound, not the typical case. ssh normally reads askpass within a
+// second or two, but on Windows the full path from `ssh_askpass_prepare`
+// returning to the spawned ssh actually calling askpass crosses a WSL
+// cold-start, bash init, Terminal.tsx's 600ms settle, the user pressing
+// Enter on the auto-typed command, and a TCP/handshake round trip — all
+// easily >8s on a slow box. 5 minutes covers any reasonable interactive
+// negotiation; the password is already on a 0700 file in the user's own
+// temp dir, so a few extra minutes is a tolerable security tradeoff.
+const CLEANUP_DELAY_SECS: u64 = 300;
 
 pub fn prepare_askpass(password: &str) -> Result<String> {
     // Defense in depth: a password containing the heredoc terminator would

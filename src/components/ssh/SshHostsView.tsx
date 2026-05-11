@@ -40,10 +40,23 @@ async function connect(host: SshHost) {
     }
   }
 
+  const spawnProgram = buildSshArgs(host);
+  if (host.authMethod === "password") {
+    // SSH_ASKPASS_REQUIRE=force (set by ssh_askpass_prepare) routes every
+    // prompt through askpass, including the first-connect "Are you sure
+    // you want to continue connecting (yes/no/fingerprint)?" host-key
+    // confirmation. Our askpass only knows the password, so it answers
+    // that prompt with the password — ssh treats it as not-yes and bails
+    // with "Host key verification failed." `accept-new` skips the prompt
+    // for genuinely-unknown hosts (TOFU) while still failing loudly on a
+    // changed key, which is the standard modern default.
+    spawnProgram.args = ["-o", "StrictHostKeyChecking=accept-new", ...spawnProgram.args];
+  }
+
   const preset: PanePreset = {
     kind: "terminal",
     sshHostId: host.id,
-    spawnProgram: buildSshArgs(host),
+    spawnProgram,
     spawnEnv,
     title: host.name,
   };
