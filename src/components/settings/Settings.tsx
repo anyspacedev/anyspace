@@ -7,6 +7,8 @@ import { Icon } from "../ui/Icon";
 import { useSttStore, type SttSettings } from "../../stores/sttStore";
 import { useAiStore, type AiSettings } from "../../stores/aiStore";
 import { useProxyStore, type ProxySettings } from "../../stores/proxyStore";
+import { useSshHostsStore } from "../../stores/sshHostsStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import {
   useSuperAgentSettingsStore,
   isToolEnabled,
@@ -43,6 +45,7 @@ const SECTION_KEYWORDS: Record<string, string> = {
   "code-agent-api": "code agent api token mcp loopback bearer",
   teams: "teams team multi agent role skill template coordinator developer reviewer qa",
   proxy: "proxy http https socks5 noproxy network",
+  ssh: "ssh remote host bastion jump key identityfile port reconnect",
   about: "about version",
 };
 
@@ -77,6 +80,7 @@ const SECTION_GROUPS = [
     label: "System",
     items: [
       { id: "proxy", label: "Network proxy" },
+      { id: "ssh", label: "SSH hosts" },
       { id: "about", label: "About" },
     ],
   },
@@ -278,6 +282,10 @@ export function Settings() {
 
         <section id="proxy" aria-label="Network proxy" className={sectionClass("proxy")}>
           <ProxySettingsSection />
+        </section>
+
+        <section id="ssh" aria-label="SSH hosts" className={sectionClass("ssh")}>
+          <SshSettingsSection />
         </section>
 
         <section id="about" aria-label="About" className={sectionClass("about")}>
@@ -1006,6 +1014,74 @@ function ProxySettingsSection() {
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function SshSettingsSection() {
+  const hosts = useSshHostsStore((s) => s.hosts);
+  const setView = useWorkspaceStore((s) => s.setView);
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-head">
+        <h2 className="settings-section-title">SSH hosts</h2>
+        <div className="settings-section-sub">
+          Anyspace runs the system <code>ssh</code> binary as the PTY root
+          process. Stored hosts spawn a fresh remote shell from the sidebar's
+          Remotes view. <code>~/.ssh/config</code>, ControlMaster, jump hosts,
+          and agent forwarding all work natively.
+        </div>
+      </div>
+
+      <div className="stt-form">
+        <div className="stt-field">
+          <span className="stt-field-label">Stored hosts</span>
+          <div className="ssh-settings-summary">
+            <span>
+              {hosts.length === 0
+                ? "No hosts yet."
+                : `${hosts.length} host${hosts.length === 1 ? "" : "s"} configured.`}
+            </span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setView("ssh")}
+            >
+              Open Remotes
+            </button>
+          </div>
+        </div>
+
+        <div className="stt-field">
+          <span className="stt-field-label">Caveats</span>
+          <ul className="ssh-settings-notes">
+            <li>
+              <strong>No command blocks or Super Brain on SSH panes.</strong>
+              {" "}They depend on the local shell-integration hook, which
+              isn't installed on the remote shell.
+            </li>
+            <li>
+              <strong>Custom env vars need server cooperation.</strong>
+              {" "}Per-host <code>SetEnv</code> entries only take effect if
+              the remote <code>sshd</code> whitelists them via
+              {" "}<code>AcceptEnv</code>.
+            </li>
+            <li>
+              <strong>ControlMaster is shared.</strong>
+              {" "}If your <code>~/.ssh/config</code> sets a fixed
+              {" "}<code>ControlPath</code>, anyspace's SSH panes share the
+              multiplex with any other ssh session on this machine.
+            </li>
+            <li>
+              <strong>Windows requires WSL.</strong>
+              {" "}<code>ssh</code> is invoked inside the WSL distro via
+              {" "}<code>wsl.exe -e</code>; the Linux <code>ssh</code> binary
+              must be available there.
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,11 @@ import { invoke as rawInvoke, Channel } from "@tauri-apps/api/core";
 
 export type SessionId = string;
 
+export type SpawnProgram = {
+  cmd: string;
+  args: string[];
+};
+
 export type SpawnArgs = {
   cwd?: string;
   env?: Record<string, string>;
@@ -11,6 +16,11 @@ export type SpawnArgs = {
   rows: number;
   paneId?: string;
   tabId?: string;
+  /** Override the PTY root process. When set, the PTY spawns this binary
+   *  directly (e.g. `ssh user@host`) instead of the user's interactive
+   *  shell. On Windows the program is wrapped with `wsl.exe -e` so the
+   *  Linux binary inside the WSL distro is reachable. */
+  program?: SpawnProgram;
 };
 
 export async function ptySpawn(

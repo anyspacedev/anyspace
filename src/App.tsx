@@ -6,6 +6,8 @@ import { useKanbanStore } from "./stores/kanbanStore";
 import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
+import { useSshHostsStore } from "./stores/sshHostsStore";
+import { buildSshArgs } from "./lib/sshCommand";
 import { useTeamStore } from "./stores/teamStore";
 import { useTeamSettingsStore } from "./stores/teamSettingsStore";
 import { useNewWorkspacePickerStore } from "./stores/newWorkspacePickerStore";
@@ -27,6 +29,7 @@ import { KanbanBoard } from "./components/kanban/Board";
 import { AgentManager } from "./components/agents/AgentManager";
 import { KnowledgeView } from "./components/knowledge/KnowledgeView";
 import { Settings } from "./components/settings/Settings";
+import { SshHostsView } from "./components/ssh/SshHostsView";
 import { useSuperAgentStore } from "./stores/superAgentStore";
 import { useSuperAgentSettingsStore } from "./stores/superAgentSettingsStore";
 import { useKnowledgeStore } from "./stores/knowledgeStore";
@@ -51,6 +54,7 @@ export default function App() {
   const loadStt = useSttStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
   const loadProxy = useProxyStore((s) => s.load);
+  const loadSshHosts = useSshHostsStore((s) => s.load);
   const loadTeams = useTeamStore((s) => s.load);
   const loadTeamSettings = useTeamSettingsStore((s) => s.load);
   const loadSuperAgent = useSuperAgentStore((s) => s.load);
@@ -63,6 +67,35 @@ export default function App() {
     void loadTheme();
     void (async () => {
       await hydrateWorkspace();
+      // SSH hosts load right after workspace hydrate — the resume loop below
+      // needs them to re-derive spawn commands before the Terminal effects fire.
+      await loadSshHosts().catch((e) => console.warn("[ssh] hosts load failed", e));
+      // Re-derive spawnProgram for every terminal pane that points at a stored
+      // SSH host. spawnProgram is stripped on persist (EPHEMERAL_KEYS) so the
+      // host record is the single source of truth — editing a host between
+      // launches takes effect on the very next pane spawn.
+      try {
+        const ws = useWorkspaceStore.getState();
+        const hosts = useSshHostsStore.getState().hosts;
+        for (const tab of ws.tabs) {
+          for (const pane of Object.values(tab.panes)) {
+            const hostId = pane.payload?.sshHostId as string | undefined;
+            if (!hostId) continue;
+            const host = hosts.find((h) => h.id === hostId);
+            if (!host) {
+              console.warn("[ssh.resume] host record missing", { paneId: pane.id, hostId });
+              continue;
+            }
+            ws.setPanePayload(tab.id, pane.id, {
+              spawnProgram: buildSshArgs(host),
+              title: host.name,
+            });
+            console.log("[ssh.resume]", { paneId: pane.id, hostId, name: host.name });
+          }
+        }
+      } catch (err) {
+        console.warn("[ssh.resume] failed", err);
+      }
       await loadKanban().catch((e) => console.warn("[kanban] load failed", e));
       await loadTeams().catch((e) => console.warn("[team] load failed", e));
       await loadTeamSettings().catch((e) => console.warn("[team] settings load failed", e));
@@ -101,7 +134,7 @@ export default function App() {
     // into the child env.
     void ensureAgentApi().catch((e) => console.warn("[agent_api] info load failed", e));
     void startAgentApiBridge().catch((e) => console.warn("[agent_api] bridge start failed", e));
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadSshHosts, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
@@ -283,6 +316,11 @@ export default function App() {
           {view === "agents" && (
             <div className="view-overlay view-fade" key="agents">
               <AgentManager />
+            </div>
+          )}
+          {view === "ssh" && (
+            <div className="view-overlay view-fade" key="ssh">
+              <SshHostsView />
             </div>
           )}
           {view === "settings" && (

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { LayoutNode, Pane, PaneKind, Tab } from "../lib/types";
-import { settingsGet, settingsSet } from "../lib/tauri";
+import { settingsGet, settingsSet, type SpawnProgram } from "../lib/tauri";
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
@@ -154,6 +154,11 @@ export type PanePreset = {
   // (the latter triggers auto-detect of a Vite/Next/etc dev server).
   url?: string;
   projectPath?: string;
+  // SSH-only seeds: linking a terminal pane to a stored SshHost. spawnProgram
+  // is the {cmd, args} pair pty_spawn uses to override the default shell —
+  // re-derived from the host record on every resume so edits propagate.
+  sshHostId?: string;
+  spawnProgram?: SpawnProgram;
 };
 
 function presetToPayload(preset: PanePreset): Record<string, unknown> {
@@ -167,13 +172,15 @@ function presetToPayload(preset: PanePreset): Record<string, unknown> {
     if (preset.url !== undefined) payload.url = preset.url;
     if (preset.projectPath !== undefined) payload.projectPath = preset.projectPath;
   }
+  if (preset.sshHostId !== undefined) payload.sshHostId = preset.sshHostId;
+  if (preset.spawnProgram !== undefined) payload.spawnProgram = preset.spawnProgram;
   return payload;
 }
 
 type WorkspaceState = {
   tabs: Tab[];
   activeTabId: string | null;
-  selectedView: "workspace" | "kanban" | "knowledge" | "agents" | "settings";
+  selectedView: "workspace" | "kanban" | "knowledge" | "agents" | "ssh" | "settings";
   hydrated: boolean;
 
   setView: (view: WorkspaceState["selectedView"]) => void;
@@ -336,6 +343,12 @@ const EPHEMERAL_KEYS = new Set([
   "pickerActive",
   "connectionId",
   "logsChannelId",
+  // SSH: sshHostId stays; the derived command line + the dead-PTY flag +
+  // the reconnect counter are recomputed on resume from the live host
+  // record (or default to fresh values).
+  "spawnProgram",
+  "sshExited",
+  "sshAttempt",
 ]);
 function stripEphemeral(payload: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!payload) return {};

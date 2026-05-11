@@ -24,6 +24,7 @@ impl PtySession {
         env: HashMap<String, String>,
         cols: u16,
         rows: u16,
+        program: Option<crate::pty::commands::SpawnProgram>,
         on_data: Channel<Vec<u8>>,
     ) -> Result<Self> {
         let pty_system = native_pty_system();
@@ -31,44 +32,74 @@ impl PtySession {
             .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
             .context("openpty failed")?;
 
-        let shell = pick_shell()?;
-
-        // Compute final args + integration env up front so we can mutate args
-        // for bash (--rcfile) before handing them to CommandBuilder.
+        // Compute the shell-integration env unconditionally — even program-
+        // overridden spawns (ssh, etc) keep the vars set on the child; they're
+        // harmless for non-shells and useful if the override is something like
+        // a bash login that does source it.
         let integration = crate::shell_integration::scripts::write_integration_script()?;
-        let mut shell_args: Vec<String> = shell.args.clone();
 
         // Per-shell wiring. BASH_ENV alone never worked for *interactive* bash
         // or any zsh — see shell_integration/scripts.rs for the full story.
         let mut zsh_wrapper: Option<String> = None;
         let mut zsh_user_zdotdir: Option<String> = None;
-        if shell.kind == ShellKind::Zsh {
-            zsh_wrapper = Some(crate::shell_integration::scripts::write_zsh_wrapper_dir()?);
-            zsh_user_zdotdir = Some(
-                std::env::var("ZDOTDIR")
-                    .ok()
-                    .filter(|s| !s.is_empty())
-                    .or_else(|| std::env::var("HOME").ok())
-                    .unwrap_or_default(),
-            );
-        } else if shell.kind == ShellKind::Bash {
-            // bash --rcfile is ignored for login shells, so we drop -l and
-            // replay the login init chain inside the wrapper rc file.
-            let wrapper = crate::shell_integration::scripts::write_bash_wrapper_rc()?;
-            // On Windows we run bash *inside WSL*, so the wrapper path
-            // (Windows-native) needs to be re-expressed in `/mnt/<drive>/`
-            // form for the Linux-side bash to find it.
-            #[cfg(windows)]
-            let wrapper = crate::shell_integration::scripts::to_wsl_path(Path::new(&wrapper));
-            // Long options must precede short ones — `bash -i --rcfile X`
-            // makes bash 5.2 bail with `--: invalid option`.
-            shell_args = vec!["--rcfile".into(), wrapper, "-i".into()];
-        }
 
-        let mut cmd = CommandBuilder::new(shell.program);
-        for arg in &shell_args {
-            cmd.arg(arg);
-        }
+        let mut cmd = if let Some(prog) = program {
+            // Program-override path: spawn the requested binary directly. On
+            // Windows we still need to go through WSL (cmd.exe / PowerShell
+            // can't reach the system ssh; bash inside WSL can), so the
+            // override is prepended with `wsl.exe -e`. On unix the binary
+            // runs natively.
+            #[cfg(windows)]
+            {
+                let mut c = CommandBuilder::new("wsl.exe");
+                c.arg("-e");
+                c.arg(&prog.cmd);
+                for arg in &prog.args {
+                    c.arg(arg);
+                }
+                c
+            }
+            #[cfg(not(windows))]
+            {
+                let mut c = CommandBuilder::new(&prog.cmd);
+                for arg in &prog.args {
+                    c.arg(arg);
+                }
+                c
+            }
+        } else {
+            let shell = pick_shell()?;
+            let mut shell_args: Vec<String> = shell.args.clone();
+
+            if shell.kind == ShellKind::Zsh {
+                zsh_wrapper = Some(crate::shell_integration::scripts::write_zsh_wrapper_dir()?);
+                zsh_user_zdotdir = Some(
+                    std::env::var("ZDOTDIR")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| std::env::var("HOME").ok())
+                        .unwrap_or_default(),
+                );
+            } else if shell.kind == ShellKind::Bash {
+                // bash --rcfile is ignored for login shells, so we drop -l and
+                // replay the login init chain inside the wrapper rc file.
+                let wrapper = crate::shell_integration::scripts::write_bash_wrapper_rc()?;
+                // On Windows we run bash *inside WSL*, so the wrapper path
+                // (Windows-native) needs to be re-expressed in `/mnt/<drive>/`
+                // form for the Linux-side bash to find it.
+                #[cfg(windows)]
+                let wrapper = crate::shell_integration::scripts::to_wsl_path(Path::new(&wrapper));
+                // Long options must precede short ones — `bash -i --rcfile X`
+                // makes bash 5.2 bail with `--: invalid option`.
+                shell_args = vec!["--rcfile".into(), wrapper, "-i".into()];
+            }
+
+            let mut c = CommandBuilder::new(shell.program);
+            for arg in &shell_args {
+                c.arg(arg);
+            }
+            c
+        };
         if let Some(cwd) = cwd.as_deref() {
             if Path::new(cwd).is_dir() {
                 cmd.cwd(cwd);

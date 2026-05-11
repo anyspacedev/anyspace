@@ -19,7 +19,7 @@ function displayHotkey(code: string): string {
 }
 
 const NAV_ITEMS: Array<{
-  id: "workspace" | "kanban" | "knowledge" | "agents" | "settings";
+  id: "workspace" | "kanban" | "knowledge" | "agents" | "ssh" | "settings";
   label: string;
   icon: IconName;
 }> = [
@@ -27,6 +27,7 @@ const NAV_ITEMS: Array<{
   { id: "kanban", label: "Tasks", icon: "list-checks" },
   { id: "knowledge", label: "Knowledge", icon: "network" },
   { id: "agents", label: "Agents", icon: "play" },
+  { id: "ssh", label: "Remotes", icon: "server" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
 

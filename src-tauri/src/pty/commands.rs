@@ -8,6 +8,14 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SpawnProgram {
+    pub cmd: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SpawnArgs {
     pub cwd: Option<String>,
     #[serde(default)]
@@ -18,6 +26,11 @@ pub struct SpawnArgs {
     /// so the bundled MCP server can identify its caller.
     pub pane_id: Option<String>,
     pub tab_id: Option<String>,
+    /// Optional root-process override. When set, the PTY spawns this program
+    /// directly (e.g. `ssh user@host`) instead of the user's interactive
+    /// shell. The shell-integration env vars are still injected on the child
+    /// — harmless for non-shell programs that ignore them.
+    pub program: Option<SpawnProgram>,
 }
 
 #[tauri::command]
@@ -47,8 +60,17 @@ pub async fn pty_spawn(
         env.entry("ANYSPACE_TAB_ID".into()).or_insert(tab_id);
     }
 
-    let session = PtySession::spawn(app, &id, args.cwd, env, args.cols, args.rows, on_data)
-        .map_err(|e| format!("{e:#}"))?;
+    let session = PtySession::spawn(
+        app,
+        &id,
+        args.cwd,
+        env,
+        args.cols,
+        args.rows,
+        args.program,
+        on_data,
+    )
+    .map_err(|e| format!("{e:#}"))?;
     manager.sessions.insert(id.clone(), session);
     Ok(id)
 }

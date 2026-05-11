@@ -1127,6 +1127,16 @@ button.mode-chip--info:hover {
   white-space: nowrap;
   font-weight: 500;
 }
+.pane-subtitle {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--fg-muted);
+  margin-left: 6px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .caret {
   color: var(--fg-dim);
   display: inline-grid;
@@ -6498,5 +6508,227 @@ body.screenshot-dragging {
    long form rows don't stretch beyond comfortable line length on wide
    windows. Wrapper paddings/overflow already set above. */
 .settings-content > * { max-width: 880px; }
+
+/* ===== SSH "Remotes" view ===== */
+
+.ssh-view {
+  height: 100%;
+  overflow: auto;
+  padding: var(--pad-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-md);
+}
+.ssh-view-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pad-md);
+  max-width: 880px;
+}
+.ssh-view-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--fg);
+}
+.ssh-view-sub {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  line-height: 1.4;
+  max-width: 60ch;
+}
+.ssh-view-empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--pad-lg);
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  max-width: 700px;
+}
+.ssh-view-empty p { margin: 0 0 6px; }
+.ssh-view-empty-hint {
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+.ssh-view-empty code {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.ssh-host-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 880px;
+}
+.ssh-host-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pad-md);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.ssh-host-row:hover {
+  border-color: var(--border-strong);
+}
+.ssh-host-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ssh-host-row-name {
+  font-weight: 600;
+  color: var(--fg);
+}
+.ssh-host-row-target {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ssh-host-row-tag {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  color: var(--fg-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.ssh-host-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ssh-host-form-wrap {
+  max-width: 640px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--pad-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-sm);
+}
+.ssh-host-form-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--fg);
+}
+.ssh-host-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ssh-host-form-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ssh-host-form-row > input { flex: 1 1 auto; }
+.ssh-host-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ssh-host-form-error {
+  color: var(--danger, #d04747);
+  font-size: var(--font-size-sm);
+}
+
+.ssh-settings-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pad-md);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+.ssh-settings-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+.ssh-settings-notes code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* SSH pane badge in the pane header — sits next to the kind icon to make
+   SSH terminals visually distinct from local shells. */
+.pane-ssh-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-fg, #fff);
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 2px 5px;
+  line-height: 1;
+  margin-left: 4px;
+}
+
+/* SSH reconnect overlay — shown when the underlying ssh process exits but
+   we want to keep the pane alive so the operator can reconnect. */
+.ssh-reconnect-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--bg) 85%, transparent);
+  z-index: 5;
+  pointer-events: auto;
+}
+.ssh-reconnect-card {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 380px;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.3);
+}
+.ssh-reconnect-card-title {
+  font-weight: 600;
+  color: var(--fg);
+}
+.ssh-reconnect-card-sub {
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
 
 

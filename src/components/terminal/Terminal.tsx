@@ -7,10 +7,12 @@ import { SearchAddon } from "@xterm/addon-search";
 import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ptySpawn, ptyWrite, ptyResize, ptyKill, clipboardSaveBlob } from "../../lib/tauri";
+import { ptySpawn, ptyWrite, ptyResize, ptyKill, clipboardSaveBlob, type SpawnProgram } from "../../lib/tauri";
 import { useThemeStore } from "../../stores/themeStore";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useSshHostsStore } from "../../stores/sshHostsStore";
+import { buildSshArgs } from "../../lib/sshCommand";
 import { applyEvent, parseOsc133Payload, type CommandBlock } from "./osc133";
 import { extractCommand, extractOutput } from "./blockBuffer";
 import { CommandBlocks } from "./CommandBlocks";
@@ -312,8 +314,18 @@ export function Terminal({ pane, tabId }: Props) {
     // lands in the same directory as the rest of the workspace by default.
     const tabProjectPath = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId)?.projectPath;
     const spawnCwd = (pane.payload?.spawnCwd as string | undefined) ?? tabProjectPath;
+    const spawnProgram = pane.payload?.spawnProgram as SpawnProgram | undefined;
+    const sshHostId = pane.payload?.sshHostId as string | undefined;
     void ptySpawn(
-      { cols, rows, env: spawnEnv, cwd: spawnCwd, paneId: pane.id, tabId },
+      {
+        cols,
+        rows,
+        env: spawnEnv,
+        cwd: spawnCwd,
+        paneId: pane.id,
+        tabId,
+        program: spawnProgram,
+      },
       channel,
     )
       .then((sid) => {
@@ -325,8 +337,16 @@ export function Terminal({ pane, tabId }: Props) {
         setPanePayload(tabId, pane.id, { sessionId: sid });
         // Shell exited (typed `exit`, Ctrl+D, kill, …) → close the pane
         // immediately rather than leave a dead terminal sitting around.
+        // SSH panes are an exception: we keep the pane so the operator
+        // can hit Reconnect (network drop or remote reboot shouldn't
+        // destroy a pane the user wanted alive).
         void listen(`pty:exit:${sid}`, () => {
           if (disposed) return;
+          if (sshHostId) {
+            sessionIdRef.current = null;
+            setPanePayload(tabId, pane.id, { sessionId: undefined, sshExited: true });
+            return;
+          }
           closePane(tabId, pane.id);
         }).then((u) => {
           if (disposed) u();
@@ -562,6 +582,23 @@ export function Terminal({ pane, tabId }: Props) {
     0,
   );
 
+  const sshExited = Boolean(pane.payload?.sshExited);
+  const sshHostIdRender = pane.payload?.sshHostId as string | undefined;
+  const sshHostForOverlay = useSshHostsStore((s) =>
+    sshHostIdRender ? s.hosts.find((h) => h.id === sshHostIdRender) ?? null : null,
+  );
+  const reconnectSsh = () => {
+    if (!sshHostForOverlay) return;
+    const program = buildSshArgs(sshHostForOverlay);
+    const prev = (pane.payload?.sshAttempt as number | undefined) ?? 0;
+    setPanePayload(tabId, pane.id, {
+      sshExited: undefined,
+      sessionId: undefined,
+      spawnProgram: program,
+      sshAttempt: prev + 1,
+    });
+  };
+
   return (
     <div className="terminal-wrap" ref={containerRef} tabIndex={0}>
       <CommandBlocks
@@ -609,6 +646,38 @@ export function Terminal({ pane, tabId }: Props) {
                   Learn more →
                 </a>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {sshExited && (
+        <div className="ssh-reconnect-overlay" role="status">
+          <div className="ssh-reconnect-card">
+            <div className="ssh-reconnect-card-title">
+              SSH session ended{sshHostForOverlay ? ` — ${sshHostForOverlay.name}` : ""}
+            </div>
+            <div className="ssh-reconnect-card-sub">
+              {sshHostForOverlay
+                ? "The remote process exited or the connection dropped. Reconnect runs ssh again with the latest host settings."
+                : "The remote process exited. The host record is missing — restore it from Settings → SSH or close this pane."}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-with-icon"
+                disabled={!sshHostForOverlay}
+                onClick={reconnectSsh}
+              >
+                <Icon name="refresh" size={14} />
+                Reconnect
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => closePane(tabId, pane.id)}
+              >
+                Close pane
+              </button>
             </div>
           </div>
         </div>

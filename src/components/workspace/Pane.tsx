@@ -57,7 +57,13 @@ export function Pane({ pane, tabId }: { pane: PaneType; tabId: string }) {
 
 function PaneBody({ kind, pane, tabId }: { kind: PaneKind; pane: PaneType; tabId: string }) {
   switch (kind) {
-    case "terminal": return <Terminal pane={pane} tabId={tabId} />;
+    case "terminal": {
+      // SSH reconnect bumps sshAttempt → the terminal remounts so it spawns
+      // a fresh ssh process. Scrollback from the dead session is discarded
+      // (acceptable: the remote shell that produced it is gone anyway).
+      const sshAttempt = (pane.payload?.sshAttempt as number | undefined) ?? 0;
+      return <Terminal key={`t-${sshAttempt}`} pane={pane} tabId={tabId} />;
+    }
     case "editor": return <Editor pane={pane} tabId={tabId} />;
     case "preview": return <PreviewPane pane={pane} tabId={tabId} />;
     case "filebrowser": return <FileBrowser pane={pane} tabId={tabId} />;

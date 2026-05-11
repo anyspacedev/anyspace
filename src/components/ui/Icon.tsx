@@ -40,7 +40,8 @@ export type IconName =
   | "user-round"
   | "shield"
   | "network"
-  | "link";
+  | "link"
+  | "server";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -273,6 +274,15 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path d="M10 14a3 3 0 0 0 4.2 0l3-3a3 3 0 1 0-4.2-4.2l-1 1" />
       <path d="M14 10a3 3 0 0 0-4.2 0l-3 3a3 3 0 1 0 4.2 4.2l1-1" />
+    </>
+  ),
+  // Stacked rack — remotes / SSH hosts.
+  server: (
+    <>
+      <rect x="3" y="4" width="18" height="7" rx="1.5" />
+      <rect x="3" y="13" width="18" height="7" rx="1.5" />
+      <path d="M7 7.5h0.01" />
+      <path d="M7 16.5h0.01" />
     </>
   ),
 };

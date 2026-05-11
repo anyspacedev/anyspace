@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useSshHostsStore } from "../../stores/sshHostsStore";
+import { formatHostTarget } from "../../lib/sshCommand";
 import { usePaneDragStore, type DropZone } from "../../stores/paneDragStore";
 import type { Pane, PaneKind } from "../../lib/types";
 import { Icon, type IconName } from "../ui/Icon";
@@ -54,12 +56,18 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
   const setPaneKind = useWorkspaceStore((s) => s.setPaneKind);
   const splitPane = useWorkspaceStore((s) => s.splitPane);
   const closePane = useWorkspaceStore((s) => s.closePane);
+  const sshHostId = pane.payload?.sshHostId as string | undefined;
+  const sshHost = useSshHostsStore((s) =>
+    sshHostId ? s.hosts.find((h) => h.id === sshHostId) ?? null : null,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const title =
-    (pane.payload?.title as string) ||
-    (pane.payload?.path as string) ||
-    KIND_LABELS[pane.kind];
+  const title = sshHost
+    ? sshHost.name
+    : (pane.payload?.title as string) ||
+      (pane.payload?.path as string) ||
+      KIND_LABELS[pane.kind];
+  const subtitle = sshHost ? formatHostTarget(sshHost) : null;
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -137,12 +145,14 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
       <button
         className="pane-kind-btn"
         onClick={() => setMenuOpen((o) => !o)}
-        title="Change pane type"
+        title={subtitle ? `${title} — ${subtitle}` : "Change pane type"}
       >
         <span className="pane-icon">
-          <Icon name={KIND_ICONS[pane.kind]} size={14} />
+          <Icon name={sshHost ? "server" : KIND_ICONS[pane.kind]} size={14} />
         </span>
         <span className="pane-title">{title}</span>
+        {sshHost && <span className="pane-ssh-badge" aria-label="SSH session">SSH</span>}
+        {subtitle && <span className="pane-subtitle">{subtitle}</span>}
         <span className="caret">
           <Icon name="chevron-down" size={12} />
         </span>
@@ -204,7 +214,7 @@ export function PaneHeader({ pane, tabId, selectionIndex, broadcastSize = 0 }: H
         </span>
       )}
       <div className="pane-actions">
-        {pane.kind === "terminal" && (
+        {pane.kind === "terminal" && !sshHostId && (
           <button
             className="icon-btn"
             title="Super Brain — AI suggests next command (⌘⇧B)"
