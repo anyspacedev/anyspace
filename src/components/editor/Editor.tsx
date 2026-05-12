@@ -58,7 +58,7 @@ type Props = { pane: Pane; tabId: string };
 
 export function Editor({ pane, tabId }: Props) {
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
-  const theme = useThemeStore((s) => s.current);
+  const theme = useThemeStore((s) => s.resolved);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const viewStatesRef = useRef(

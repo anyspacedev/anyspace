@@ -3,10 +3,14 @@ import type { Agent, Task } from "../../lib/types";
 import { Card } from "./Card";
 import { Icon } from "../ui/Icon";
 
+// "In Review" needs a distinct hue from the three semantic tokens (info /
+// warning / success). With the neutral palette --accent collapses to --fg
+// (near-black/white) which would read as primary — use a literal violet
+// instead. Tailwind violet-500; clears 3:1 against bg-elev in both modes.
 const COLUMN_TONE: Record<Task["column"], string> = {
   todo: "var(--info)",
   in_progress: "var(--warning)",
-  in_review: "var(--accent)",
+  in_review: "#a855f7",
   complete: "var(--success)",
 };
 

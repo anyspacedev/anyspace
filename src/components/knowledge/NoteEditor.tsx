@@ -31,7 +31,7 @@ export function NoteEditor({
   onWikilinkOpen,
   initialFocusTitle,
 }: Props) {
-  const theme = useThemeStore((s) => s.current);
+  const theme = useThemeStore((s) => s.resolved);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const decoCollectionRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);

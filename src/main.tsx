@@ -64,8 +64,8 @@ function NoClerkBridge() {
  * dark themes apply Clerk's `dark` baseTheme, light themes use the default,
  * and `colorPrimary` always tracks the theme's accent. */
 function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
-  const themeKind = useThemeStore((s) => s.current.kind);
-  const accent = useThemeStore((s) => s.current.ui.accent);
+  const themeKind = useThemeStore((s) => s.resolved.kind);
+  const accent = useThemeStore((s) => s.resolved.ui.accent);
   return (
     <ClerkProvider
       publishableKey={PUBLISHABLE_KEY!}
