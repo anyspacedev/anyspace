@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { settingsGet, settingsSet, sttHotkeySet, sttTranscribe } from "../lib/tauri";
+import {
+  settingsGet,
+  settingsSet,
+  sttHotkeySet,
+  sttTranscribe,
+  sttTranscribeLocal,
+} from "../lib/tauri";
 import { ANYSPACE_CLOUD_URL, getAuthToken, isSignedIn } from "../lib/auth";
 import {
   cancelRecording,
@@ -24,7 +30,13 @@ export type SttSettings = {
   apiKey: string;
   model: string;
   language: string; // empty = auto-detect
-  presetId: "groq" | "openai" | "elevenlabs" | "anyspace-cloud" | "custom";
+  presetId:
+    | "groq"
+    | "openai"
+    | "elevenlabs"
+    | "anyspace-cloud"
+    | "local-whisper"
+    | "custom";
   // KeyboardEvent.code of the hold-to-talk hotkey. Apple-built keyboards have
   // no Right Control key, so the default differs by platform; user can rebind
   // in Settings.
@@ -32,6 +44,14 @@ export type SttSettings = {
   // Persisted screen position of the floating bubble. null = default
   // (bottom-center, driven by CSS).
   bubblePos: BubblePos | null;
+  // === Local Whisper preset ===
+  // Curated model id from src-tauri/src/stt/models.rs (`tiny`, `base`,
+  // `small`, `large-v3-turbo-q8`). Used only when presetId === "local-whisper".
+  localModelId: string;
+  // Last successfully-resolved model path. Populated by the Settings panel
+  // when the chosen model is verified present; consulted at transcribe time
+  // so we don't re-stat on every hotkey press.
+  localModelPath: string;
 };
 
 function isMacPlatform(): boolean {
@@ -53,6 +73,8 @@ const DEFAULT_SETTINGS: SttSettings = {
   presetId: "groq",
   hotkey: defaultHotkey(),
   bubblePos: null,
+  localModelId: "small",
+  localModelPath: "",
 };
 
 const SETTINGS_KEY = "stt";
@@ -273,6 +295,17 @@ export const useSttStore = create<SttState>((set, get) => ({
         scheduleDismiss(set, 4000);
         return;
       }
+    } else if (presetId === "local-whisper") {
+      if (!get().settings.localModelPath) {
+        console.warn("[stt] startListening blocked — no local model selected");
+        set({
+          phase: "error",
+          message: "Download a Whisper model first — Settings → Speech to text",
+          analyser: null,
+        });
+        scheduleDismiss(set, 4000);
+        return;
+      }
     } else if (!get().settings.apiKey) {
       console.warn("[stt] startListening blocked — no API key configured");
       set({
@@ -295,7 +328,10 @@ export const useSttStore = create<SttState>((set, get) => ({
     // sees a non-idle state and tears down properly.
     set({ phase: "listening", message: "", analyser: null });
     try {
-      const { analyser } = await startRecording();
+      // Local Whisper can't decode opus; force the recorder's WAV path so
+      // the backend gets a blob whisper.cpp accepts directly.
+      const forceWav = presetId === "local-whisper";
+      const { analyser } = await startRecording({ forceWav });
       // If a concurrent cancel/stop fired while getUserMedia was pending,
       // bail out — recorder.ts cleanup already happened.
       if (gen !== startGen || get().phase !== "listening") {
@@ -388,6 +424,66 @@ export const useSttStore = create<SttState>((set, get) => ({
 
     const gen = startGen;
     const { settings } = get();
+
+    // Local Whisper: short-circuit the remote-endpoint code path entirely.
+    // No endpoint, no API key, no provider routing.
+    if (settings.presetId === "local-whisper") {
+      try {
+        const audio = new Uint8Array(await result.blob.arrayBuffer());
+        if (gen !== startGen) return;
+        console.log(
+          "[stt] sttTranscribeLocal → model=%s lang=%s bytes=%d",
+          settings.localModelId,
+          settings.language || "(auto)",
+          audio.byteLength,
+        );
+        const t0 = performance.now();
+        const text = await sttTranscribeLocal({
+          audio,
+          modelPath: settings.localModelPath,
+          language: settings.language || undefined,
+        });
+        const elapsedMs = Math.round(performance.now() - t0);
+        if (gen !== startGen) return;
+        console.log(
+          '[stt] local transcribed %dms chars=%d preview="%s"',
+          elapsedMs,
+          text.length,
+          text.slice(0, 60).replace(/\n/g, " "),
+        );
+        // Empty result = whisper.cpp returned only sentinel markers
+        // (`[BLANK_AUDIO]` etc.) which we stripped backend-side. Surface
+        // a brief message instead of injecting nothing.
+        if (!text) {
+          set({ phase: "error", message: "No speech detected", analyser: null });
+          scheduleDismiss(set, 1500);
+          return;
+        }
+        const target = activeTarget ?? { kind: "none", label: "no target" };
+        const out = await inject(text, target);
+        if (gen !== startGen) return;
+        if (out.ok) {
+          set({ phase: "success", message: out.message, analyser: null });
+          scheduleDismiss(set, 1400);
+        } else {
+          set({ phase: "error", message: out.message, analyser: null });
+          scheduleDismiss(set, 4000);
+        }
+      } catch (e) {
+        if (gen !== startGen) return;
+        console.error("[stt] local transcribe/inject failed:", e);
+        set({
+          phase: "error",
+          message: e instanceof Error ? e.message : String(e),
+          analyser: null,
+        });
+        scheduleDismiss(set, 4000);
+      } finally {
+        if (gen === startGen) activeTarget = null;
+      }
+      return;
+    }
+
     const provider: "openai" | "elevenlabs" =
       settings.presetId === "elevenlabs" ? "elevenlabs" : "openai";
 

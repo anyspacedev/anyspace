@@ -43,7 +43,8 @@ export type IconName =
   | "link"
   | "server"
   | "eye"
-  | "eye-off";
+  | "eye-off"
+  | "trash-2";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -299,6 +300,15 @@ const paths: Record<IconName, ReactElement> = {
       <path d="M10.6 6.1A11 11 0 0 1 12 6c6 0 10 6 10 6a18 18 0 0 1-2.6 3.3" />
       <path d="M6.1 6.1A18 18 0 0 0 2 12s4 6 10 6c1.6 0 3.1-.4 4.4-1" />
       <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
+  "trash-2": (
+    <>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
     </>
   ),
 };
