@@ -43,7 +43,10 @@
 
 .sidebar {
   grid-area: sidebar;
-  background: var(--bg-elev);
+  /* Use bg-elev-2 (one step beyond cards) so persistent chrome reads as a
+     rail, not as content. Cards/popovers continue to use bg-elev and so sit
+     visually closer to the main canvas. */
+  background: var(--bg-elev-2);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -488,7 +491,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--pad-md);
-  background: var(--bg-elev);
+  background: var(--bg-elev-2);
   border-top: 1px solid var(--border);
   font-size: var(--font-size-xs);
   color: var(--fg-muted);
@@ -1023,28 +1026,35 @@ button.mode-chip--info:hover {
   background: var(--bg);
   height: 100%;
   width: 100%;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
+  /* shadcn card pattern: always-visible 1px border + subtle radius. Inactive
+     panes read as cards, not as raw content. Active gets a stronger border
+     and an outer ring shadow instead of swapping the border to pure accent
+     (which would render as solid black in light mode and look like a
+     selection chunk). */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  transition: border-color var(--duration-fast) var(--ease-out);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 .pane.active,
 .pane.selected {
-  border-color: color-mix(in oklab, var(--accent) 80%, transparent);
+  border-color: var(--border-strong);
 }
-.pane.active .pane-header,
-.pane.selected .pane-header {
-  border-bottom-color: color-mix(in oklab, var(--accent) 35%, var(--border));
+.pane.active {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
 }
-/* Selected-but-not-active: a faint inset glow so peripheral vision picks up
-   that this pane is part of the broadcast group. */
+/* Selected-but-not-active: dotted-style inner highlight so peripheral vision
+   picks up that this pane is in the broadcast group, but the chrome stays
+   restrained. */
 .pane.selected:not(.active)::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  border-radius: var(--radius);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 
 .pane-broadcast-badge {
@@ -2484,12 +2494,29 @@ button.mode-chip--info:hover {
 }
 .preview-empty-url-row {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: var(--pad-sm);
   width: 100%;
   max-width: 360px;
 }
-.preview-empty-url-row .btn { padding: 0 10px; }
+.preview-empty-url-row .url-input {
+  /* Make the input visibly the primary affordance; raise its bg from --bg
+     so the row reads as a single composed control rather than two equal
+     siblings. */
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius);
+}
+.preview-empty-url-row .btn {
+  /* Icon-only chevron; ghost variant + dim color so it doesn't compete with
+     the primary "Pick project folder" CTA above. */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--fg-dim);
+}
+.preview-empty-url-row .btn:hover { color: var(--fg); }
 
 /* ===== Buttons ===== */
 
@@ -3719,17 +3746,31 @@ button.mode-chip--info:hover {
   animation: none;
 }
 
-/* Always-visible idle affordance — slightly dimmer until hovered. */
+/* Idle affordance — small square icon button instead of a 48px FAB circle.
+   Listening/transcribing states keep the larger pill shape since they need
+   horizontal room for the waveform / spinner. */
 .stt-bubble--idle {
   min-width: 0;
-  width: 48px;
+  width: 32px;
+  height: 32px;
   padding: 0;
+  border-radius: var(--radius-md);
   justify-content: center;
-  opacity: 0.85;
-  transition: opacity var(--duration-fast) var(--ease-out);
+  background: var(--bg-elev);
+  border-color: var(--border);
+  box-shadow: none;
+  opacity: 0.7;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 .stt-bubble--idle:hover {
   opacity: 1;
+  background: var(--bg-elev-2);
+}
+.stt-bubble--idle .stt-mic-idle svg {
+  width: 16px;
+  height: 16px;
 }
 
 @keyframes stt-fade-in {
