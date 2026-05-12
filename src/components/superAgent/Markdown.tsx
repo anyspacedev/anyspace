@@ -31,7 +31,7 @@ const components: Components = {
 };
 
 export function Markdown({ children }: { children: string }) {
-  const kind = useThemeStore((s) => s.current.kind);
+  const kind = useThemeStore((s) => s.resolved.kind);
   const shikiTheme: ["github-light", "github-dark"] | ["github-dark", "github-light"] =
     kind === "light" ? ["github-light", "github-dark"] : ["github-dark", "github-light"];
 

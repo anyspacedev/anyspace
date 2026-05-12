@@ -8,7 +8,7 @@ import { hardenRenderService } from "./xtermPatches";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ptySpawn, ptyWrite, ptyResize, ptyKill, clipboardSaveBlob, type SpawnProgram } from "../../lib/tauri";
-import { useThemeStore } from "../../stores/themeStore";
+import { darkTheme } from "../../themes/definitions";
 import type { Pane } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSshHostsStore } from "../../stores/sshHostsStore";
@@ -58,7 +58,10 @@ export function Terminal({ pane, tabId }: Props) {
   const focusedBlockIdRef = useRef<string | null>(null);
   const [explain, setExplain] = useState<{ block: CommandBlock; output: string } | null>(null);
   const [spawnError, setSpawnError] = useState<{ title: string; body: string; href?: string } | null>(null);
-  const theme = useThemeStore((s) => s.current);
+  // Terminals stay dark even when the app is in Light mode — matches the
+  // convention of every IDE (VS Code, iTerm, Warp). Pinning the palette here
+  // means the xterm bg/ANSI colors don't react to the global theme toggle.
+  const xtermTheme = darkTheme.terminal;
   const setPanePayload = useWorkspaceStore((s) => s.setPanePayload);
   const closePane = useWorkspaceStore((s) => s.closePane);
 
@@ -73,7 +76,7 @@ export function Terminal({ pane, tabId }: Props) {
       cursorBlink: !reduceMotion,
       allowProposedApi: true,
       scrollback: 5000,
-      theme: theme.terminal,
+      theme: xtermTheme,
     });
 
     const fit = new FitAddon();
@@ -421,14 +424,7 @@ export function Terminal({ pane, tabId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // React to theme changes
-  useEffect(() => {
-    const t = termRef.current;
-    if (!t) return;
-    t.options.theme = theme.terminal;
-  }, [theme]);
-
-  // Cmd+F opens in-terminal search (only when this pane is focused).
+// Cmd+F opens in-terminal search (only when this pane is focused).
   useEffect(() => {
     const u = registerShortcut("search", () => {
       // Best-effort: if this pane's container has focus, open the search bar.

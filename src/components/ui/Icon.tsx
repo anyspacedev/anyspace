@@ -44,7 +44,10 @@ export type IconName =
   | "server"
   | "eye"
   | "eye-off"
-  | "trash-2";
+  | "trash-2"
+  | "sun"
+  | "moon"
+  | "monitor";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -309,6 +312,27 @@ const paths: Record<IconName, ReactElement> = {
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6" />
       <path d="M14 11v6" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m4.93 19.07 1.41-1.41" />
+      <path d="m17.66 6.34 1.41-1.41" />
+    </>
+  ),
+  moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />,
+  monitor: (
+    <>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
     </>
   ),
 };

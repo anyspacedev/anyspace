@@ -3,9 +3,9 @@ import type { SelectHTMLAttributes } from "react";
 import { Icon } from "./Icon";
 
 // Drop-in replacement for `<select>` that renders its own chevron via an
-// inline <Icon>, so the chevron picks up `var(--fg-muted)` directly and
-// stays correct across all 25+ themes. Uses appearance: none on the native
-// select; the wrapper holds the chevron and forwards click-through.
+// inline <Icon>, so the chevron picks up `var(--fg-muted)` directly across
+// themes. Uses appearance: none on the native select; the wrapper holds the
+// chevron and forwards click-through.
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...rest }, ref) {
     return (

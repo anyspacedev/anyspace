@@ -43,7 +43,7 @@ import { Toaster } from "./components/ui/Toaster";
 
 export default function App() {
   const loadTheme = useThemeStore((s) => s.load);
-  const cycleTheme = useThemeStore((s) => s.cycle);
+  const toggleTheme = useThemeStore((s) => s.toggle);
   const view = useWorkspaceStore((s) => s.selectedView);
   const newTab = useWorkspaceStore((s) => s.newTab);
   const closeTab = useWorkspaceStore((s) => s.closeTab);
@@ -245,7 +245,7 @@ export default function App() {
       registerShortcut("switchTab7", () => switchToTabIndex(6)),
       registerShortcut("switchTab8", () => switchToTabIndex(7)),
       registerShortcut("switchTab9", () => switchToTabIndex(8)),
-      registerShortcut("themeNext", () => cycleTheme()),
+      registerShortcut("themeNext", () => toggleTheme()),
       registerShortcut("runSuperBrain", () => {
         const id = useWorkspaceStore.getState().activeTabId;
         console.log("[shortcut] runSuperBrain dispatched", { activeTabId: id });
@@ -281,7 +281,7 @@ export default function App() {
       window.removeEventListener("keydown", onEsc, true);
       unregisters.forEach((u) => u());
     };
-  }, [newTab, closeTab, switchToTabIndex, cycleTheme, activeTabId]);
+  }, [newTab, closeTab, switchToTabIndex, toggleTheme, activeTabId]);
 
   return (
     <div className="app-root">

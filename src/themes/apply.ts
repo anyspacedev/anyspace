@@ -50,10 +50,12 @@ export function monacoThemeFor(theme: Theme): {
     inherit: true,
     rules: [
       { token: "comment", foreground: hex6(theme.ui.fgDim), fontStyle: "italic" },
-      { token: "keyword", foreground: hex6(theme.ui.accent) },
+      { token: "keyword", foreground: hex6(theme.terminal.magenta) },
       { token: "string", foreground: hex6(theme.terminal.green) },
       { token: "number", foreground: hex6(theme.terminal.yellow) },
       { token: "type", foreground: hex6(theme.terminal.cyan) },
+      { token: "operator", foreground: hex6(theme.ui.fgMuted) },
+      { token: "regexp", foreground: hex6(theme.terminal.red) },
     ],
     colors: {
       "editor.background": theme.ui.bg,
@@ -62,7 +64,7 @@ export function monacoThemeFor(theme: Theme): {
       "editorLineNumber.foreground": theme.ui.fgDim,
       "editorLineNumber.activeForeground": theme.ui.fgMuted,
       "editor.selectionBackground": theme.terminal.selectionBackground,
-      "editorCursor.foreground": theme.ui.accent,
+      "editorCursor.foreground": theme.ui.fg,
       "editorWidget.background": theme.ui.bgElev,
       "editorWidget.border": theme.ui.border,
     },

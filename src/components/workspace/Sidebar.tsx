@@ -1,6 +1,5 @@
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
-import { useThemeStore } from "../../stores/themeStore";
 import { useSttStore } from "../../stores/sttStore";
 import { Icon, type IconName } from "../ui/Icon";
 
@@ -38,7 +37,6 @@ export function Sidebar() {
   const taskCount = useKanbanStore((s) =>
     s.tasks.filter((t) => t.column !== "complete").length,
   );
-  const theme = useThemeStore((s) => s.current);
   const sttHotkey = useSttStore((s) => s.settings.hotkey);
 
   return (
@@ -66,7 +64,6 @@ export function Sidebar() {
         </svg>
         <div className="brand-text" data-tauri-drag-region="">
           <div className="brand-name" data-tauri-drag-region="">AnySpace</div>
-          <div className="brand-sub" data-tauri-drag-region="">{theme.name}</div>
         </div>
       </div>
 
