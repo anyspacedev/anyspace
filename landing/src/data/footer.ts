@@ -12,7 +12,6 @@ export const FOOTER_COLS = [
     heading: "Resources",
     links: [
       { href: "/docs", label: "Docs" },
-      { href: "/docs/agents", label: "Agent templates" },
       { href: "/changelog", label: "Changelog" },
       { href: "https://github.com/anyspacedev/anyspace", label: "GitHub" },
     ],
