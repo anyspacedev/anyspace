@@ -155,9 +155,14 @@ mod imp {
             .map_err(|e| anyhow!("create_state: {e}"))?;
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        if let Some(lang) = language {
-            if !lang.is_empty() {
-                params.set_language(Some(lang));
+        // whisper-rs's FullParams defaults `language` to "en" — so leaving it
+        // untouched silently forces English. Explicitly enable auto-detect
+        // when the caller didn't supply a language tag.
+        match language.map(str::trim).filter(|s| !s.is_empty()) {
+            Some(lang) => params.set_language(Some(lang)),
+            None => {
+                params.set_language(Some("auto"));
+                params.set_detect_language(true);
             }
         }
         params.set_print_special(false);
