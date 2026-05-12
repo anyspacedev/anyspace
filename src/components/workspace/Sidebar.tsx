@@ -48,19 +48,13 @@ export function Sidebar() {
           viewBox="0 0 160 160"
           aria-hidden="true"
         >
-          <defs>
-            <linearGradient id="sidebarBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#6366f1" />
-              <stop offset="100%" stopColor="#8b5cf6" />
-            </linearGradient>
-          </defs>
-          <rect x="0" y="0" width="160" height="160" rx="36" fill="url(#sidebarBrandGrad)" />
-          <circle cx="20" cy="20" r="4" fill="#ffffff" opacity="0.9" />
-          <circle cx="34" cy="20" r="4" fill="#ffffff" opacity="0.6" />
-          <circle cx="48" cy="20" r="4" fill="#ffffff" opacity="0.4" />
-          <rect x="20" y="40" width="55" height="50" rx="6" fill="#ffffff" opacity="0.95" />
-          <rect x="85" y="40" width="55" height="50" rx="6" fill="#ffffff" opacity="0.55" />
-          <rect x="20" y="100" width="120" height="40" rx="6" fill="#ffffff" opacity="0.75" />
+          <rect className="brand-mark-tile" x="0" y="0" width="160" height="160" rx="36" />
+          <circle className="brand-mark-shape" cx="20" cy="20" r="4" opacity="0.9" />
+          <circle className="brand-mark-shape" cx="34" cy="20" r="4" opacity="0.6" />
+          <circle className="brand-mark-shape" cx="48" cy="20" r="4" opacity="0.4" />
+          <rect className="brand-mark-shape" x="20" y="40" width="55" height="50" rx="6" opacity="0.95" />
+          <rect className="brand-mark-shape" x="85" y="40" width="55" height="50" rx="6" opacity="0.55" />
+          <rect className="brand-mark-shape" x="20" y="100" width="120" height="40" rx="6" opacity="0.75" />
         </svg>
         <div className="brand-text" data-tauri-drag-region="">
           <div className="brand-name" data-tauri-drag-region="">AnySpace</div>

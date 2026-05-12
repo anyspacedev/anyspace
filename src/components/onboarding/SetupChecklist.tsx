@@ -3,7 +3,6 @@ import { useAiStore } from "../../stores/aiStore";
 import { useKanbanStore } from "../../stores/kanbanStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useNewWorkspacePickerStore } from "../../stores/newWorkspacePickerStore";
-import { useThemeStore } from "../../stores/themeStore";
 import { Icon, type IconName } from "../ui/Icon";
 
 type Step = {
@@ -30,7 +29,6 @@ export function SetupChecklist() {
   const setView = useWorkspaceStore((s) => s.setView);
   const newTab = useWorkspaceStore((s) => s.newTab);
   const openPickerWith = useNewWorkspacePickerStore((s) => s.openWith);
-  const theme = useThemeStore((s) => s.resolved);
 
   const aiConfigured =
     !!ai.endpoint && !!ai.apiKey && !!ai.model;
@@ -91,14 +89,16 @@ export function SetupChecklist() {
   return (
     <div className="welcome">
       <div className="welcome-card setup-card">
-        <div
-          className="welcome-mark"
-          style={{
-            background: `linear-gradient(135deg, ${theme.ui.accent}, ${theme.ui.info})`,
-            color: theme.ui.accentFg,
-          }}
-        >
-          T
+        <div className="welcome-mark">
+          <svg viewBox="0 0 160 160" aria-hidden="true">
+            <rect className="brand-mark-tile" x="0" y="0" width="160" height="160" rx="36" />
+            <circle className="brand-mark-shape" cx="20" cy="20" r="4" opacity="0.9" />
+            <circle className="brand-mark-shape" cx="34" cy="20" r="4" opacity="0.6" />
+            <circle className="brand-mark-shape" cx="48" cy="20" r="4" opacity="0.4" />
+            <rect className="brand-mark-shape" x="20" y="40" width="55" height="50" rx="6" opacity="0.95" />
+            <rect className="brand-mark-shape" x="85" y="40" width="55" height="50" rx="6" opacity="0.55" />
+            <rect className="brand-mark-shape" x="20" y="100" width="120" height="40" rx="6" opacity="0.75" />
+          </svg>
         </div>
         <h1 className="welcome-title">Welcome to AnySpace</h1>
         <div className="welcome-sub">
