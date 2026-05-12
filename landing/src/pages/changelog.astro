@@ -1,0 +1,192 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const title = "Changelog — AnySpace";
+const description =
+  "What's new in AnySpace. Notable user-facing changes per release, newest first.";
+
+const REPO = "https://github.com/anyspacedev/anyspace";
+---
+
+<Base title={title} description={description}>
+  <Nav />
+  <main id="main" class="py-16 sm:py-20">
+    <div class="container">
+      <div class="mx-auto max-w-3xl">
+        <header class="mb-12">
+          <p class="mb-3 font-mono text-xs uppercase tracking-[0.14em] text-fg-dim">
+            Changelog
+          </p>
+          <h1 class="text-display text-fg">
+            What's new
+            <span class="text-fg-muted">in AnySpace.</span>
+          </h1>
+          <p class="mt-5 max-w-2xl text-base text-fg-muted sm:text-lg">
+            User-facing changes per release, newest first. For the full commit
+            history, see{" "}
+            <a
+              href={REPO}
+              target="_blank"
+              rel="noopener"
+              class="underline decoration-border-strong underline-offset-[3px] transition-colors hover:decoration-fg"
+              >the GitHub repo</a
+            >.
+          </p>
+        </header>
+
+        <article class="docs-prose">
+          <!-- ============ Unreleased ============ -->
+          <h2 id="unreleased">Unreleased</h2>
+          <p>
+            <em>In development on <code>master</code>.</em>{" "}
+            <a
+              href={`${REPO}/compare/v0.1.0-2...master`}
+              target="_blank"
+              rel="noopener"
+              >Compare on GitHub →</a
+            >
+          </p>
+
+          <h3>Added</h3>
+          <ul>
+            <li>
+              Landing site: <a href="/about">/about</a>,{" "}
+              <a href="/privacy">/privacy</a>, <a href="/terms">/terms</a>{" "}
+              pages.
+            </li>
+          </ul>
+
+          <h3>Fixed</h3>
+          <ul>
+            <li>
+              <strong>Windows SSH password auth</strong> — fix askpass cleanup
+              race and auto-trust the host key on first connect, so the prompt
+              for an unknown host doesn't hang the session.
+            </li>
+          </ul>
+
+          <!-- ============ v0.1.0-2 ============ -->
+          <h2 id="v0-1-0-2">v0.1.0-2 — 2026-05-11</h2>
+          <p>
+            <a
+              href={`${REPO}/releases/tag/v0.1.0-2`}
+              target="_blank"
+              rel="noopener"
+              >GitHub release →</a
+            >
+          </p>
+
+          <h3>Fixed</h3>
+          <ul>
+            <li>
+              <strong>Windows terminal init</strong> — preserve the WSL
+              path-rewrite prefix on <code>bash --rcfile</code> so the OSC 133
+              shell-integration hook sources correctly inside WSL. Without
+              this, command blocks and Super Brain were silently broken on
+              Windows.
+            </li>
+          </ul>
+
+          <!-- ============ v0.1.0-1 ============ -->
+          <h2 id="v0-1-0-1">v0.1.0-1 — 2026-05-11 · First public release</h2>
+          <p>
+            <a
+              href={`${REPO}/releases/tag/v0.1.0-1`}
+              target="_blank"
+              rel="noopener"
+              >GitHub release →</a
+            >
+          </p>
+
+          <h3>Added</h3>
+          <ul>
+            <li>
+              <strong>SSH Remotes sidebar</strong> — store hosts, reconnect
+              them as terminal panes, with an optional password-auth path for
+              hosts that don't use keys.
+            </li>
+            <li>
+              <strong>Knowledge view</strong> — a project-local wiki with
+              wikilinks and a graph view, stored in your project tree.
+            </li>
+            <li>
+              <strong>MCP server</strong> — tasks, notes, messages, and
+              terminal context are exposed over MCP for external clients.
+            </li>
+            <li>
+              <strong>Embedded browser pane</strong> — scaffolded behind a
+              "deferred" placeholder; not yet enabled by default.
+            </li>
+            <li>
+              <strong>AnySpace Cloud</strong> as the default AI and Super
+              Agent endpoint, with a sign-in guide on first launch.
+            </li>
+            <li>
+              <strong>User docs</strong> at <a href="/docs">/docs</a> on the
+              landing site, including Remotes and Knowledge walkthroughs.
+            </li>
+            <li>
+              Landing site rebuilt in the monochrome agentic-workspace
+              direction.
+            </li>
+            <li>
+              Inter and JetBrains Mono self-hosted via{" "}
+              <code>@fontsource-variable</code> — no Google Fonts dependency
+              at runtime.
+            </li>
+          </ul>
+
+          <h3>Changed</h3>
+          <ul>
+            <li>
+              Native <code>window.confirm</code> replaced with the Tauri
+              dialog plugin's themed <code>confirm()</code> — consistent
+              styling and accessibility across platforms.
+            </li>
+            <li>
+              About dialog now shows the real version and git short hash.
+            </li>
+            <li>
+              <code>TERM=xterm-256color</code> set on every PTY spawn so
+              256-color and truecolor escape sequences render correctly out of
+              the box.
+            </li>
+          </ul>
+
+          <h3>Fixed</h3>
+          <ul>
+            <li>
+              <strong>WebKitGTK white-screen on maximize</strong> — disabled
+              the DMABUF renderer on Linux/GNOME where it raced with window
+              resizes.
+            </li>
+            <li>
+              OSC 133 integration is skipped in non-interactive shells, so
+              scripts and CI invocations no longer get spurious shell-prompt
+              markers.
+            </li>
+          </ul>
+
+          <h3>Platform support</h3>
+          <ul>
+            <li>
+              <strong>Windows</strong> — WSL is required. AnySpace runs your
+              terminals inside <code>wsl.exe -e bash -il</code> because the
+              OSC 133 shell-integration hook can't be sourced from{" "}
+              <code>cmd.exe</code> or PowerShell. If WSL isn't installed, the
+              terminal pane shows a setup overlay instead of a degraded shell.
+            </li>
+            <li>
+              <strong>iOS Simulator preview</strong> hidden on non-macOS
+              platforms (requires Apple's ScreenCaptureKit, which doesn't
+              exist on Linux or Windows).
+            </li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>
