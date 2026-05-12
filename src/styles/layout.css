@@ -1525,7 +1525,10 @@ button.mode-chip--info:hover {
   position: relative;
   width: 100%;
   height: 100%;
-  background: var(--bg);
+  /* Pinned dark — matches the xterm palette in Terminal.tsx. DOM-renderer
+     fallback panes (past MAX_WEBGL_TERMINALS) have a transparent viewport,
+     so this is the backdrop they actually show. */
+  background: #0a0a0a;
   transition: box-shadow var(--duration-fast) var(--ease-out);
 }
 .terminal-wrap:focus-visible {
