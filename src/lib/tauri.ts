@@ -217,6 +217,75 @@ export async function sttHotkeySet(code: string): Promise<void> {
   return rawInvoke("stt_hotkey_set", { code });
 }
 
+// === Local (on-device) Whisper preset ===
+
+export type SttTranscribeLocalArgs = {
+  /** 16-bit PCM mono WAV blob from the recorder's forceWav path. */
+  audio: Uint8Array;
+  modelPath: string;
+  language?: string;
+};
+
+export async function sttTranscribeLocal(
+  args: SttTranscribeLocalArgs,
+): Promise<string> {
+  return rawInvoke<string>("stt_transcribe_local", {
+    args: { ...args, audio: Array.from(args.audio) },
+  });
+}
+
+export type SttModelStatus = {
+  id: string;
+  label: string;
+  sizeMb: number;
+  url: string;
+  default: boolean;
+  installed: boolean;
+  path: string | null;
+  installedBytes: number | null;
+};
+
+export type SttGpuStatus = {
+  useGpu: boolean;
+  /** "metal" | "vulkan" | "cuda" | "cpu" */
+  backend: string;
+};
+
+export type SttModelListResponse = {
+  models: SttModelStatus[];
+  /** null until the first transcribe loads a model. */
+  gpu: SttGpuStatus | null;
+  /** Disk location where models live (for the "Stored in:" hint). */
+  modelsDir: string | null;
+};
+
+export async function sttModelList(): Promise<SttModelListResponse> {
+  return rawInvoke<SttModelListResponse>("stt_model_list");
+}
+
+export type SttDownloadProgress = {
+  downloaded: number;
+  total: number;
+  done: boolean;
+};
+
+export async function sttModelDownload(
+  id: string,
+  onProgress: Channel<SttDownloadProgress>,
+): Promise<string> {
+  return rawInvoke<string>("stt_model_download", { id, onProgress });
+}
+
+/** Cancels an in-flight download. The matching `sttModelDownload` promise
+ *  will reject with "aborted" and the `.part` file is cleaned up. */
+export async function sttModelDownloadAbort(id: string): Promise<void> {
+  return rawInvoke("stt_model_download_abort", { id });
+}
+
+export async function sttModelDelete(id: string): Promise<void> {
+  return rawInvoke("stt_model_delete", { id });
+}
+
 export type AiChatArgs = {
   endpoint: string;
   apiKey: string;

@@ -1,5 +1,7 @@
 use serde::Deserialize;
 use std::error::Error as _;
+use std::path::PathBuf;
+use tauri::ipc::Channel;
 
 // Mirrors the helper in ai/commands.rs: reqwest::Error's Display only prints
 // the top-level message and hides the underlying io/dns/tls cause. Walk the
@@ -171,6 +173,126 @@ pub async fn stt_transcribe(
         text.chars().count()
     );
     Ok(text)
+}
+
+// ---------------------------------------------------------------------------
+// Local (on-device) Whisper preset
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscribeLocalArgs {
+    /// 16-bit PCM mono WAV blob produced by the recorder's `forceWav` path.
+    pub audio: Vec<u8>,
+    /// Absolute path to a `ggml-<id>.bin` Whisper model file.
+    pub model_path: String,
+    /// Optional ISO language code ("en", "zh", …). Empty/None = auto-detect.
+    pub language: Option<String>,
+}
+
+#[tauri::command]
+pub async fn stt_transcribe_local(args: TranscribeLocalArgs) -> Result<String, String> {
+    let model_path = PathBuf::from(&args.model_path);
+    if !model_path.is_file() {
+        return Err(format!(
+            "model file not found: {} — download it first via Settings",
+            args.model_path
+        ));
+    }
+    let bytes_len = args.audio.len();
+    let lang_tag = args.language.clone().unwrap_or_default();
+    eprintln!(
+        "[stt_transcribe_local] model={} lang={} bytes={}",
+        args.model_path, lang_tag, bytes_len
+    );
+    let started = std::time::Instant::now();
+
+    // Whisper inference is CPU-bound and can take seconds; run on the
+    // blocking pool so the async runtime keeps serving UI events.
+    let result = tokio::task::spawn_blocking(move || {
+        crate::stt::local::transcribe(&args.audio, &model_path, args.language.as_deref())
+    })
+    .await
+    .map_err(|e| format!("join: {e}"))?;
+
+    match result {
+        Ok(text) => {
+            eprintln!(
+                "[stt_transcribe_local] ok chars={} elapsed={:?}",
+                text.chars().count(),
+                started.elapsed()
+            );
+            Ok(text)
+        }
+        Err(e) => {
+            eprintln!(
+                "[stt_transcribe_local] error elapsed={:?}: {e:#}",
+                started.elapsed()
+            );
+            Err(format!("{e:#}"))
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelListResponse {
+    pub models: Vec<crate::stt::models::ModelStatus>,
+    pub gpu: Option<crate::stt::local::GpuStatus>,
+    pub models_dir: Option<String>,
+}
+
+#[tauri::command]
+pub fn stt_model_list(app: tauri::AppHandle) -> Result<ModelListResponse, String> {
+    let models = crate::stt::models::list(&app);
+    let dir = crate::stt::models::models_dir(&app)
+        .ok()
+        .map(|p| p.to_string_lossy().to_string());
+    Ok(ModelListResponse {
+        models,
+        gpu: crate::stt::local::current_gpu_status(),
+        models_dir: dir,
+    })
+}
+
+#[tauri::command]
+pub async fn stt_model_download(
+    app: tauri::AppHandle,
+    id: String,
+    on_progress: Channel<crate::stt::models::DownloadProgress>,
+    manager: tauri::State<'_, crate::stt::ModelDownloadManager>,
+) -> Result<String, String> {
+    // Register an abort handle keyed by model id. Inserting drops any
+    // previous sender for the same id, which aborts an in-flight download
+    // — the user clicked Download twice in a row, only the latest wins.
+    let (abort_tx, abort_rx) = tokio::sync::oneshot::channel::<()>();
+    manager.aborts.insert(id.clone(), abort_tx);
+    let result = crate::stt::models::download(app, id.clone(), on_progress, abort_rx).await;
+    // Only remove if WE still own the entry — a concurrent download for the
+    // same id may have already replaced it.
+    manager
+        .aborts
+        .remove_if(&id, |_, _| true /* unconditional best-effort */);
+    result
+}
+
+/// Cancels an in-flight download for `id`. Dropping the oneshot sender
+/// races against the `bytes_stream` poll in `models::download`, which
+/// detects the abort, removes the `.part` file, and returns `Err("aborted")`.
+#[tauri::command]
+pub fn stt_model_download_abort(
+    id: String,
+    manager: tauri::State<'_, crate::stt::ModelDownloadManager>,
+) {
+    if let Some((_, _tx)) = manager.aborts.remove(&id) {
+        // _tx is dropped here → receiver future resolves → download aborts.
+        eprintln!("[stt_model_download_abort] cancelled id={id}");
+    }
+}
+
+#[tauri::command]
+pub fn stt_model_delete(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    crate::stt::models::delete(&app, &id)
 }
 
 fn strip_bracketed_annotations(text: &str) -> String {

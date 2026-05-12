@@ -57,7 +57,13 @@ function tryCreateMediaRecorder(s: MediaStream): MediaRecorder | null {
 
 export type StartResult = { analyser: AnalyserNode; mime: string };
 
-export async function startRecording(): Promise<StartResult> {
+export type StartOptions = {
+  /** Skip the MediaRecorder/webm branch and capture raw 16-bit mono WAV.
+   *  Required by the local Whisper preset (whisper.cpp can't decode opus). */
+  forceWav?: boolean;
+};
+
+export async function startRecording(opts?: StartOptions): Promise<StartResult> {
   if (state !== "idle") throw new Error("recorder busy");
   stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
@@ -69,7 +75,7 @@ export async function startRecording(): Promise<StartResult> {
   analyser.smoothingTimeConstant = 0.6;
   src.connect(analyser);
 
-  recorder = tryCreateMediaRecorder(stream);
+  recorder = opts?.forceWav ? null : tryCreateMediaRecorder(stream);
 
   if (recorder) {
     mimeType = recorder.mimeType || pickMime() || "audio/webm";

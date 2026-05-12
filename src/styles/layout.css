@@ -4126,6 +4126,156 @@ button.mode-chip--info:hover {
   justify-content: flex-start;
 }
 
+/* ===== Local Whisper (on-device STT) picker ===== */
+
+.stt-local-models {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  padding: 4px;
+}
+.stt-local-empty {
+  padding: var(--pad-sm);
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+}
+.stt-local-model {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pad-sm);
+  padding: 8px var(--pad-sm);
+  border-radius: var(--radius);
+  background: transparent;
+}
+.stt-local-model:hover {
+  background: var(--bg-elev-2);
+}
+.stt-local-model.is-selected {
+  background: color-mix(in oklab, var(--accent) 12%, var(--bg-elev));
+}
+.stt-local-model-main {
+  display: flex;
+  align-items: center;
+  gap: var(--pad-sm);
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+.stt-local-model-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.stt-local-model-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+.stt-local-model-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 22%, var(--bg-elev));
+  color: var(--accent);
+}
+.stt-local-model-meta {
+  font-size: var(--font-size-xs, 11px);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.stt-local-error {
+  color: var(--danger);
+}
+/* Reserve a consistent width so the row layout doesn't jump as the action
+   swaps between Download / Cancel / Delete / Retry / two-button confirm. */
+.stt-local-model-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+.stt-local-confirm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Progress bar shown beneath the meta line while a download is in flight.
+   `transform: scaleX` would lose the accent gradient, so width animation
+   is fine here — there's no layout reflow because the track is fixed
+   width and the fill is absolutely contained. */
+.stt-local-progress {
+  margin-top: 6px;
+  width: 100%;
+  height: 4px;
+  background: var(--bg-elev-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.stt-local-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 120ms linear;
+}
+
+/* Destructive variant of the icon-only button. Tints text red, fills the
+   hover background with a faint danger wash. Matches the
+   .tab-context-row--danger pattern used elsewhere. */
+.icon-btn--danger {
+  color: var(--fg-muted);
+}
+.icon-btn--danger:hover {
+  background: color-mix(in oklab, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.icon-btn--danger svg {
+  color: inherit;
+}
+
+.stt-local-gpu {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.stt-local-gpu svg {
+  flex-shrink: 0;
+}
+.stt-local-gpu--ok svg {
+  color: var(--accent);
+}
+.stt-local-gpu--warn svg {
+  color: var(--warn, var(--accent));
+}
+.stt-local-gpu--muted svg {
+  color: var(--fg-muted);
+}
+.stt-local-dir {
+  margin-top: 2px;
+  word-break: break-all;
+}
+.stt-local-dir code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs, 11px);
+  background: var(--bg-elev);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
 /* ===== Login Guide modal ===== */
 
 .modal.login-guide {

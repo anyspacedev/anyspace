@@ -54,6 +54,14 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 # http probe for preview port detection
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "socks", "stream"] }
 
+# Local on-device STT via whisper.cpp. Optional behind the `local-stt`
+# feature so contributors without cmake / a C++ toolchain can still
+# `cargo check --no-default-features`. Per-platform GPU backends are
+# enabled below in the target-specific dependency stanzas (Metal on macOS,
+# Vulkan on Linux). Windows defaults to CPU; CUDA can be opted-in by
+# self-builders.
+whisper-rs = { version = "0.13", optional = true, default-features = false }
+
 # in-process HTTP server that backs $ANYSPACE_API_URL for terminal-spawned
 # Code Agents (drives Preview, returns screenshot paths). Loopback-only,
 # bearer-token authed. axum 0.7 pairs cleanly with the tokio 1 runtime
@@ -88,6 +96,9 @@ rmcp = { version = "1.6.0", features = ["server", "macros", "transport-streamabl
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", features = ["v2_38"] }
 device_query = "2"
+# Vulkan backend for whisper.cpp on Linux GPUs. Requires the Vulkan SDK
+# at build time; runtime probe falls back to CPU if no Vulkan device.
+whisper-rs = { version = "0.13", optional = true, default-features = false, features = ["vulkan"] }
 
 # Direct dependency on the Secret Service D-Bus client so we can bootstrap
 # the user's default collection on first SSH password save. On fresh Debian/
@@ -120,6 +131,12 @@ objc2-foundation = { version = "0.3", features = ["NSValue", "NSString"] }
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKPreferences", "objc2-app-kit"] }
 objc2-app-kit = { version = "0.3", features = ["NSEvent", "block2"] }
 block2 = "0.6"
+# Metal backend for whisper.cpp on Apple Silicon / Intel Mac GPUs.
+whisper-rs = { version = "0.13", optional = true, default-features = false, features = ["metal"] }
 
 [features]
+default = ["local-stt"]
 custom-protocol = ["tauri/custom-protocol"]
+# Compiles in the on-device Whisper backend. Disable with
+# `--no-default-features` if cmake / a C++ toolchain isn't available.
+local-stt = ["dep:whisper-rs"]

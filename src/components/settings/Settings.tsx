@@ -28,6 +28,7 @@ import {
 } from "../../lib/teamRoles";
 import { BUILTIN_SKILLS, type TeamSkill } from "../../lib/teamSkills";
 import { ANYSPACE_CLOUD_URL } from "../../lib/auth";
+import { LocalWhisperSection } from "./LocalWhisperSection";
 import { AnySpaceCloudAccount } from "../auth/AnySpaceCloudAccount";
 import { SettingsSearch } from "./SettingsSearch";
 import { TestAiConnection } from "./TestConnection";
@@ -547,6 +548,12 @@ const STT_PRESETS: Record<
     model: "scribe_v1",
     label: "ElevenLabs",
   },
+  "local-whisper": {
+    // No endpoint/model — the picker below drives those for this preset.
+    endpoint: "",
+    model: "",
+    label: "Local (Whisper) — on-device",
+  },
   custom: { endpoint: "", model: "", label: "Custom" },
 };
 
@@ -611,6 +618,7 @@ function SttSettingsSection() {
   const update = useSttStore((s) => s.updateSettings);
   const [revealKey, setRevealKey] = useState(false);
   const isAnySpaceCloud = settings.presetId === "anyspace-cloud";
+  const isLocalWhisper = settings.presetId === "local-whisper";
 
   return (
     <div className="settings-section">
@@ -657,7 +665,9 @@ function SttSettingsSection() {
           </select>
         </label>
 
-        {isAnySpaceCloud ? (
+        {isLocalWhisper ? (
+          <LocalWhisperSection />
+        ) : isAnySpaceCloud ? (
           <>
             <div className="stt-field">
               <span className="stt-field-label">Account</span>
@@ -720,16 +730,18 @@ function SttSettingsSection() {
           </>
         )}
 
-        <label className="stt-field">
-          <span className="stt-field-label">Model</span>
-          <input
-            type="text"
-            value={settings.model}
-            placeholder="whisper-large-v3-turbo"
-            onChange={(e) => void update({ model: e.target.value })}
-            spellCheck={false}
-          />
-        </label>
+        {!isLocalWhisper && (
+          <label className="stt-field">
+            <span className="stt-field-label">Model</span>
+            <input
+              type="text"
+              value={settings.model}
+              placeholder="whisper-large-v3-turbo"
+              onChange={(e) => void update({ model: e.target.value })}
+              spellCheck={false}
+            />
+          </label>
+        )}
 
         <label className="stt-field">
           <span className="stt-field-label">Language (optional)</span>

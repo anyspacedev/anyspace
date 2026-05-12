@@ -118,6 +118,7 @@ pub fn run() {
         .manage(team::TeamManager::new())
         .manage(knowledge::KnowledgeManager::new())
         .manage(ai::AiStreamManager::new())
+        .manage(stt::ModelDownloadManager::new())
         .invoke_handler(tauri::generate_handler![
             // PTY
             pty::commands::pty_spawn,
@@ -151,6 +152,11 @@ pub fn run() {
             // STT
             stt::commands::stt_transcribe,
             stt::commands::stt_hotkey_set,
+            stt::commands::stt_transcribe_local,
+            stt::commands::stt_model_list,
+            stt::commands::stt_model_download,
+            stt::commands::stt_model_download_abort,
+            stt::commands::stt_model_delete,
             // AI
             ai::commands::ai_chat,
             ai::stream::ai_chat_stream,
