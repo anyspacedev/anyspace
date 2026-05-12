@@ -451,6 +451,14 @@ export const useSttStore = create<SttState>((set, get) => ({
           text.length,
           text.slice(0, 60).replace(/\n/g, " "),
         );
+        // Empty result = whisper.cpp returned only sentinel markers
+        // (`[BLANK_AUDIO]` etc.) which we stripped backend-side. Surface
+        // a brief message instead of injecting nothing.
+        if (!text) {
+          set({ phase: "error", message: "No speech detected", analyser: null });
+          scheduleDismiss(set, 1500);
+          return;
+        }
         const target = activeTarget ?? { kind: "none", label: "no target" };
         const out = await inject(text, target);
         if (gen !== startGen) return;

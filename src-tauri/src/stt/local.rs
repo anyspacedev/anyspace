@@ -179,7 +179,10 @@ mod imp {
                 .map_err(|e| anyhow!("seg {i}: {e}"))?;
             out.push_str(&seg);
         }
-        Ok(out.trim().to_string())
+        // whisper.cpp emits sentinel markers like `[BLANK_AUDIO]`, `[Music]`,
+        // `[_BEG_]` when there's no speech or for internal tokens. They're
+        // noise once injected into a terminal/editor — strip at the boundary.
+        Ok(crate::stt::strip_bracketed_annotations(out.trim()))
     }
 
     /// Parses a canonical 16-bit PCM WAV blob into `(samples_mono_i16, sample_rate)`.

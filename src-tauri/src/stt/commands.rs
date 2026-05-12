@@ -164,7 +164,7 @@ pub async fn stt_transcribe(
     // transcript. They're noise once the text is being injected into a terminal /
     // editor, so drop them here before returning.
     let text = if is_elevenlabs {
-        strip_bracketed_annotations(&raw_text)
+        crate::stt::strip_bracketed_annotations(&raw_text)
     } else {
         raw_text
     };
@@ -295,42 +295,9 @@ pub fn stt_model_delete(app: tauri::AppHandle, id: String) -> Result<(), String>
     crate::stt::models::delete(&app, &id)
 }
 
-fn strip_bracketed_annotations(text: &str) -> String {
-    let mut stripped = String::with_capacity(text.len());
-    let mut bracket_depth: u32 = 0;
-    let mut paren_depth: u32 = 0;
-    for ch in text.chars() {
-        match ch {
-            '[' => bracket_depth += 1,
-            ']' if bracket_depth > 0 => bracket_depth -= 1,
-            '(' => paren_depth += 1,
-            ')' if paren_depth > 0 => paren_depth -= 1,
-            _ if bracket_depth == 0 && paren_depth == 0 => stripped.push(ch),
-            _ => {}
-        }
-    }
-    let mut out = String::with_capacity(stripped.len());
-    let mut prev_space = true;
-    for ch in stripped.chars() {
-        if ch.is_whitespace() {
-            if !prev_space {
-                out.push(' ');
-                prev_space = true;
-            }
-        } else {
-            out.push(ch);
-            prev_space = false;
-        }
-    }
-    while out.ends_with(' ') {
-        out.pop();
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
-    use super::strip_bracketed_annotations;
+    use crate::stt::strip_bracketed_annotations;
 
     #[test]
     fn strips_bracketed_audio_events() {
