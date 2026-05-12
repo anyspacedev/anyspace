@@ -795,7 +795,7 @@ button.mode-chip--info:hover {
 .mode-chip svg {
   flex-shrink: 0;
 }
-.theme-select, .device-select, .zoom-select {
+.device-select, .zoom-select {
   background: var(--bg-elev-2);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -804,20 +804,8 @@ button.mode-chip--info:hover {
   font-size: var(--font-size-xs);
   transition: border-color var(--duration-fast) var(--ease-out);
 }
-.theme-select:hover, .device-select:hover, .zoom-select:hover {
+.device-select:hover, .zoom-select:hover {
   border-color: var(--border-strong);
-}
-.status-theme {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.status-theme-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px color-mix(in oklab, var(--accent) 70%, transparent);
 }
 
 /* ===== Workspace + panes ===== */
@@ -3622,197 +3610,43 @@ button.mode-chip--info:hover {
   font-weight: 600;
   margin-top: var(--pad-sm);
 }
-/* Theme picker — compact dropdown with swatch + grouped listbox panel.
-   Native <select> can't render colour swatches per option, so this is a
-   custom listbox. Trigger is a fixed-width button; panel anchors below. */
-.theme-select {
-  position: relative;
-  width: 100%;
-  max-width: 360px;
-}
-.theme-select-trigger {
-  display: flex;
-  align-items: center;
-  gap: var(--pad-sm);
-  width: 100%;
-  height: 38px;
-  padding: 0 10px 0 10px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--fg);
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
-}
-.theme-select-trigger:hover {
-  border-color: var(--border-strong);
-}
-.theme-select-trigger:focus-visible,
-.theme-select-trigger.open {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
-}
-.theme-select-label {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.theme-select-name {
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: var(--fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.theme-select-kind {
-  font-size: var(--font-size-xs);
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.theme-select-chevron {
-  display: grid;
-  place-items: center;
-  color: var(--fg-dim);
-  flex-shrink: 0;
-}
-
-.theme-swatch-mini {
-  display: inline-grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0;
-  width: 56px;
-  height: 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.theme-swatch-mini span { display: block; }
-
-.theme-select-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  box-shadow:
-    0 1px 2px color-mix(in oklab, var(--shadow) 60%, transparent),
-    0 12px 32px -12px color-mix(in oklab, var(--shadow) 80%, transparent);
-  overflow: hidden;
-  animation: theme-select-in 120ms var(--ease-out);
-}
-@keyframes theme-select-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .theme-select-panel { animation: none; }
-}
-
-.theme-select-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-}
-.theme-select-search-icon {
-  display: grid;
-  place-items: center;
-  color: var(--fg-dim);
-}
-.theme-select-search input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: var(--fg);
-  font-size: var(--font-size-sm);
-  outline: none;
-}
-
-.theme-select-list {
-  max-height: 320px;
-  overflow-y: auto;
+/* Theme mode picker — 3-segment control (Light / Dark / System). */
+.theme-mode-picker {
+  display: inline-flex;
   padding: 4px;
+  gap: 2px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
-.theme-select-empty {
-  padding: var(--pad-md);
-  color: var(--fg-dim);
-  font-size: var(--font-size-sm);
-  text-align: center;
-}
-.theme-select-group {
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-dim);
-  font-weight: 600;
-  padding: 8px 8px 4px 8px;
-}
-.theme-select-group:not(:first-child) {
-  border-top: 1px solid var(--border);
-  margin-top: 4px;
-  padding-top: 10px;
-}
-
-.theme-option {
-  display: flex;
+.theme-mode-seg {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
+  gap: 8px;
+  padding: 7px 14px;
+  border: 0;
   background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-}
-.theme-option.hl {
-  background: color-mix(in oklab, var(--accent) 14%, transparent);
-}
-.theme-option.sel { color: var(--fg); }
-.theme-option-name {
-  flex: 1;
-  min-width: 0;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.theme-option-kind {
-  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
   color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  flex-shrink: 0;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
-.theme-option-check {
-  display: grid;
-  place-items: center;
-  color: var(--accent);
-  flex-shrink: 0;
+.theme-mode-seg:hover {
+  color: var(--fg);
+}
+.theme-mode-seg.is-selected {
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--shadow) 50%, transparent);
+}
+.theme-mode-seg:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 50%, transparent);
+  outline-offset: 2px;
 }
 
 .kbd-list {

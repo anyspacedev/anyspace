@@ -3,7 +3,6 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useOperatorInboxStore } from "../../stores/operatorInboxStore";
 import { ModeStrip } from "./ModeStrip";
 import { InboxPopover } from "../inbox/InboxPopover";
-import { StatusBarThemePicker } from "../theme/StatusBarThemePicker";
 
 export function StatusBar() {
   const tabs = useWorkspaceStore((s) => s.tabs);
@@ -41,9 +40,6 @@ export function StatusBar() {
             </span>
           </>
         )}
-      </div>
-      <div className="status-right">
-        <StatusBarThemePicker />
       </div>
     </div>
   );

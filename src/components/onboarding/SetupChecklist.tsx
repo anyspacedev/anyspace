@@ -30,7 +30,7 @@ export function SetupChecklist() {
   const setView = useWorkspaceStore((s) => s.setView);
   const newTab = useWorkspaceStore((s) => s.newTab);
   const openPickerWith = useNewWorkspacePickerStore((s) => s.openWith);
-  const theme = useThemeStore((s) => s.current);
+  const theme = useThemeStore((s) => s.resolved);
 
   const aiConfigured =
     !!ai.endpoint && !!ai.apiKey && !!ai.model;
