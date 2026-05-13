@@ -1,5 +1,6 @@
-import { SignInButton, SignOutButton } from "@clerk/clerk-react";
+import { SignOutButton } from "@clerk/clerk-react";
 import { useAuthStore } from "../../stores/authStore";
+import { useDesktopSignIn } from "../../lib/clerkDesktopAuth";
 
 /**
  * Inline account row shown in Settings sections that select the
@@ -7,7 +8,7 @@ import { useAuthStore } from "../../stores/authStore";
  *   - "this build wasn't compiled with a Clerk key" notice
  *   - "checking sign-in…" while the bridge initializes
  *   - signed-in row with email + sign-out
- *   - signed-out row with the Clerk sign-in modal trigger
+ *   - signed-out row with the desktop sign-in button (opens system browser)
  *
  * Reused across Settings panels and the Login Guide modal.
  */
@@ -49,11 +50,21 @@ export function AnySpaceCloudAccount() {
   return (
     <div className="stt-tc-account">
       <span>Sign in to use AnySpace Cloud — no API key required.</span>
-      <SignInButton mode="modal">
-        <button type="button" className="btn btn-primary">
-          Sign in
-        </button>
-      </SignInButton>
+      <DesktopSignInPrimaryButton />
     </div>
+  );
+}
+
+function DesktopSignInPrimaryButton() {
+  const { isLoaded, busy, start } = useDesktopSignIn();
+  return (
+    <button
+      type="button"
+      className="btn btn-primary"
+      disabled={!isLoaded || busy}
+      onClick={() => void start()}
+    >
+      {busy ? "Opening browser…" : "Sign in"}
+    </button>
   );
 }

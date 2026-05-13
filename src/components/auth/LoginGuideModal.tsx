@@ -1,5 +1,4 @@
 import { useEffect, useId } from "react";
-import { SignInButton } from "@clerk/clerk-react";
 import { Icon } from "../ui/Icon";
 import { useAuthStore } from "../../stores/authStore";
 import {
@@ -8,6 +7,7 @@ import {
 } from "../../stores/loginGuideStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useHideBrowsersWhile } from "../../lib/useHideBrowsersWhile";
+import { useDesktopSignIn } from "../../lib/clerkDesktopAuth";
 
 const COPY: Record<
   LoginGuideFeature,
@@ -89,11 +89,7 @@ export function LoginGuideModal() {
           </div>
         ) : (
           <div className="login-guide-actions">
-            <SignInButton mode="modal">
-              <button type="button" className="btn btn-primary">
-                Sign in
-              </button>
-            </SignInButton>
+            <DesktopSignInPrimaryButton />
             <button
               type="button"
               className="btn btn-ghost"
@@ -105,5 +101,19 @@ export function LoginGuideModal() {
         )}
       </div>
     </div>
+  );
+}
+
+function DesktopSignInPrimaryButton() {
+  const { isLoaded, busy, start } = useDesktopSignIn();
+  return (
+    <button
+      type="button"
+      className="btn btn-primary"
+      disabled={!isLoaded || busy}
+      onClick={() => void start()}
+    >
+      {busy ? "Opening browser…" : "Sign in"}
+    </button>
   );
 }

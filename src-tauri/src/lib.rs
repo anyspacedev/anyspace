@@ -3,6 +3,7 @@ use tauri::Manager;
 mod agent;
 mod agent_api;
 mod ai;
+mod auth;
 mod browser;
 mod clipboard;
 mod fs_ops;
@@ -111,6 +112,7 @@ pub fn run() {
                 .js_init_script_on_all_frames(PREVIEW_PICKER_SCRIPT)
                 .build(),
         )
+        .manage(auth::DesktopAuthManager::new())
         .manage(pty::PtyManager::new())
         .manage(preview::PreviewManager::new())
         .manage(browser::BrowserManager::new())
@@ -198,6 +200,9 @@ pub fn run() {
             agent_api::commands::agent_api_info,
             agent_api::commands::agent_api_reply,
             agent_api::commands::agent_api_rotate_token,
+            // Desktop OAuth bridge (system-browser → loopback → Clerk ticket)
+            auth::commands::desktop_auth_begin,
+            auth::commands::desktop_auth_cancel,
             // SSH (keychain-backed password auth + askpass helper)
             ssh::commands::ssh_password_set,
             ssh::commands::ssh_password_get,
