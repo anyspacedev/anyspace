@@ -1133,6 +1133,7 @@ function SuperAgentSettingsSection() {
             multimodal content (some OpenAI-compatible proxies).
           </span>
         </label>
+
       </div>
 
       {!isAnySpaceCloud && !(isInherit && aiIsAnySpaceCloud) && (

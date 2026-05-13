@@ -249,33 +249,27 @@ Multi-turn AI chat **inside the app** with tools for inspecting/manipulating the
 - **Full-page** at `selectedView === "superagent"` (sidebar nav between Teams and Agents; `mode="full"`).
 - **Collapsed pill** (`.sa-collapsed-tab`) in `.workspace-content` when closed.
 
-**Data model** (migration `005_super_agent.sql`):
-- `super_agent_sessions` — one row per conversation; `system_prompt_override` overrides Settings default.
-- `super_agent_messages` — keyed `(session_id, ordinal)`, roles `user|assistant|tool|system`; `tool_calls_json`/`tool_results_json` are JSON arrays.
+**Runtime** — `@earendil-works/pi-agent-core` `Agent` class lives in the webview; we no longer maintain our own ReAct loop. `src/lib/superAgent/agent.ts:createSuperAgent` builds the Agent from settings + `resolveAiCreds`; `piRunner.ts:runPiPrompt` is the headless entry point; `panelBridge.ts` translates pi `AgentEvent`s into legacy Zustand-store mutations so the existing `SuperAgentPanel.tsx` / `MessageBubble.tsx` / `ToolCallCard.tsx` keep rendering unchanged. `runner.ts` is a 30-line shim re-exporting `sendUserMessage`, `abortActive`, `decideQueuedToolCall` for back-compat with existing imports.
 
-**Streaming AI** (`src-tauri/src/ai/stream.rs`):
-- `ai_chat_stream(args, on_event)` POSTs `stream:true`, parses SSE via `Response::bytes_stream()` (needs `stream` feature on reqwest), emits typed events through `Channel<StreamEvent>`: `delta{content}` / `tool_call_delta{index,id?,name?,arguments_partial?}` / `done{finish_reason?}` / `error`.
-- **Aborts** in `ai::AiStreamManager` (DashMap of oneshot senders); `abort_ai_chat_stream(stream_id)` resolves mid-stream.
-- **Fallback**: 4xx on stream → retries one-shot, synthesizes a single `delta` + `done` so runner code path doesn't branch.
+**Data model:**
+- Sessions live in `super_agent_sessions` (migration `005_super_agent.sql`).
+- Messages live in `super_agent_messages_v2` (migration `007_super_agent_pi.sql`) — one JSON blob per row matching pi's `AgentMessage` union (`UserMessage | AssistantMessage | ToolResultMessage` with `TextContent / ImageContent / ThinkingContent / ToolCall` blocks). `persistence.ts:loadAgentMessages` migrates from the legacy `super_agent_messages` table (kept around for safety) lazily on first session open and stamps `super_agent_sessions.pi_version` to prevent re-running.
 
-**ReAct loop** (`src/lib/superAgent/runner.ts`):
-1. Append user message; persist.
-2. Build history (system prompt + last `memoryWindow` messages + `tools[]` for enabled tools). `role:"system"` in history is skipped — runner always re-injects the current Settings system prompt fresh, so display-only system bubbles (e.g. operator inbox handoff) don't duplicate or pollute context.
-3. `aiChatStream` → tokens into live assistant bubble; tool_call_deltas accumulate by index.
-4. On `done`: for each completed tool call, short-circuit if disabled, queue if `pauseToolCalls`, else execute.
-5. Persist `tool` message with all results; loop until plain content (no tool_calls) or `maxToolCallsPerTurn` hit.
+**Provider transport — direct from webview.** `pi-ai`'s openai-completions provider calls the user's endpoint via the `openai` SDK with `dangerouslyAllowBrowser: true` + `baseURL: model.baseUrl`. AnySpace Cloud preset mints a Clerk JWT through `resolveAiCreds`; BYO presets pass through the stored key. Consequence: **AI traffic skips `src-tauri/src/net/mod.rs`'s reqwest proxy** — Chromium picks up the OS proxy instead. The Rust SSE bridge (`ai_chat_stream` / `abort_ai_chat_stream` / `AiStreamManager`) was retired in phase 6 of the pi refactor; only the one-shot `ai_chat` Rust command survives, called exclusively by `settings/probe.ts`'s "Test AI Connection" button.
 
-**Trust mode** — no approval modal. Write tools execute immediately. Audit surface = inline `ToolCallCard`. Panel-header global **pause-tool-calls** toggle flips queue mode; queued cards expose Run/Skip observed via Zustand subscribe. Per-tool **disable** in Settings → Super Agent → Tools — stripped from model's `tools[]` AND short-circuited at execution as `disabled` cards.
+**Event → store translation (`panelBridge.ts`):** `message_start[role=assistant]` → `appendMessage(streaming:true)`; `message_update.text_delta` → setState content; `message_update.thinking_delta` → setState reasoningContent; `message_update.toolcall_end` → capture `ToolCall` in `liveToolCalls`; `message_end` → finalize via `updateMessage(toolCalls, streaming:false)`; `tool_execution_start` → `appendMessage(role:"tool", toolResults:[{status:"running"}])`; `tool_execution_end` → `updateMessage(toolResults:[{status: ok|error, resultText, images?}])` with `images` pulled from `result.details.imagePaths` (set by the adapter). **Subscriber promises gate run settlement** — pi awaits each `subscribe` callback's return; the bridge MUST return a `Promise` so `setState` mutations serialize (fire-and-forget `void handleEvent(...)` was a load-bearing bug in early 4b).
 
-**Tool registry** (`src/lib/superAgent/tools.ts`): typed `Tool[]` with JSON-schema params. Read tools wrap `getTerminalContext`/`fsListDirRecursive`/`gitStatus`/`previewDetect`/stores; includes `read_team_messages` (newest-first `parseMessages` over MESSAGES.md, filters `since_ts`/`from`/`to`/`type`/`limit`). Write tools wrap `ptyWrite`/`newTab+closePane`/`createTask`/MESSAGES.md append/`create+launchTeam`, plus `team_broadcast` (`runSuperBrainTeamBroadcast`) and `team_send_to_pane` (resolves `paneId` directly or via `label`). `quick_suggest` wraps `runQuickSuggest` (renamed Super Brain v1 helper). New tools default-enabled — `toolEnabled[name] !== false` is the gate.
+**Tool adapter (`tools/index.ts`):** pi-ai's `validateToolArguments` accepts raw JSON-Schema when no TypeBox metadata is present (`utils/validation.js:257`), so the existing `TOOLS: Tool[]` registry in `tools.ts` (1659 lines, 41 tools) passes through unchanged. `adaptTool(legacy)` wraps each entry into `AgentTool<TSchema, PiToolDetails>` — handler stays in `tools.ts`, only the surface gets pi-shaped. `filterEnabledTools(toolEnabledMap)` honors the per-tool disable map. New tools default-enabled — `toolEnabled[name] !== false` is the gate.
 
-**⌘⇧B unchanged.** `runSuperBrain(tabId)` keeps the legacy keyboard pipeline (single `aiChat`, no history, draft into PTY without `\n`). Internally delegates to `runQuickSuggest({paneId, write:true})`. Wiring in `App.tsx`/`shortcuts.ts` unchanged.
+**Trust mode + pause/queue.** Write tools execute immediately (audit surface = inline `ToolCallCard`). Pause toggle flips `useSuperAgentStore.pauseToolCalls`; on the next tool call, pi's `beforeToolCall` (built by `panelBridge:buildBeforeToolCall`) flips the existing tool row to `status:"queued"` and `await`s a `decideQueuedToolCall` decision. **Pi event-order gotcha:** `tool_execution_start` fires BEFORE `beforeToolCall` (agent-loop.js:246-251 sequential, :279-283 parallel). Row creation lives in `tool_execution_start`; `beforeToolCall` only mutates the existing row's status. Skipping that order produces duplicate "tool" rows.
 
-**Voice-in.** Super Agent textarea registers in `inputRegistry.ts` (mirrors `editorRegistry`). STT's last-resort fallback (`inject.ts`) — after focused-input / focused-pane checks fail — checks `useSuperAgentStore.panelOpen || selectedView === "superagent"` and writes via `setRangeText` + dispatched input events (controlled React state updates).
+**⌘⇧B and AI Explain** (`src/lib/superBrain.ts`, `src/lib/aiSuggest/runner.ts`) route through `piAiChat` (`src/lib/aiSuggest/piAiChat.ts`) — a one-shot wrapper over pi-ai's `completeSimple`. No Agent, no tools, no loop. Same `{endpoint, apiKey, model, systemPrompt, userMessage} → Promise<string>` signature as the legacy `aiChat`. `settings/probe.ts` is the sole remaining caller of the Rust `ai_chat` command.
+
+**Voice-in.** Super Agent textarea registers in `inputRegistry.ts` (mirrors `editorRegistry`). STT's last-resort fallback (`inject.ts`) — after focused-input / focused-pane checks fail — checks `useSuperAgentStore.panelOpen || selectedView === "superagent"` and writes via `setRangeText` + dispatched input events.
 
 **Settings** persisted under `"superAgent"` via `useSuperAgentSettingsStore`. Endpoint/key/model are *optional overrides* — empty strings fall back to AI section. Per-tool toggles default enabled.
 
-**Streaming caveat for Anthropic-compatible endpoints.** Runner emits OpenAI's tool-calling shape (`assistant.tool_calls[]`, `tool` role keyed by `tool_call_id`). OpenAI-compat shims (Groq, OpenRouter, Together) accept verbatim; Anthropic's native API doesn't — use an OpenAI-compat proxy.
+**Native Anthropic** is now first-class via pi-ai's `anthropic-messages` api — the legacy OpenAI-compat-proxy caveat no longer applies. We currently always build an `openai-completions` Model in `agent.ts` regardless of provider, so AnySpace Cloud + every BYO preset routes through OpenAI-compat shape. A future change can branch on `aiStore.presetId` to construct a native `anthropic-messages` Model when the user has an Anthropic key.
 
 ### Windows
 

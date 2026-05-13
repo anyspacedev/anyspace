@@ -1,4 +1,4 @@
-import { aiChat } from "../tauri";
+import { piAiChat } from "./piAiChat";
 import { useAiStore } from "../../stores/aiStore";
 import { resolveAiCreds } from "../cloudCredentials";
 import { openLoginGuide } from "../../stores/loginGuideStore";
@@ -68,9 +68,9 @@ export async function runAiSuggest<T>({
   }
 
   const userMessage = JSON.stringify(context, null, 2);
-  console.log(`[suggestWithAi:${surface}] aiChat`, { msglen: userMessage.length });
+  console.log(`[suggestWithAi:${surface}] piAiChat`, { msglen: userMessage.length });
 
-  const reply = await aiChat({
+  const reply = await piAiChat({
     endpoint: creds.endpoint,
     apiKey: creds.apiKey,
     model: creds.model,

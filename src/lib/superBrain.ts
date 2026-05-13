@@ -6,7 +6,8 @@
 
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useAiStore } from "../stores/aiStore";
-import { aiChat, ptyWrite } from "./tauri";
+import { ptyWrite } from "./tauri";
+import { piAiChat } from "./aiSuggest/piAiChat";
 import { getTerminalContext, type TerminalContext } from "../components/terminal/terminalRegistry";
 import { toast } from "../stores/toastStore";
 import { resolveAiCreds } from "./cloudCredentials";
@@ -68,7 +69,7 @@ export async function runQuickSuggest(opts: {
     }
     throw new Error("AI not configured (Settings → AI)");
   }
-  const reply = await aiChat({
+  const reply = await piAiChat({
     endpoint: creds.endpoint,
     apiKey: creds.apiKey,
     model: creds.model,
@@ -180,7 +181,7 @@ export async function runSuperBrain(tabId: string): Promise<SuperBrainResult> {
       });
       try {
         console.log("[superBrain] calling aiChat", { paneId, endpoint: creds.endpoint, model: creds.model });
-        const reply = await aiChat({
+        const reply = await piAiChat({
           endpoint: creds.endpoint,
           apiKey: creds.apiKey,
           model: creds.model,
