@@ -8,7 +8,7 @@ const PANEL_WIDTH_MAX = 720;
 const clampPanelWidth = (n: number) =>
   Math.max(PANEL_WIDTH_MIN, Math.min(PANEL_WIDTH_MAX, Math.round(n)));
 
-const DEFAULT_SYSTEM_PROMPT =
+export const SUPER_AGENT_DEFAULT_SYSTEM_PROMPT =
   "You are Super Agent, an in-app coding assistant embedded in a multi-pane terminal app. " +
   "You can call tools to inspect the workspace (list panes, read terminal output, list dirs, " +
   "read files, git status) and to act on it (open terminals, write commands into panes, create " +
@@ -63,7 +63,7 @@ const DEFAULT_SETTINGS: SuperAgentSettings = {
   endpoint: "",
   apiKey: "",
   model: "",
-  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  systemPrompt: SUPER_AGENT_DEFAULT_SYSTEM_PROMPT,
   memoryWindow: 30,
   maxToolCallsPerTurn: 25,
   streaming: true,

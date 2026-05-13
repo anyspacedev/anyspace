@@ -9,7 +9,7 @@ export type AiSettings = {
   systemPrompt: string;
 };
 
-const DEFAULT_SYSTEM_PROMPT =
+export const AI_DEFAULT_SYSTEM_PROMPT =
   "You are a terminal assistant. Explain the user's command and its output " +
   "concisely. If the command failed, suggest a likely fix. Keep replies short " +
   "and use plain text — no markdown formatting.";
@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS: AiSettings = {
   apiKey: "",
   model: ANYSPACE_CLOUD_DEFAULT_MODEL,
   presetId: "anyspace-cloud",
-  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  systemPrompt: AI_DEFAULT_SYSTEM_PROMPT,
 };
 
 const SETTINGS_KEY = "ai";
