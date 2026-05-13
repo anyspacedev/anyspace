@@ -298,88 +298,10 @@ export async function aiChat(args: AiChatArgs): Promise<string> {
   return rawInvoke<string>("ai_chat", { args });
 }
 
-// === Streaming ai chat (Super Agent) ===
-
-/**
- * OpenAI-style multimodal content blocks. Used in user-role messages when a
- * vision-capable model needs to see images alongside text. Tool messages
- * remain text-only (per the OpenAI spec — images go through user turns).
- */
-export type AiContentBlock =
-  | { type: "text"; text: string }
-  | {
-      type: "image_url";
-      image_url: { url: string; detail?: "low" | "high" | "auto" };
-    };
-
-export type AiMessage =
-  | { role: "system"; content: string }
-  | { role: "user"; content: string | AiContentBlock[] }
-  | {
-      role: "assistant";
-      content: string | null;
-      tool_calls?: AiToolCall[];
-      /** Round-tripped on every follow-up call — DeepSeek's hybrid thinking
-       *  mode rejects the request otherwise. */
-      reasoning_content?: string;
-    }
-  | { role: "tool"; tool_call_id: string; content: string };
-
-export type AiToolCall = {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-};
-
-export type AiToolDef = {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-  };
-};
-
-export type ChatStreamArgs = {
-  endpoint: string;
-  apiKey: string;
-  model: string;
-  messages: AiMessage[];
-  tools?: AiToolDef[];
-  toolChoice?: "auto" | "none" | { type: "function"; function: { name: string } };
-  streaming?: boolean;
-};
-
-export type AiStreamEvent =
-  | { type: "delta"; content: string }
-  | { type: "reasoning_delta"; content: string }
-  | {
-      type: "tool_call_delta";
-      index: number;
-      id?: string;
-      name?: string;
-      arguments_partial?: string;
-    }
-  | { type: "done"; finish_reason?: string }
-  | { type: "error"; message: string };
-
-export type AiStreamHandle = {
-  streamId: string;
-  abort: () => Promise<void>;
-};
-
-export async function aiChatStream(
-  args: ChatStreamArgs,
-  onEvent: (ev: AiStreamEvent) => void,
-): Promise<AiStreamHandle> {
-  const channel = new Channel<AiStreamEvent>();
-  channel.onmessage = (ev) => onEvent(ev);
-  const streamId = await rawInvoke<string>("ai_chat_stream", { args, onEvent: channel });
-  return {
-    streamId,
-    abort: () => rawInvoke<void>("abort_ai_chat_stream", { streamId }),
-  };
-}
+// Streaming AI chat (Super Agent's previous Rust SSE path) was retired in the
+// phase 6 pi-agent-framework cleanup. The webview now calls pi-ai directly:
+// multi-turn via `superAgent/piRunner`, one-shot via `aiSuggest/piAiChat`.
+// `aiChat` above remains for the Settings → AI Test Connection probe.
 
 export async function clipboardSaveBlob(bytes: Uint8Array, ext: string): Promise<string> {
   return rawInvoke<string>("clipboard_save_blob", { bytes: Array.from(bytes), ext });

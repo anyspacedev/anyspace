@@ -117,7 +117,6 @@ pub fn run() {
         .manage(mobile::MobileManager::new())
         .manage(team::TeamManager::new())
         .manage(knowledge::KnowledgeManager::new())
-        .manage(ai::AiStreamManager::new())
         .manage(stt::ModelDownloadManager::new())
         .invoke_handler(tauri::generate_handler![
             // PTY
@@ -157,10 +156,8 @@ pub fn run() {
             stt::commands::stt_model_download,
             stt::commands::stt_model_download_abort,
             stt::commands::stt_model_delete,
-            // AI
+            // AI (one-shot only; streaming + cancellation moved to pi-ai in the webview)
             ai::commands::ai_chat,
-            ai::stream::ai_chat_stream,
-            ai::stream::abort_ai_chat_stream,
             // Clipboard
             clipboard::commands::clipboard_save_blob,
             // Screenshot (preview / mobile capture, terminal drop attach)

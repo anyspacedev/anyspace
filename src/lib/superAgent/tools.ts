@@ -15,7 +15,6 @@ import {
   previewDetect,
   ptyWrite,
   teamWritePrompt,
-  type AiToolDef,
 } from "../tauri";
 import { capturePreviewIframeRaw } from "../previewCapture";
 import { driveIframe, getPreviewIframe } from "../previewDrive";
@@ -1641,19 +1640,4 @@ function escapeRegex(s: string): string {
 
 export function findTool(name: string): Tool | undefined {
   return TOOLS.find((t) => t.name === name);
-}
-
-/** Build the OpenAI `tools: [...]` payload, skipping disabled tools so the
- *  model never sees options the operator turned off. */
-export function buildToolsPayload(
-  enabledTools: Set<ToolName>,
-): AiToolDef[] {
-  return TOOLS.filter((t) => enabledTools.has(t.name)).map((t) => ({
-    type: "function",
-    function: {
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters,
-    },
-  }));
 }
