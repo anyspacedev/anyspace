@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { settingsGet, settingsSet } from "../lib/tauri";
-import type { PromptId } from "../lib/prompts";
+import type { PromptId } from "../lib/promptOverrides";
 
 const SETTINGS_KEY = "prompts";
 

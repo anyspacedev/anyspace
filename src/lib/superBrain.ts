@@ -8,7 +8,7 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useAiStore } from "../stores/aiStore";
 import { ptyWrite } from "./tauri";
 import { piAiChat } from "./aiSuggest/piAiChat";
-import { getPrompt } from "./prompts";
+import { getPrompt } from "./promptOverrides";
 import { getTerminalContext, type TerminalContext } from "../components/terminal/terminalRegistry";
 import { toast } from "../stores/toastStore";
 import { resolveAiCreds } from "./cloudCredentials";
@@ -74,7 +74,7 @@ export async function runQuickSuggest(opts: {
     endpoint: creds.endpoint,
     apiKey: creds.apiKey,
     model: creds.model,
-    systemPrompt: getPrompt("superBrain"),
+    systemPrompt: getPrompt("superBrain", SUPER_BRAIN_SYSTEM_PROMPT_DEFAULT),
     userMessage: buildUserMessage(ctx),
   });
   const cmd = sanitize(reply);
@@ -186,7 +186,7 @@ export async function runSuperBrain(tabId: string): Promise<SuperBrainResult> {
           endpoint: creds.endpoint,
           apiKey: creds.apiKey,
           model: creds.model,
-          systemPrompt: getPrompt("superBrain"),
+          systemPrompt: getPrompt("superBrain", SUPER_BRAIN_SYSTEM_PROMPT_DEFAULT),
           userMessage: buildUserMessage(ctx),
         });
         console.log("[superBrain] aiChat reply", { paneId, replyLength: reply.length, replyPreview: reply.slice(0, 200) });

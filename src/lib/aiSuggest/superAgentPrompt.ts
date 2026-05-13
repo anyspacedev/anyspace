@@ -1,7 +1,7 @@
 import { runAiSuggest } from "./runner";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { getTerminalContext, getTerminalScreen } from "../../components/terminal/terminalRegistry";
-import { getPrompt } from "../prompts";
+import { getPrompt } from "../promptOverrides";
 
 export type SuggestedPrompt = {
   prompt: string;
@@ -80,7 +80,7 @@ export async function suggestSuperAgentPrompt(): Promise<SuggestedPrompt> {
 
   return runAiSuggest({
     surface: "super-agent-prompt",
-    systemPrompt: getPrompt("aiSuggestSuperAgent"),
+    systemPrompt: getPrompt("aiSuggestSuperAgent", AI_SUGGEST_SUPER_AGENT_PROMPT_DEFAULT),
     context: {
       tabName: tab?.name,
       projectPath: tab?.projectPath,

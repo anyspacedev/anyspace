@@ -23,7 +23,7 @@ import { resolveAiCreds } from "../cloudCredentials";
 import { useAiStore } from "../../stores/aiStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
 import { filterEnabledTools } from "./tools/index";
-import { getPrompt } from "../prompts";
+import { getPrompt } from "../promptOverrides";
 
 export type CreateSuperAgentOptions = {
   sessionId: string;
@@ -74,7 +74,7 @@ export async function createSuperAgent(opts: CreateSuperAgentOptions): Promise<A
   const basePrompt = opts.systemPromptOverride ?? sa.systemPrompt ?? "";
   const systemPrompt =
     mode === "background"
-      ? basePrompt + getPrompt("superAgentBackgroundSuffix")
+      ? basePrompt + getPrompt("superAgentBackgroundSuffix", SUPER_AGENT_BACKGROUND_SUFFIX_DEFAULT)
       : basePrompt;
 
   let model: Model<string>;

@@ -1,5 +1,5 @@
 import { runAiSuggest } from "./runner";
-import { getPrompt } from "../prompts";
+import { getPrompt } from "../promptOverrides";
 
 export type KanbanAgentLite = {
   id: string;
@@ -39,7 +39,7 @@ export async function suggestKanbanTask(input: {
 
   return runAiSuggest({
     surface: "kanban-task",
-    systemPrompt: getPrompt("aiSuggestKanbanTask"),
+    systemPrompt: getPrompt("aiSuggestKanbanTask", AI_SUGGEST_KANBAN_TASK_PROMPT_DEFAULT),
     context: {
       title,
       existingBody: input.existingBody?.trim() || undefined,

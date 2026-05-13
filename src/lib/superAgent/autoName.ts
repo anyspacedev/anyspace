@@ -10,7 +10,7 @@ import { piAiChat } from "../aiSuggest/piAiChat";
 import { resolveAiCreds } from "../cloudCredentials";
 import { useAiStore } from "../../stores/aiStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
-import { getPrompt } from "../prompts";
+import { getPrompt } from "../promptOverrides";
 
 const LOG = "[superAgent:autoName]";
 const DEFAULT_NAME_PATTERN = /^Session \S/;
@@ -69,7 +69,7 @@ export async function maybeAutoNameSession(sessionId: string): Promise<void> {
       endpoint: creds.endpoint,
       apiKey: creds.apiKey,
       model: creds.model,
-      systemPrompt: getPrompt("superAgentAutoName"),
+      systemPrompt: getPrompt("superAgentAutoName", SUPER_AGENT_AUTO_NAME_PROMPT_DEFAULT),
       userMessage,
     });
     const cleaned = sanitizeTitle(reply);

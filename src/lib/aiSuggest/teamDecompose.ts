@@ -2,7 +2,7 @@ import { useKanbanStore } from "../../stores/kanbanStore";
 import { BUILTIN_ROLES, type TeamRole } from "../teamRoles";
 import { BUILTIN_SKILLS } from "../teamSkills";
 import { runAiSuggest } from "./runner";
-import { getPrompt } from "../prompts";
+import { getPrompt } from "../promptOverrides";
 
 export type DecomposedRosterRow = {
   role: TeamRole;
@@ -52,7 +52,7 @@ export async function decomposeWithAi(input: {
 
   return runAiSuggest({
     surface: "team-decompose",
-    systemPrompt: getPrompt("aiSuggestTeamDecompose"),
+    systemPrompt: getPrompt("aiSuggestTeamDecompose", AI_SUGGEST_TEAM_DECOMPOSE_PROMPT_DEFAULT),
     context: {
       goal,
       projectPath: input.projectPath,

@@ -1,6 +1,6 @@
 import { runAiSuggest } from "./runner";
 import type { KanbanAgentLite } from "./kanbanTask";
-import { getPrompt } from "../prompts";
+import { getPrompt } from "../promptOverrides";
 
 export type TemplateLite = {
   id: number;
@@ -49,7 +49,7 @@ export async function suggestTemplateSetup(input: {
 
   return runAiSuggest({
     surface: "template-setup",
-    systemPrompt: getPrompt("aiSuggestTemplateSetup"),
+    systemPrompt: getPrompt("aiSuggestTemplateSetup", AI_SUGGEST_TEMPLATE_SETUP_PROMPT_DEFAULT),
     context: {
       goal,
       templates: input.templates,

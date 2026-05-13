@@ -13,7 +13,7 @@
  * override (if any) and falls back to the compiled-in default.
  */
 
-import { usePromptsStore } from "../stores/promptsStore";
+import type { PromptId } from "./promptOverrides";
 import { SUPER_BRAIN_SYSTEM_PROMPT_DEFAULT } from "./superBrain";
 import { AI_SUGGEST_SUPER_AGENT_PROMPT_DEFAULT } from "./aiSuggest/superAgentPrompt";
 import { AI_SUGGEST_TEMPLATE_SETUP_PROMPT_DEFAULT } from "./aiSuggest/templateSetup";
@@ -31,22 +31,7 @@ import {
 } from "./teamRoles";
 import { OPERATOR_INBOX_HANDOFF_DEFAULT } from "./operatorInboxHandoff";
 
-export type PromptId =
-  | "superBrain"
-  | "aiSuggestSuperAgent"
-  | "aiSuggestTemplateSetup"
-  | "aiSuggestTeamDecompose"
-  | "aiSuggestKanbanTask"
-  | "superAgentAutoName"
-  | "superAgentBackgroundSuffix"
-  | "teamCommonRules"
-  | "teamCoordinator"
-  | "teamBuilder"
-  | "teamScout"
-  | "teamReviewer"
-  | "teamCustom"
-  | "operatorInboxHandoff"
-  | "agentApiHint";
+export type { PromptId } from "./promptOverrides";
 
 export type PromptGroupId =
   | "super-brain"
@@ -350,13 +335,6 @@ export const PROMPT_GROUPS: PromptGroup[] = [
     promptIds: ["agentApiHint"],
   },
 ];
-
-/** Sync read: live override if present and non-empty, otherwise compiled-in default. */
-export function getPrompt(id: PromptId): string {
-  const override = usePromptsStore.getState().settings.overrides[id];
-  if (override !== undefined) return override;
-  return DEFAULT_PROMPTS[id];
-}
 
 /** Whether the user has stored an override for this prompt (including empty string). */
 export function isPromptOverridden(id: PromptId, overrides: Partial<Record<PromptId, string>>): boolean {

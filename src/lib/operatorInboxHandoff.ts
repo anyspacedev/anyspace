@@ -4,7 +4,7 @@ import {
   useOperatorInboxStore,
   type OperatorPing,
 } from "../stores/operatorInboxStore";
-import { getPrompt } from "./prompts";
+import { getPrompt } from "./promptOverrides";
 
 /** Wrapper template for the system note that hands off the @operator inbox
  *  into Super Agent. `${COUNT}`, `${PLURAL}`, and `${LINES}` are substituted
@@ -47,7 +47,7 @@ export async function handoffInboxToSuperAgent(): Promise<void> {
     .sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0))
     .map(formatPing)
     .join("\n");
-  const content = getPrompt("operatorInboxHandoff")
+  const content = getPrompt("operatorInboxHandoff", OPERATOR_INBOX_HANDOFF_DEFAULT)
     .replaceAll("${COUNT}", String(pings.length))
     .replaceAll("${PLURAL}", pings.length === 1 ? "" : "s")
     .replaceAll("${LINES}", lines);

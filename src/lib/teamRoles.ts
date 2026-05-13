@@ -1,4 +1,4 @@
-import { getPrompt } from "./prompts";
+import { getPrompt } from "./promptOverrides";
 
 export const BUILTIN_ROLES = ["coordinator", "builder", "scout", "reviewer", "custom"] as const;
 export type BuiltinRole = (typeof BUILTIN_ROLES)[number];
@@ -205,18 +205,18 @@ Use \`tmsg\` to send updates to the Coordinator (\`tmsg send --to "Coordinator" 
 
 function builtinBody(role: BuiltinRole): string {
   switch (role) {
-    case "coordinator": return getPrompt("teamCoordinator");
-    case "builder": return getPrompt("teamBuilder");
-    case "scout": return getPrompt("teamScout");
-    case "reviewer": return getPrompt("teamReviewer");
-    case "custom": return getPrompt("teamCustom");
+    case "coordinator": return getPrompt("teamCoordinator", TEAM_COORDINATOR_PROMPT_DEFAULT);
+    case "builder": return getPrompt("teamBuilder", TEAM_BUILDER_PROMPT_DEFAULT);
+    case "scout": return getPrompt("teamScout", TEAM_SCOUT_PROMPT_DEFAULT);
+    case "reviewer": return getPrompt("teamReviewer", TEAM_REVIEWER_PROMPT_DEFAULT);
+    case "custom": return getPrompt("teamCustom", TEAM_CUSTOM_PROMPT_DEFAULT);
   }
 }
 
 export function rolePromptBody(role: string, custom: TeamCustomRole[] = []): string {
   if (isBuiltinRole(role)) return builtinBody(role);
   const found = custom.find((c) => c.id === role);
-  return found?.body ?? getPrompt("teamCustom");
+  return found?.body ?? getPrompt("teamCustom", TEAM_CUSTOM_PROMPT_DEFAULT);
 }
 
 export function renderRolePrompt(input: RolePromptInput): string {
@@ -239,7 +239,7 @@ export function renderRolePrompt(input: RolePromptInput): string {
     "## Role Instructions",
     body,
     "",
-    getPrompt("teamCommonRules"),
+    getPrompt("teamCommonRules", TEAM_COMMON_RULES_DEFAULT),
   ];
 
   if (input.skillsMarkdown.trim().length > 0) {
