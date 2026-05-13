@@ -22,6 +22,7 @@ import type {
   BeforeToolCallResult,
 } from "@earendil-works/pi-agent-core";
 
+import { maybeAutoNameSession } from "./autoName";
 import { runPiPrompt, type RunPiPromptOptions } from "./piRunner";
 import {
   useSuperAgentStore,
@@ -205,6 +206,7 @@ async function handleEvent(run: ActiveRun, event: AgentEvent): Promise<void> {
       toolCalls: run.liveToolCalls.length ? run.liveToolCalls : undefined,
       streaming: false,
     });
+    void maybeAutoNameSession(sessionId);
     return;
   }
 
