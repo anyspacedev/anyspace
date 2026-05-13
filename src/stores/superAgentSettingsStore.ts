@@ -48,6 +48,14 @@ export type SuperAgentSettings = {
    *  multimodal tools (capture_preview_screenshot) into the next user turn.
    *  Disable for models or proxies that reject `image_url` content blocks. */
   enableVision: boolean;
+  /** When true (default), the background watcher loop is active. Observes
+   *  the window every 90s + on store mutations and surfaces proposals for
+   *  the user to apply or dismiss. Strictly read-only at the tool layer. */
+  backgroundEnabled: boolean;
+  /** Id of the dedicated SA session used by the background watcher.
+   *  Created lazily on first start; reset to undefined if the underlying
+   *  session row is deleted. */
+  backgroundSessionId?: string;
 };
 
 const DEFAULT_SETTINGS: SuperAgentSettings = {
@@ -64,6 +72,7 @@ const DEFAULT_SETTINGS: SuperAgentSettings = {
   panelOpen: false,
   activeSessionId: null,
   enableVision: true,
+  backgroundEnabled: true,
 };
 
 type SuperAgentSettingsState = {

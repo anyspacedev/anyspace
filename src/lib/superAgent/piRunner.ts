@@ -36,6 +36,9 @@ export type RunPiPromptOptions = {
   modelOverride?: Model<string>;
   getApiKeyOverride?: () => string | undefined | Promise<string | undefined>;
   systemPromptOverride?: string;
+  /** Forwarded to `createSuperAgent`. "background" restricts tools to
+   *  read-only + propose_action. */
+  mode?: "user" | "background";
   /** When false, skip the internal `super_agent_messages_v2` persistence.
    *  Set this from the panel bridge, which writes to the legacy v1 table
    *  via the existing Zustand store so the UI keeps rendering through the
@@ -67,6 +70,7 @@ export async function runPiPrompt(
     modelOverride: opts.modelOverride,
     getApiKeyOverride: opts.getApiKeyOverride,
     systemPromptOverride: opts.systemPromptOverride,
+    mode: opts.mode,
     beforeToolCall: opts.beforeToolCall,
   });
   opts.onAgentReady?.(agent);

@@ -3,6 +3,7 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useOperatorInboxStore } from "../../stores/operatorInboxStore";
 import { ModeStrip } from "./ModeStrip";
 import { InboxPopover } from "../inbox/InboxPopover";
+import { BackgroundProposalsPill } from "../ui/BackgroundProposalsPill";
 
 export function StatusBar() {
   const tabs = useWorkspaceStore((s) => s.tabs);
@@ -40,6 +41,7 @@ export function StatusBar() {
             </span>
           </>
         )}
+        <BackgroundProposalsPill />
       </div>
     </div>
   );

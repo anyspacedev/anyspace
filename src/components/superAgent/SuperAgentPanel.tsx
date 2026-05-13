@@ -10,6 +10,11 @@ import { abortActive, sendUserMessage } from "../../lib/superAgent/runner";
 import { Icon } from "../ui/Icon";
 import { Waveform } from "../stt/Waveform";
 import { MessageBubble } from "./MessageBubble";
+import { BackgroundProposalsBlock } from "./BackgroundProposalsBlock";
+import {
+  bumpUserInteraction,
+  isBackgroundSession,
+} from "../../lib/backgroundWatcher";
 import { registerSuperAgentInput } from "./inputRegistry";
 import { suggestSuperAgentPrompt } from "../../lib/aiSuggest/superAgentPrompt";
 import { AiSuggestNotConfiguredError } from "../../lib/aiSuggest/runner";
@@ -372,6 +377,8 @@ export function SuperAgentPanel() {
         </div>
       </header>
 
+      {isBackgroundSession(activeSessionId) && <BackgroundProposalsBlock />}
+
       {filterOpen && (
         <div className="sa-search">
           <input
@@ -501,7 +508,10 @@ export function SuperAgentPanel() {
           ref={textareaRef}
           id={inputId}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            bumpUserInteraction();
+          }}
           placeholder={placeholder}
           rows={3}
           onKeyDown={(e) => {

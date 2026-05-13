@@ -932,6 +932,48 @@ function SshSettingsSection() {
   );
 }
 
+function BackgroundWatcherStatusLine() {
+  const enabled = useSuperAgentSettingsStore((s) => s.settings.backgroundEnabled !== false);
+  const [running, setRunning] = useState(false);
+  const [lastTickAt, setLastTickAt] = useState(0);
+  const [, force] = useState(0);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    let interval: number | null = null;
+    void import("../../lib/backgroundWatcher").then((mod) => {
+      unsubscribe = mod.subscribeWatcherStatus((r, t) => {
+        setRunning(r);
+        setLastTickAt(t);
+      });
+      // Tick once every 5s while displayed so "Ns ago" stays fresh.
+      interval = window.setInterval(() => force((n) => n + 1), 5_000);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+      if (interval != null) window.clearInterval(interval);
+    };
+  }, []);
+
+  if (!enabled) {
+    return <span className="stt-field-hint" style={{ marginTop: 4 }}>Off.</span>;
+  }
+  const text = running
+    ? "Observation in flight…"
+    : lastTickAt > 0
+      ? `Last observation ${relativeSeconds(lastTickAt)} ago.`
+      : "Waiting for first observation.";
+  return <span className="stt-field-hint" style={{ marginTop: 4 }}>{text}</span>;
+}
+
+function relativeSeconds(ts: number): string {
+  const secs = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h`;
+}
+
 function SuperAgentSettingsSection() {
   const settings = useSuperAgentSettingsStore((s) => s.settings);
   const update = useSuperAgentSettingsStore((s) => s.update);
@@ -1132,6 +1174,24 @@ function SuperAgentSettingsSection() {
             the next user turn as an <code>image_url</code> block. Disable for endpoints that reject
             multimodal content (some OpenAI-compatible proxies).
           </span>
+        </label>
+
+        <label className="stt-field">
+          <span className="stt-field-label">
+            <input
+              type="checkbox"
+              checked={settings.backgroundEnabled !== false}
+              onChange={(e) => void update({ backgroundEnabled: e.target.checked })}
+              style={{ marginRight: 6 }}
+            />
+            Background watcher
+          </span>
+          <span className="stt-field-hint">
+            Continuously observes your workspace and proposes actions for review. Read-only by
+            default — nothing is applied without your confirmation. Proposals surface in the
+            "Background Watcher" Super Agent session and as a status-bar pill.
+          </span>
+          <BackgroundWatcherStatusLine />
         </label>
 
       </div>

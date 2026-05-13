@@ -37,6 +37,10 @@ export type CreateSuperAgentOptions = {
   getApiKeyOverride?: () => string | undefined | Promise<string | undefined>;
   /** Optional per-session override; falls back to settings systemPrompt. */
   systemPromptOverride?: string;
+  /** "background" restricts the tool surface to read-only + propose_action
+   *  and appends a system-prompt suffix steering the model into observe-and-
+   *  propose mode. Default "user". */
+  mode?: "user" | "background";
   /** Pi callback fired before every tool invocation. Return `{block: true}`
    *  to short-circuit with a synthetic error result. Panel bridge uses this
    *  for the pause/queue gate. */
@@ -45,6 +49,9 @@ export type CreateSuperAgentOptions = {
     signal?: AbortSignal,
   ) => Promise<BeforeToolCallResult | undefined>;
 };
+
+const BACKGROUND_PROMPT_SUFFIX =
+  "\n\nYou are running in observe-and-propose mode. You CANNOT call write tools — only read-only tools and `propose_action` are available to you. To suggest any change the user should consider, call `propose_action` with the appropriate kind and args. Pick `confidence` honestly: low when uncertain, high only when the evidence is unambiguous. Bias toward in-progress / wait when a task or pane is mid-stream — never propose `complete` for a kanban task unless the terminal output explicitly indicates completion. Stay silent (no tool calls, no text) when nothing in the observation needs attention.";
 
 /** Trailing-window history slice that backs up if the cut would orphan a
  *  `toolResult` from its preceding assistant tool_call. Mirrors the legacy
@@ -62,7 +69,10 @@ export async function createSuperAgent(opts: CreateSuperAgentOptions): Promise<A
   const sa = useSuperAgentSettingsStore.getState().settings;
   const ai = useAiStore.getState().settings;
 
-  const systemPrompt = opts.systemPromptOverride ?? sa.systemPrompt ?? "";
+  const mode = opts.mode ?? "user";
+  const basePrompt = opts.systemPromptOverride ?? sa.systemPrompt ?? "";
+  const systemPrompt =
+    mode === "background" ? basePrompt + BACKGROUND_PROMPT_SUFFIX : basePrompt;
 
   let model: Model<string>;
   let getApiKey: () => string | undefined | Promise<string | undefined>;
@@ -96,7 +106,7 @@ export async function createSuperAgent(opts: CreateSuperAgentOptions): Promise<A
     getApiKey = () => resolved.apiKey;
   }
 
-  const tools = filterEnabledTools(sa.toolEnabled);
+  const tools = filterEnabledTools(sa.toolEnabled, mode);
   const memoryWindow = sa.memoryWindow > 0 ? sa.memoryWindow : 30;
 
   return new Agent({

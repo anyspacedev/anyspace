@@ -122,6 +122,16 @@ export default function App() {
       await syncOperatorInboxSubscriptions().catch((e) =>
         console.warn("[operatorInbox] initial sync failed", e),
       );
+      // Boot the background SA watcher after every store hydrate above. It
+      // reads kanban/workspace/team state on every tick so it has to wait
+      // until those are in memory. start() is idempotent + no-ops silently
+      // when AI creds aren't configured yet (rechecked each tick).
+      try {
+        const { start: startBackgroundWatcher } = await import("./lib/backgroundWatcher");
+        startBackgroundWatcher();
+      } catch (err) {
+        console.warn("[backgroundWatcher] start failed", err);
+      }
     })();
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
@@ -134,6 +144,11 @@ export default function App() {
     // into the child env.
     void ensureAgentApi().catch((e) => console.warn("[agent_api] info load failed", e));
     void startAgentApiBridge().catch((e) => console.warn("[agent_api] bridge start failed", e));
+    return () => {
+      void import("./lib/backgroundWatcher")
+        .then(({ stop }) => stop())
+        .catch(() => undefined);
+    };
   }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadSshHosts, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the

@@ -74,13 +74,30 @@ export function adaptTool(
 /** Full registry — every legacy tool wrapped as an `AgentTool`. */
 export const piTools: AgentTool<TSchema, PiToolDetails>[] = legacyTools.map(adaptTool);
 
+/** Map of every legacy tool's `readOnly` flag, indexed by tool name. Built
+ *  once at module load so the mode filter can drop write tools without
+ *  re-walking the legacy registry. */
+const legacyReadOnly: Record<string, boolean> = Object.fromEntries(
+  legacyTools.map((t) => [t.name, t.readOnly]),
+);
+
 /**
  * Filter the registry by the user's per-tool enable map. A tool is enabled
  * unless its name maps to a literal `false` — matches the runner's existing
  * `isToolEnabled` semantics (`map[name] !== false`).
+ *
+ * When `mode === "background"`, additionally drop every tool whose legacy
+ * `readOnly` flag is false. The model literally does not see write tools,
+ * so it cannot call them — belt-and-suspenders with the background system
+ * prompt suffix.
  */
 export function filterEnabledTools(
   toolEnabled: Record<string, boolean | undefined>,
+  mode: "user" | "background" = "user",
 ): AgentTool<TSchema, PiToolDetails>[] {
-  return piTools.filter((t) => toolEnabled[t.name] !== false);
+  return piTools.filter((t) => {
+    if (toolEnabled[t.name] === false) return false;
+    if (mode === "background" && legacyReadOnly[t.name] === false) return false;
+    return true;
+  });
 }

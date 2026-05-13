@@ -25,6 +25,11 @@ import { useTeamSettingsStore } from "../../stores/teamSettingsStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useOperatorInboxStore } from "../../stores/operatorInboxStore";
 import {
+  useBackgroundProposalsStore,
+  type ProposalConfidence,
+  type ProposalKind,
+} from "../../stores/backgroundProposalsStore";
+import {
   getTerminalContext,
   getTerminalScreen,
   getTerminalSessionId,
@@ -90,7 +95,8 @@ export type ToolName =
   | "list_notes"
   | "search_notes"
   | "find_backlinks"
-  | "link_notes";
+  | "link_notes"
+  | "propose_action";
 
 export type ToolHandlerResult = {
   /** JSON-stringified content the model sees as the tool result. */
@@ -1618,6 +1624,61 @@ export const TOOLS: Tool[] = [
       } catch (e) {
         return bad(e instanceof Error ? e.message : String(e));
       }
+    },
+  },
+  {
+    name: "propose_action",
+    description:
+      "Surface a proposal for the user to review and apply. ONLY way for a background watcher to suggest a change — the user clicks Apply to execute. Use kind=\"note\" for an info-only nudge (no Apply button).\n\nFor kanban.move: args = {taskId, column, prevColumn} where column∈{todo,in_progress,in_review,complete}. Always include prevColumn so Undo works.\nFor kanban.update: args = {taskId, patch, prevPatch} — patch is the partial Task fields to write; prevPatch is the inverse for Undo.\nFor pty.write: args = {paneId, text, withNewline?} — withNewline defaults false.\nFor team.broadcast: args = {teamId, text, withNewline?}.\nFor team.send_to_pane: args = {teamId, text, paneId?, label?, withNewline?}.\nFor pane.close: args = {tabId, paneId}.\nFor note: args = {text}.\n\nConfidence: \"high\" only if the terminal output / kanban state makes the action obvious; \"medium\" if it's plausibly right but you'd want a human glance; \"low\" if uncertain.",
+    readOnly: true,
+    parameters: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: [
+            "kanban.move",
+            "kanban.update",
+            "pty.write",
+            "team.broadcast",
+            "team.send_to_pane",
+            "pane.close",
+            "note",
+          ],
+        },
+        args: {
+          type: "object",
+          description: "Shape depends on kind. See description.",
+          additionalProperties: true,
+        },
+        reason: {
+          type: "string",
+          description: "One-sentence justification for the user.",
+        },
+        confidence: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Default medium.",
+        },
+      },
+      required: ["kind", "args", "reason"],
+    },
+    handler: async (args) => {
+      const kind = arg<ProposalKind>(args, "kind");
+      const proposalArgs = arg<Record<string, unknown>>(args, "args") ?? {};
+      const reason = arg<string>(args, "reason") ?? "";
+      const confidence = arg<ProposalConfidence>(args, "confidence");
+      if (!kind) return bad("missing kind");
+      const result = useBackgroundProposalsStore.getState().add({
+        kind,
+        args: proposalArgs,
+        reason,
+        confidence,
+      });
+      if (!result.added) {
+        return ok({ status: "deduped", reason: "already pending or dismissed within window" });
+      }
+      return ok({ status: "queued", proposalId: result.id });
     },
   },
 ];
