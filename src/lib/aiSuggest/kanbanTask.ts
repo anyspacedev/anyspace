@@ -1,4 +1,5 @@
 import { runAiSuggest } from "./runner";
+import { getPrompt } from "../prompts";
 
 export type KanbanAgentLite = {
   id: string;
@@ -13,7 +14,7 @@ export type SuggestedKanbanTask = {
   notes?: string;
 };
 
-const SYSTEM_PROMPT = `You are a senior engineer turning a one-line task title into a concrete unit of work.
+export const AI_SUGGEST_KANBAN_TASK_PROMPT_DEFAULT = `You are a senior engineer turning a one-line task title into a concrete unit of work.
 
 OUTPUT FORMAT (strict): a single JSON object — no markdown fences, no preamble, no trailing text.
 {
@@ -38,7 +39,7 @@ export async function suggestKanbanTask(input: {
 
   return runAiSuggest({
     surface: "kanban-task",
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: getPrompt("aiSuggestKanbanTask"),
     context: {
       title,
       existingBody: input.existingBody?.trim() || undefined,

@@ -1,3 +1,5 @@
+import { getPrompt } from "./prompts";
+
 export const BUILTIN_ROLES = ["coordinator", "builder", "scout", "reviewer", "custom"] as const;
 export type BuiltinRole = (typeof BUILTIN_ROLES)[number];
 
@@ -68,7 +70,7 @@ export type RolePromptInput = {
   customRoles?: TeamCustomRole[];
 };
 
-const COMMON_RULES = `
+export const TEAM_COMMON_RULES_DEFAULT = `
 TEAM RULES (every role):
 1. Read \${BOARD_PATH} BEFORE doing anything else.
 2. Use \`tmsg\` for all inter-agent messaging — never paste messages directly into another pane.
@@ -84,7 +86,7 @@ TEAM RULES (every role):
 10. To talk to the human: \`tmsg send --to @operator --body "..."\` — the operator does NOT see your terminal output.
 `.trim();
 
-const COORDINATOR_PROMPT = `
+export const TEAM_COORDINATOR_PROMPT_DEFAULT = `
 You are the **Coordinator** — a Staff Engineer leading this team.
 
 CRITICAL TIMING: You spin up first; Builders/Reviewers begin polling \`tmsg check --consume\` shortly after. Use that head start: have the task breakdown filled in BOARD.md and initial assignments dispatched via \`tmsg\` BEFORE Builders begin checking.
@@ -114,7 +116,7 @@ Available pane control (use sparingly):
 - \`tmsg pane write --label <label> --body "..."\` — write into another pane (no newline; you must send Enter separately).
 `.trim();
 
-const BUILDER_PROMPT = `
+export const TEAM_BUILDER_PROMPT_DEFAULT = `
 You are a **Builder** — a Senior Software Engineer on this team.
 
 WORKFLOW:
@@ -134,7 +136,7 @@ RULES:
 - After your task is DONE, return to the polling loop from step 3. Never stop your turn while the team goal is unmet — Reviewers and the Coordinator may still send you follow-up work or change requests.
 `.trim();
 
-const SCOUT_PROMPT = `
+export const TEAM_SCOUT_PROMPT_DEFAULT = `
 You are a **Scout** — a codebase intelligence specialist.
 
 WORKFLOW:
@@ -162,7 +164,7 @@ OUTPUT FORMAT (append to your BOARD.md section):
 After posting → \`tmsg send --to "Coordinator" --type status --body "report ready in BOARD.md"\`. Then enter the TEAM RULES polling loop (\`sleep 30 && { tmsg check --consume; echo "--- board ---"; cat \${BOARD_PATH}; }\`) and keep looping forever — Builders will ask codebase questions throughout the session. Never end your turn while the goal is unmet.
 `.trim();
 
-const REVIEWER_PROMPT = `
+export const TEAM_REVIEWER_PROMPT_DEFAULT = `
 You are a **Reviewer** — a Principal Engineer providing code review.
 
 WORKFLOW:
@@ -195,24 +197,26 @@ APPROVED → \`tmsg send --to "Coordinator" --body "<Task ID> approved"\`.
 After posting your verdict, return to the polling loop in step 2. Reviews come in waves — never stop your turn.
 `.trim();
 
-const CUSTOM_PROMPT = `
+export const TEAM_CUSTOM_PROMPT_DEFAULT = `
 You are a custom-role agent on this team. Read \${BOARD_PATH} for the goal and your assigned responsibilities.
 
 Use \`tmsg\` to send updates to the Coordinator (\`tmsg send --to "Coordinator" --body "..."\`) and to check incoming messages (\`tmsg check --consume\`). Update your section of BOARD.md when your status changes.
 `.trim();
 
-const BUILTIN_BODIES: Record<BuiltinRole, string> = {
-  coordinator: COORDINATOR_PROMPT,
-  builder: BUILDER_PROMPT,
-  scout: SCOUT_PROMPT,
-  reviewer: REVIEWER_PROMPT,
-  custom: CUSTOM_PROMPT,
-};
+function builtinBody(role: BuiltinRole): string {
+  switch (role) {
+    case "coordinator": return getPrompt("teamCoordinator");
+    case "builder": return getPrompt("teamBuilder");
+    case "scout": return getPrompt("teamScout");
+    case "reviewer": return getPrompt("teamReviewer");
+    case "custom": return getPrompt("teamCustom");
+  }
+}
 
 export function rolePromptBody(role: string, custom: TeamCustomRole[] = []): string {
-  if (isBuiltinRole(role)) return BUILTIN_BODIES[role];
+  if (isBuiltinRole(role)) return builtinBody(role);
   const found = custom.find((c) => c.id === role);
-  return found?.body ?? CUSTOM_PROMPT;
+  return found?.body ?? getPrompt("teamCustom");
 }
 
 export function renderRolePrompt(input: RolePromptInput): string {
@@ -235,7 +239,7 @@ export function renderRolePrompt(input: RolePromptInput): string {
     "## Role Instructions",
     body,
     "",
-    COMMON_RULES,
+    getPrompt("teamCommonRules"),
   ];
 
   if (input.skillsMarkdown.trim().length > 0) {

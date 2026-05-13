@@ -2,6 +2,7 @@ import { useKanbanStore } from "../../stores/kanbanStore";
 import { BUILTIN_ROLES, type TeamRole } from "../teamRoles";
 import { BUILTIN_SKILLS } from "../teamSkills";
 import { runAiSuggest } from "./runner";
+import { getPrompt } from "../prompts";
 
 export type DecomposedRosterRow = {
   role: TeamRole;
@@ -17,7 +18,7 @@ export type Decomposed = {
   notes?: string;
 };
 
-const SYSTEM_PROMPT = `You are a software-team architect. Given a goal in plain English plus the available roles, skills, and AI programs, decide how a small multi-agent team should be staffed.
+export const AI_SUGGEST_TEAM_DECOMPOSE_PROMPT_DEFAULT = `You are a software-team architect. Given a goal in plain English plus the available roles, skills, and AI programs, decide how a small multi-agent team should be staffed.
 
 OUTPUT FORMAT (strict): a single JSON object — no markdown fences, no preamble, no trailing text.
 {
@@ -51,7 +52,7 @@ export async function decomposeWithAi(input: {
 
   return runAiSuggest({
     surface: "team-decompose",
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: getPrompt("aiSuggestTeamDecompose"),
     context: {
       goal,
       projectPath: input.projectPath,

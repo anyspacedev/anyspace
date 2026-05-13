@@ -10,13 +10,14 @@ import { piAiChat } from "../aiSuggest/piAiChat";
 import { resolveAiCreds } from "../cloudCredentials";
 import { useAiStore } from "../../stores/aiStore";
 import { useSuperAgentStore } from "../../stores/superAgentStore";
+import { getPrompt } from "../prompts";
 
 const LOG = "[superAgent:autoName]";
 const DEFAULT_NAME_PATTERN = /^Session \S/;
 const MAX_REPLY_PREFIX = 600;
 const MAX_TITLE_LEN = 60;
 
-const SYSTEM_PROMPT =
+export const SUPER_AGENT_AUTO_NAME_PROMPT_DEFAULT =
   "Summarize the user's request as a short session title. " +
   "Reply with only the title — 2 to 5 words, no quotes, no trailing punctuation.";
 
@@ -68,7 +69,7 @@ export async function maybeAutoNameSession(sessionId: string): Promise<void> {
       endpoint: creds.endpoint,
       apiKey: creds.apiKey,
       model: creds.model,
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: getPrompt("superAgentAutoName"),
       userMessage,
     });
     const cleaned = sanitizeTitle(reply);

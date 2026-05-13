@@ -8,12 +8,13 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useAiStore } from "../stores/aiStore";
 import { ptyWrite } from "./tauri";
 import { piAiChat } from "./aiSuggest/piAiChat";
+import { getPrompt } from "./prompts";
 import { getTerminalContext, type TerminalContext } from "../components/terminal/terminalRegistry";
 import { toast } from "../stores/toastStore";
 import { resolveAiCreds } from "./cloudCredentials";
 import { openLoginGuide } from "../stores/loginGuideStore";
 
-const SUPER_BRAIN_SYSTEM_PROMPT =
+export const SUPER_BRAIN_SYSTEM_PROMPT_DEFAULT =
   "You are a paired engineer driving a terminal. Given the user's last " +
   "command and its output, propose the single next shell command to run. " +
   "Output the command alone — one line, no explanation, no markdown fences, " +
@@ -73,7 +74,7 @@ export async function runQuickSuggest(opts: {
     endpoint: creds.endpoint,
     apiKey: creds.apiKey,
     model: creds.model,
-    systemPrompt: SUPER_BRAIN_SYSTEM_PROMPT,
+    systemPrompt: getPrompt("superBrain"),
     userMessage: buildUserMessage(ctx),
   });
   const cmd = sanitize(reply);
@@ -185,7 +186,7 @@ export async function runSuperBrain(tabId: string): Promise<SuperBrainResult> {
           endpoint: creds.endpoint,
           apiKey: creds.apiKey,
           model: creds.model,
-          systemPrompt: SUPER_BRAIN_SYSTEM_PROMPT,
+          systemPrompt: getPrompt("superBrain"),
           userMessage: buildUserMessage(ctx),
         });
         console.log("[superBrain] aiChat reply", { paneId, replyLength: reply.length, replyPreview: reply.slice(0, 200) });

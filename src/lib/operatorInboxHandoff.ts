@@ -4,6 +4,15 @@ import {
   useOperatorInboxStore,
   type OperatorPing,
 } from "../stores/operatorInboxStore";
+import { getPrompt } from "./prompts";
+
+/** Wrapper template for the system note that hands off the @operator inbox
+ *  into Super Agent. `${COUNT}`, `${PLURAL}`, and `${LINES}` are substituted
+ *  at handoff time. Customizable in Settings → Prompts. */
+export const OPERATOR_INBOX_HANDOFF_DEFAULT =
+  "[Inbox handoff — ${COUNT} unread @operator message${PLURAL}]\n" +
+  "${LINES}\n\n" +
+  "Use tmsg_send to reply, or read_team_messages for more context.";
 
 function formatPing(p: OperatorPing): string {
   const ts = p.ts ? ` (${p.ts})` : "";
@@ -38,10 +47,10 @@ export async function handoffInboxToSuperAgent(): Promise<void> {
     .sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0))
     .map(formatPing)
     .join("\n");
-  const content =
-    `[Inbox handoff — ${pings.length} unread @operator message${
-      pings.length === 1 ? "" : "s"
-    }]\n${lines}\n\nUse tmsg_send to reply, or read_team_messages for more context.`;
+  const content = getPrompt("operatorInboxHandoff")
+    .replaceAll("${COUNT}", String(pings.length))
+    .replaceAll("${PLURAL}", pings.length === 1 ? "" : "s")
+    .replaceAll("${LINES}", lines);
 
   await sa.appendMessage({
     sessionId,

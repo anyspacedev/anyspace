@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
 
 /// Appended to every agent task file. Tells the model how to reach the
 /// loopback HTTP server that drives the live preview pane and returns
@@ -61,7 +63,36 @@ pub struct AgentInvocation {
     pub task_file: PathBuf,
 }
 
+/// Subset of `settings.prompts.overrides` that this module honors at task-file
+/// assembly time. Keys are camelCase to match the TS-side `PromptId` strings.
+#[derive(Default, Debug, Deserialize)]
+struct PromptOverrides {
+    #[serde(default, rename = "agentApiHint")]
+    agent_api_hint: Option<String>,
+}
+
+fn load_prompt_overrides(app: &AppHandle) -> PromptOverrides {
+    let Some(dir) = app.path().app_config_dir().ok() else {
+        return PromptOverrides::default();
+    };
+    let path = dir.join("settings.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return PromptOverrides::default();
+    };
+    let Ok(root) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return PromptOverrides::default();
+    };
+    let Some(overrides) = root
+        .get("prompts")
+        .and_then(|p| p.get("overrides"))
+    else {
+        return PromptOverrides::default();
+    };
+    serde_json::from_value::<PromptOverrides>(overrides.clone()).unwrap_or_default()
+}
+
 pub fn build_invocation(
+    app: &AppHandle,
     agent_command: &str,
     task_id: &str,
     task_title: &str,
@@ -69,6 +100,13 @@ pub fn build_invocation(
     task_body: &str,
     system_prompt: &str,
 ) -> Result<AgentInvocation> {
+    let overrides = load_prompt_overrides(app);
+    let api_hint = overrides
+        .agent_api_hint
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(AGENT_API_HINT);
+
     let dir = std::env::temp_dir().join("anyspace-tasks");
     std::fs::create_dir_all(&dir).context("create task dir")?;
     let task_file = dir.join(format!("task-{}.md", uuid::Uuid::new_v4()));
@@ -77,7 +115,7 @@ pub fn build_invocation(
         title = task_title,
         body = task_body,
         system = system_prompt,
-        api = AGENT_API_HINT,
+        api = api_hint,
     );
     std::fs::write(&task_file, contents).context("write task file")?;
 

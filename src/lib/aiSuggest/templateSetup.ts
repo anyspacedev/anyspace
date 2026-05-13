@@ -1,5 +1,6 @@
 import { runAiSuggest } from "./runner";
 import type { KanbanAgentLite } from "./kanbanTask";
+import { getPrompt } from "../prompts";
 
 export type TemplateLite = {
   id: number;
@@ -16,7 +17,7 @@ export type SuggestedTemplate = {
   notes?: string;
 };
 
-const SYSTEM_PROMPT = `You configure a multi-pane workspace from a one-line goal.
+export const AI_SUGGEST_TEMPLATE_SETUP_PROMPT_DEFAULT = `You configure a multi-pane workspace from a one-line goal.
 
 OUTPUT FORMAT (strict): a single JSON object — no markdown fences, no preamble, no trailing text.
 {
@@ -48,7 +49,7 @@ export async function suggestTemplateSetup(input: {
 
   return runAiSuggest({
     surface: "template-setup",
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: getPrompt("aiSuggestTemplateSetup"),
     context: {
       goal,
       templates: input.templates,

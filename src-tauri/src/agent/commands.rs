@@ -30,8 +30,9 @@ pub struct LaunchPlan {
 /// The frontend then passes `command` to its terminal pane (after spawning
 /// a shell with `pty_spawn`) and the contents are sent as keystrokes.
 #[tauri::command]
-pub fn agent_launch(args: LaunchArgs) -> Result<LaunchPlan, String> {
+pub fn agent_launch(app: tauri::AppHandle, args: LaunchArgs) -> Result<LaunchPlan, String> {
     let inv = build_invocation(
+        &app,
         &args.agent_command,
         &args.task_id,
         &args.task_title,

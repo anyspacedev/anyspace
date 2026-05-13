@@ -30,6 +30,7 @@ import { LocalWhisperSection } from "./LocalWhisperSection";
 import { AnySpaceCloudAccount } from "../auth/AnySpaceCloudAccount";
 import { SettingsSearch } from "./SettingsSearch";
 import { TestAiConnection } from "./TestConnection";
+import { PromptsSection } from "./PromptsSection";
 
 /**
  * Per-section keyword bag for the search filter. Adding a field means adding
@@ -41,6 +42,7 @@ const SECTION_KEYWORDS: Record<string, string> = {
   stt: "speech to text stt dictation transcribe microphone hotkey provider whisper groq elevenlabs language",
   ai: "ai openai anthropic groq openrouter chat completions endpoint api key model system prompt",
   "super-agent": "super agent chat tool tools memory window streaming vision pause",
+  prompts: "prompts system prompt override super brain ai suggest team coordinator builder scout reviewer api hint operator handoff background",
   "code-agent-api": "code agent api token mcp loopback bearer",
   teams: "teams team multi agent role skill template coordinator developer reviewer qa",
   proxy: "proxy http https socks5 noproxy network",
@@ -68,6 +70,7 @@ const SECTION_GROUPS = [
       { id: "stt", label: "Speech to text" },
       { id: "ai", label: "AI" },
       { id: "super-agent", label: "Super Agent" },
+      { id: "prompts", label: "Prompts" },
       { id: "code-agent-api", label: "Code Agent API" },
     ],
   },
@@ -266,6 +269,10 @@ export function Settings() {
 
         <section id="super-agent" aria-label="Super Agent" className={sectionClass("super-agent")}>
           <SuperAgentSettingsSection />
+        </section>
+
+        <section id="prompts" aria-label="Prompts" className={sectionClass("prompts")}>
+          <PromptsSection />
         </section>
 
         <section id="code-agent-api" aria-label="Code Agent API" className={sectionClass("code-agent-api")}>

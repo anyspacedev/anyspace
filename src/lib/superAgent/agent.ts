@@ -23,6 +23,7 @@ import { resolveAiCreds } from "../cloudCredentials";
 import { useAiStore } from "../../stores/aiStore";
 import { useSuperAgentSettingsStore } from "../../stores/superAgentSettingsStore";
 import { filterEnabledTools } from "./tools/index";
+import { getPrompt } from "../prompts";
 
 export type CreateSuperAgentOptions = {
   sessionId: string;
@@ -50,7 +51,7 @@ export type CreateSuperAgentOptions = {
   ) => Promise<BeforeToolCallResult | undefined>;
 };
 
-const BACKGROUND_PROMPT_SUFFIX =
+export const SUPER_AGENT_BACKGROUND_SUFFIX_DEFAULT =
   "\n\nYou are running in observe-and-propose mode. You CANNOT call write tools — only read-only tools and `propose_action` are available to you. To suggest any change the user should consider, call `propose_action` with the appropriate kind and args. Pick `confidence` honestly: low when uncertain, high only when the evidence is unambiguous. Bias toward in-progress / wait when a task or pane is mid-stream — never propose `complete` for a kanban task unless the terminal output explicitly indicates completion. Stay silent (no tool calls, no text) when nothing in the observation needs attention.";
 
 /** Trailing-window history slice that backs up if the cut would orphan a
@@ -72,7 +73,9 @@ export async function createSuperAgent(opts: CreateSuperAgentOptions): Promise<A
   const mode = opts.mode ?? "user";
   const basePrompt = opts.systemPromptOverride ?? sa.systemPrompt ?? "";
   const systemPrompt =
-    mode === "background" ? basePrompt + BACKGROUND_PROMPT_SUFFIX : basePrompt;
+    mode === "background"
+      ? basePrompt + getPrompt("superAgentBackgroundSuffix")
+      : basePrompt;
 
   let model: Model<string>;
   let getApiKey: () => string | undefined | Promise<string | undefined>;

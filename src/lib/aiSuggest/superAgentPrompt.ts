@@ -1,12 +1,13 @@
 import { runAiSuggest } from "./runner";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { getTerminalContext, getTerminalScreen } from "../../components/terminal/terminalRegistry";
+import { getPrompt } from "../prompts";
 
 export type SuggestedPrompt = {
   prompt: string;
 };
 
-const SYSTEM_PROMPT = `You draft a short, concrete first message for a coding-assistant chat that already has access to the user's workspace.
+export const AI_SUGGEST_SUPER_AGENT_PROMPT_DEFAULT = `You draft a short, concrete first message for a coding-assistant chat that already has access to the user's workspace.
 
 OUTPUT FORMAT (strict): a single JSON object — no markdown fences, no preamble, no trailing text.
 {
@@ -79,7 +80,7 @@ export async function suggestSuperAgentPrompt(): Promise<SuggestedPrompt> {
 
   return runAiSuggest({
     surface: "super-agent-prompt",
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: getPrompt("aiSuggestSuperAgent"),
     context: {
       tabName: tab?.name,
       projectPath: tab?.projectPath,

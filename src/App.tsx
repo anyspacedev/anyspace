@@ -6,6 +6,7 @@ import { useKanbanStore } from "./stores/kanbanStore";
 import { useSttStore } from "./stores/sttStore";
 import { useAiStore } from "./stores/aiStore";
 import { useProxyStore } from "./stores/proxyStore";
+import { usePromptsStore } from "./stores/promptsStore";
 import { useSshHostsStore } from "./stores/sshHostsStore";
 import { buildSshArgs } from "./lib/sshCommand";
 import { useTeamStore } from "./stores/teamStore";
@@ -54,6 +55,7 @@ export default function App() {
   const loadStt = useSttStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
   const loadProxy = useProxyStore((s) => s.load);
+  const loadPrompts = usePromptsStore((s) => s.load);
   const loadSshHosts = useSshHostsStore((s) => s.load);
   const loadTeams = useTeamStore((s) => s.load);
   const loadTeamSettings = useTeamSettingsStore((s) => s.load);
@@ -136,6 +138,7 @@ export default function App() {
     void loadStt().catch((e) => console.warn("[stt] load failed", e));
     void loadAi().catch((e) => console.warn("[ai] load failed", e));
     void loadProxy().catch((e) => console.warn("[proxy] load failed", e));
+    void loadPrompts().catch((e) => console.warn("[prompts] load failed", e));
     void loadKnowledge().catch((e) => console.warn("[knowledge] load failed", e));
     void loadRecentFolders().catch((e) => console.warn("[recentFolders] load failed", e));
     void loadUiHints().catch((e) => console.warn("[uiHints] load failed", e));
@@ -149,7 +152,7 @@ export default function App() {
         .then(({ stop }) => stop())
         .catch(() => undefined);
     };
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadSshHosts, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadPrompts, loadSshHosts, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
