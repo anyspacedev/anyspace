@@ -1,0 +1,28 @@
+---
+import Base from "../../layouts/Base.astro";
+import DesktopSignIn from "../../components/islands/DesktopSignIn.tsx";
+
+const title = "Sign in to AnySpace desktop";
+const description = "Browser sign-in bridge for the AnySpace desktop app.";
+
+// Astro exposes PUBLIC_* env vars to the client island below. Set these in
+// wrangler.jsonc's vars block (or Cloudflare Pages env) so the bridge knows
+// which Clerk instance to mount and where the mint-ticket endpoint lives.
+const publishableKey =
+  (import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY as string | undefined) ?? "";
+const apiBase =
+  (import.meta.env.PUBLIC_ANYSPACE_API_URL as string | undefined) ?? "";
+---
+
+<Base title={title} description={description}>
+  <!-- This page only exists to ferry a sign-in ticket back to the desktop
+       app's loopback listener; we don't want it in search results. -->
+  <meta slot="head" name="robots" content="noindex, nofollow" />
+  <main id="main" class="min-h-screen bg-bg">
+    <DesktopSignIn
+      client:only="react"
+      publishableKey={publishableKey}
+      apiBase={apiBase}
+    />
+  </main>
+</Base>

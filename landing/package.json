@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "12",
+    "@clerk/clerk-react": "^5.61.6",
     "astro": "^5.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
