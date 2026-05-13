@@ -71,6 +71,14 @@ tower-http = { version = "0.5", features = ["limit"] }
 rand = "0.8"
 hex = "0.4"
 
+# One-shot loopback listener for the desktop OAuth callback. The browser
+# completes Clerk sign-in (system browser → cookies work) and redirects to
+# 127.0.0.1:<port>/callback?ticket=…&nonce=…; we read the ticket, redeem it
+# via Clerk's "ticket" strategy in the WebView, and tear down. tiny_http is
+# blocking-IO and tiny — no second tokio runtime, no axum boilerplate for
+# what is literally two routes.
+tiny_http = "0.12"
+
 # screen-region capture for the preview pane screenshot button. xcap gives us
 # pixel-perfect captures across cross-origin iframes, WebGL canvases, and
 # embedded media — which DOM-serialisation libs can't reproduce. macOS prompts

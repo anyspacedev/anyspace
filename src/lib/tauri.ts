@@ -474,4 +474,23 @@ export async function sshAskpassPrepare(password: string): Promise<Record<string
   return rawInvoke<Record<string, string>>("ssh_askpass_prepare", { password });
 }
 
+// === Desktop OAuth bridge ===
+// System-browser OAuth + loopback ticket return. See src-tauri/src/auth/mod.rs
+// for the full rationale (short version: WebKit ITP refuses to persist Clerk's
+// Set-Cookie on cross-site XHR, so the in-WebView OAuth handshake can't
+// complete; we move the OAuth round-trip to the user's real browser and bring
+// the session back as a short-lived Clerk sign-in ticket).
+export type DesktopAuthSession = { port: number; nonce: string };
+
+export async function desktopAuthBegin(): Promise<DesktopAuthSession> {
+  return rawInvoke<DesktopAuthSession>("desktop_auth_begin");
+}
+
+export async function desktopAuthCancel(): Promise<void> {
+  return rawInvoke("desktop_auth_cancel");
+}
+
+export type DesktopAuthTicketEvent = { ticket: string };
+export type DesktopAuthErrorEvent = { error: string };
+
 export { Channel };
