@@ -36,6 +36,8 @@ import { useSuperAgentSettingsStore } from "./stores/superAgentSettingsStore";
 import { useKnowledgeStore } from "./stores/knowledgeStore";
 import { useRecentFoldersStore } from "./stores/recentFoldersStore";
 import { useUiHintsStore } from "./stores/uiHintsStore";
+import { useSubscriptionStore } from "./stores/subscriptionStore";
+import { useAuthStore } from "./stores/authStore";
 import { StatusBar } from "./components/workspace/StatusBar";
 import { QuickOpen } from "./components/sidebar/QuickOpen";
 import { SttBubble } from "./components/stt/SttBubble";
@@ -64,6 +66,7 @@ export default function App() {
   const loadKnowledge = useKnowledgeStore((s) => s.load);
   const loadRecentFolders = useRecentFoldersStore((s) => s.load);
   const loadUiHints = useUiHintsStore((s) => s.load);
+  const loadSubscription = useSubscriptionStore((s) => s.load);
 
   useEffect(() => {
     void loadTheme();
@@ -142,6 +145,9 @@ export default function App() {
     void loadKnowledge().catch((e) => console.warn("[knowledge] load failed", e));
     void loadRecentFolders().catch((e) => console.warn("[recentFolders] load failed", e));
     void loadUiHints().catch((e) => console.warn("[uiHints] load failed", e));
+    // No-ops while signed out — the auth-state effect below re-runs it once
+    // the Clerk bridge reports a signed-in session.
+    void loadSubscription().catch((e) => console.warn("[subscription] load failed", e));
     // Boot the agent_api bridge before any Code Agent terminal can spawn —
     // launchers read the cached URL+token to inject ANYSPACE_API_URL/TOKEN
     // into the child env.
@@ -152,7 +158,31 @@ export default function App() {
         .then(({ stop }) => stop())
         .catch(() => undefined);
     };
-  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadPrompts, loadSshHosts, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints]);
+  }, [loadTheme, hydrateWorkspace, loadKanban, loadStt, loadAi, loadProxy, loadPrompts, loadSshHosts, loadKnowledge, loadTeams, loadTeamSettings, loadSuperAgent, loadSuperAgentSettings, loadRecentFolders, loadUiHints, loadSubscription]);
+
+  // Subscription state follows Clerk auth. The Clerk bridge reports sign-in
+  // asynchronously (after the mount effect above), so re-load when `signedIn`
+  // flips true. While a checkout is in flight, re-check on window focus — the
+  // Stripe webhook that flips the plan to Pro may lag the user's return.
+  useEffect(() => {
+    let prevSignedIn = useAuthStore.getState().signedIn;
+    const unsub = useAuthStore.subscribe((s) => {
+      if (s.signedIn && !prevSignedIn) {
+        void useSubscriptionStore.getState().load();
+      }
+      prevSignedIn = s.signedIn;
+    });
+    const onFocus = () => {
+      if (useSubscriptionStore.getState().pendingCheckout) {
+        void useSubscriptionStore.getState().refresh();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      unsub();
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest

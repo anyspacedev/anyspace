@@ -65,6 +65,18 @@ class Settings(BaseSettings):
     llm_default_model: str = "gpt-4o-mini"
     llm_request_timeout_sec: float = 120.0
 
+    # Stripe billing (phase 3). A single paid "Pro" product; the monthly
+    # price is required, annual is optional. Checkout/portal need http(s)
+    # return URLs — point them at marketing-site pages (the desktop app
+    # re-checks /v1/license on window focus rather than via a deep link).
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_id_monthly: str = ""
+    stripe_price_id_annual: str = ""    # optional; empty = annual not offered
+    stripe_checkout_success_url: str = "https://anyspace.dev/billing/success"
+    stripe_checkout_cancel_url: str = "https://anyspace.dev/billing/cancel"
+    stripe_portal_return_url: str = "https://anyspace.dev/billing/portal-return"
+
     @property
     def clerk_jwks_url(self) -> str:
         return f"{self.clerk_frontend_api.rstrip('/')}/.well-known/jwks.json"
@@ -72,6 +84,10 @@ class Settings(BaseSettings):
     @property
     def clerk_issuer(self) -> str:
         return self.clerk_frontend_api.rstrip("/")
+
+    @property
+    def stripe_configured(self) -> bool:
+        return bool(self.stripe_secret_key and self.stripe_price_id_monthly)
 
     @property
     def cors_origins_list(self) -> list[str]:

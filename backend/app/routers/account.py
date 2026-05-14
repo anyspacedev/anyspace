@@ -13,11 +13,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
+from ..db import get_db
 from ..deps import current_user
+from ..models.subscription import Subscription
 from ..models.user import User
 
 router = APIRouter(prefix="/v1")
+
+# Stripe statuses that still entitle Pro access (mirrors stripe_billing).
+_ACTIVE_STATUSES = {"active", "trialing", "past_due"}
 
 
 def _gone() -> JSONResponse:
@@ -57,22 +63,51 @@ def me(user: User = Depends(current_user)) -> dict:
     }
 
 
-def _free_tier_license(user: User) -> dict:
-    """Phase-2 placeholder. Phase 3 reads from Stripe via subscriptions table."""
+def _license_for(db: Session, user: User) -> dict:
+    """Subscription state, read from the Stripe-mirrored `subscriptions` row.
+
+    No row, or a row dropped back to `plan == "free"` (e.g. after a
+    cancellation), means Free. The Stripe webhook keeps the row current, so
+    `refresh` is just a re-read — no forced Stripe round-trip needed.
+    """
+    sub = (
+        db.query(Subscription)
+        .filter(Subscription.user_id == user.id)
+        .one_or_none()
+    )
+    if sub is None or sub.plan == "free":
+        return {
+            "user_id": user.id,
+            "plan": "free",
+            "active": True,
+            "status": sub.status if sub else "free",
+            "current_period_end": None,
+            "cancel_at_period_end": False,
+        }
     return {
         "user_id": user.id,
-        "plan": "free",
-        "active": True,
-        "trial_ends_at": None,
-        "current_period_end": None,
+        "plan": sub.plan,
+        "active": sub.status in _ACTIVE_STATUSES,
+        "status": sub.status,
+        "current_period_end": (
+            sub.current_period_end.isoformat()
+            if sub.current_period_end else None
+        ),
+        "cancel_at_period_end": sub.cancel_at_period_end,
     }
 
 
 @router.get("/license")
-def license_get(user: User = Depends(current_user)) -> dict:
-    return _free_tier_license(user)
+def license_get(
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return _license_for(db, user)
 
 
 @router.post("/license/refresh")
-def license_refresh(user: User = Depends(current_user)) -> dict:
-    return _free_tier_license(user)
+def license_refresh(
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return _license_for(db, user)

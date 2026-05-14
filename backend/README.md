@@ -103,6 +103,31 @@ key under `services.api.environment:` in `docker-compose.yml` or pass
 | `CLERK_FRONTEND_API` | `""` | e.g. `https://<slug>.clerk.accounts.dev`. |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | `""` | Svix webhook secret. |
 | `CLERK_JWT_LEEWAY_SEC` | `30` | Allowed clock skew for JWT validation. |
+| **Stripe billing** (phase 3; `/v1/billing/*` return 503 until SECRET_KEY + PRICE_ID_MONTHLY set) | | |
+| `STRIPE_SECRET_KEY` | `""` | `sk_test_…` / `sk_live_…`. |
+| `STRIPE_WEBHOOK_SECRET` | `""` | `whsec_…`; powers `/v1/billing/webhook` (503 until set). |
+| `STRIPE_PRICE_ID_MONTHLY` | `""` | `price_…` for the monthly "AnySpace Pro" price. |
+| `STRIPE_PRICE_ID_ANNUAL` | `""` | Optional `price_…` for an annual price. |
+| `STRIPE_CHECKOUT_SUCCESS_URL` | `https://anyspace.dev/billing/success` | Checkout redirect on success. |
+| `STRIPE_CHECKOUT_CANCEL_URL` | `https://anyspace.dev/billing/cancel` | Checkout redirect on cancel. |
+| `STRIPE_PORTAL_RETURN_URL` | `https://anyspace.dev/billing/portal-return` | Billing Portal return URL. |
+
+#### Stripe dashboard setup (phase 3)
+
+1. Create a Product **AnySpace Pro** with a monthly recurring Price (and
+   optionally an annual Price); copy the `price_…` ids into the env vars above.
+2. Enable the Customer Portal (allow cancel + update payment method).
+3. Add a webhook endpoint → `https://api.anyspace.dev/v1/billing/webhook`,
+   subscribed to `checkout.session.completed` and
+   `customer.subscription.{created,updated,deleted}`; copy the `whsec_…` into
+   `STRIPE_WEBHOOK_SECRET`.
+4. The `anyspace.dev/billing/{success,cancel,portal-return}` pages live in the
+   marketing-site project — the desktop app re-checks `/v1/license` on window
+   focus rather than via a deep link, so they only need to tell the user to
+   return to AnySpace.
+
+For local testing: `stripe listen --forward-to localhost:9100/v1/billing/webhook`
+and paste the printed `whsec_…` into `STRIPE_WEBHOOK_SECRET`.
 
 ### Volume
 
@@ -207,9 +232,11 @@ phase 1. (No auth header yet; phase 2 adds Bearer.)
 
 ## What's NOT in phase 1
 
-User accounts, sessions, OAuth, JWT, Stripe, email, real Tauri update
-file hosting, cloud AI chat endpoint, usage metering, multi-tenancy.
-See `PLAN.md` for the phase 2/3/4 roadmap.
+Email, real Tauri update file hosting, cloud AI chat endpoint, usage
+metering, multi-tenancy. (User accounts + JWT landed in phase 2; Stripe
+billing — `/v1/billing/*`, the `subscriptions` table, `/v1/license` — landed
+in phase 3 but does not yet gate rate limits.) See `PLAN.md` for the
+phase 2/3/4 roadmap.
 
 ## Operational notes
 

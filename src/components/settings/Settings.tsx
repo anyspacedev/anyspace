@@ -31,12 +31,14 @@ import { AnySpaceCloudAccount } from "../auth/AnySpaceCloudAccount";
 import { SettingsSearch } from "./SettingsSearch";
 import { TestAiConnection } from "./TestConnection";
 import { PromptsSection } from "./PromptsSection";
+import { SubscriptionSection } from "./SubscriptionSection";
 
 /**
  * Per-section keyword bag for the search filter. Adding a field means adding
  * its label here so users can find it. Cheaper than walking the rendered DOM.
  */
 const SECTION_KEYWORDS: Record<string, string> = {
+  subscription: "subscription billing plan pro upgrade payment stripe invoice manage account",
   appearance: "appearance theme mode dark light system color",
   keyboard: "keyboard shortcut hotkey keybinding",
   stt: "speech to text stt dictation transcribe microphone hotkey provider whisper groq elevenlabs language",
@@ -57,6 +59,10 @@ function sectionMatches(id: string, q: string): boolean {
 }
 
 const SECTION_GROUPS = [
+  {
+    label: "Account",
+    items: [{ id: "subscription", label: "Subscription" }],
+  },
   {
     label: "General",
     items: [
@@ -228,6 +234,10 @@ export function Settings() {
         onQueryChange={setQuery}
       />
       <div className="settings-content" ref={scrollRef}>
+        <section id="subscription" aria-label="Subscription" className={sectionClass("subscription")}>
+          <SubscriptionSection />
+        </section>
+
         <section id="appearance" aria-label="Appearance" className={sectionClass("appearance")}>
           <div className="settings-section">
             <div className="settings-section-head">
