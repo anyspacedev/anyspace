@@ -60,22 +60,5 @@ Output is fully static — drop `dist/` on any static host (Cloudflare Pages, Ne
 - Footer links (`/docs`, `/blog`, `/privacy`, etc.) — point at real routes when they exist
 - `site` URL in `astro.config.mjs` — change `https://anyspace.dev` to the real domain so canonical/OG URLs render correctly
 
-## Structure
-
-```
-src/
-├── layouts/Base.astro        — <html>, meta, fonts, skip-link
-├── pages/index.astro         — composes the sections in order
-├── components/
-│   ├── Nav.astro             — sticky, OS-aware
-│   ├── Hero.astro            — value prop + CTAs + OS-detected download label
-│   ├── TerminalMockup.astro  — CSS-only terminal showing OSC 133 blocks
-│   ├── Features.astro        — six pillars
-│   ├── HowItWorks.astro      — three-step flow
-│   ├── Pricing.astro         — Free / Pro / Team with monthly/annual toggle
-│   ├── FAQ.astro             — six items, native <details>
-│   └── Footer.astro          — secondary nav + copyright
-└── styles/global.css         — tokens, primitives (.btn, .card), reset, reduced-motion
-```
 
 Design tokens live in `:root` in `global.css` — change once, the whole site re-themes.
