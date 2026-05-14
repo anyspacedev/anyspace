@@ -13,5 +13,17 @@
   "assets": {
     "binding": "ASSETS",
     "directory": "dist"
+  },
+  // PUBLIC_* are Astro/Vite build-time inlines, baked into the static
+  // bundle by `astro build`. They're also exposed here as worker runtime
+  // vars so the single source of truth is this file (committed) rather
+  // than the CF dashboard, which gets wiped on auto-deploy. Both values
+  // are non-secret by design — the Clerk publishable key ships in every
+  // client bundle, and the API URL is the public production endpoint.
+  // Local override: drop a `.env` in landing/ (gitignored) and Astro
+  // will use it instead.
+  "vars": {
+    "PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYW55c3BhY2UuZGV2JA",
+    "PUBLIC_ANYSPACE_API_URL": "https://api.anyspace.dev"
   }
 }
