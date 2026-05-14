@@ -48,4 +48,5 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 export const ANYSPACE_CLOUD_URL: string =
-  (import.meta.env.VITE_ANYSPACE_CLOUD_URL as string | undefined) ?? "";
+  (import.meta.env.VITE_ANYSPACE_CLOUD_URL as string | undefined) ||
+  "https://api.anyspace.dev/v1";
