@@ -96,6 +96,16 @@ jobs:
       - name: Install Linux deps
         if: matrix.os == 'ubuntu-22.04'
         run: |
+          # whisper-rs is built with the `vulkan` feature on Linux
+          # (src-tauri/Cargo.toml). whisper.cpp's ggml CMake needs the Vulkan
+          # loader + headers and the glslc shader compiler at build time, or
+          # find_package(Vulkan) aborts. Ubuntu 22.04 ships no glslc, so pull
+          # the Vulkan packages from the LunarG SDK apt repo (shaderc provides
+          # glslc).
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/lunarg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/lunarg.gpg] https://packages.lunarg.com/vulkan jammy main" \
+            | sudo tee /etc/apt/sources.list.d/lunarg-vulkan.list
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
@@ -104,12 +114,9 @@ jobs:
             librsvg2-dev \
             libsoup-3.0-dev \
             patchelf \
+            vulkan-headers \
             libvulkan-dev \
-            glslc
-          # whisper-rs is built with the `vulkan` feature on Linux
-          # (src-tauri/Cargo.toml). whisper.cpp's ggml CMake needs the Vulkan
-          # loader headers/lib (libvulkan-dev) and the glslc shader compiler
-          # at build time, or `find_package(Vulkan)` aborts the build.
+            shaderc
 
       - name: Cache node_modules
         id: node-cache
