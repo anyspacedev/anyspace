@@ -6,9 +6,10 @@
  *   2. Call `desktopAuthBegin` — Rust binds 127.0.0.1:0, returns the port
  *      + a random nonce.
  *   3. Open the bridge URL in the user's default browser via plugin-shell.
- *      Bridge defaults to the in-process fake page until
- *      `VITE_DESKTOP_AUTH_BRIDGE_URL` is set to the real
- *      anyspace.dev/desktop/sign-in page.
+ *      Bridge defaults to the real anyspace.dev/desktop/sign-in page in
+ *      production builds, or the in-process `/fake-bridge` stub in dev
+ *      builds. `VITE_DESKTOP_AUTH_BRIDGE_URL` overrides either (e.g. to
+ *      point at a local landing dev server).
  *   4. Await the `desktop:auth:ticket` event (or 130s timeout).
  *   5. Redeem the ticket via `signIn.create({ strategy: "ticket" })`, then
  *      `setActive({ session })`.
@@ -37,13 +38,14 @@ import {
  *  Rust side reports first if the user just walks away. */
 const OVERALL_TIMEOUT_MS = 130_000;
 
-/** Override the bridge page host. When unset, we point at the in-process
- *  fake bridge served by the same Rust listener — enough to smoke-test
- *  the loopback + event plumbing without anyspace.dev/desktop/sign-in
- *  shipping. Set this once the real bridge is live, e.g.:
- *
- *      VITE_DESKTOP_AUTH_BRIDGE_URL=https://anyspace.dev/desktop/sign-in
- */
+/** The real bridge page. Default for production builds, and for dev
+ *  builds when `VITE_DESKTOP_AUTH_BRIDGE_URL` is set. Unset in a dev
+ *  build falls back to the in-process `/fake-bridge` stub instead — see
+ *  `bridgeBase` below. */
+const DEFAULT_BRIDGE_URL = "https://anyspace.dev/desktop/sign-in";
+
+/** Override for the bridge page URL — e.g. a local landing dev server.
+ *  Unset → `DEFAULT_BRIDGE_URL` (prod) or `/fake-bridge` (dev). */
 const BRIDGE_OVERRIDE: string | undefined =
   (import.meta.env.VITE_DESKTOP_AUTH_BRIDGE_URL as string | undefined) ||
   undefined;
@@ -97,7 +99,10 @@ export async function desktopSignIn(
     const { port, nonce } = await desktopAuthBegin();
     const returnTo = `http://127.0.0.1:${port}/callback`;
     const bridgeBase =
-      BRIDGE_OVERRIDE ?? `http://127.0.0.1:${port}/fake-bridge`;
+      BRIDGE_OVERRIDE ??
+      (import.meta.env.DEV
+        ? `http://127.0.0.1:${port}/fake-bridge`
+        : DEFAULT_BRIDGE_URL);
     const url =
       `${bridgeBase}?return_to=${encodeURIComponent(returnTo)}` +
       `&nonce=${encodeURIComponent(nonce)}` +
