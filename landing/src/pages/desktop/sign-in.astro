@@ -5,13 +5,23 @@ import DesktopSignIn from "../../components/islands/DesktopSignIn.tsx";
 const title = "Sign in to AnySpace desktop";
 const description = "Browser sign-in bridge for the AnySpace desktop app.";
 
-// Astro exposes PUBLIC_* env vars to the client island below. Set these in
-// wrangler.jsonc's vars block (or Cloudflare Pages env) so the bridge knows
-// which Clerk instance to mount and where the mint-ticket endpoint lives.
+// Public-by-design defaults — the Clerk publishable key ships in every
+// client bundle anyway, and the API URL is the production endpoint. They
+// live here (and as a mirror in wrangler.jsonc `vars`) so an auto-deploy
+// from a fresh build environment can never produce a bundle missing them.
+// Override via .env / CI env / dashboard build vars for staging/local.
+//
+// `||` (not `??`) because Vite replaces an unset `import.meta.env.PUBLIC_X`
+// with an empty string, which `??` would treat as a real value.
+const DEFAULT_CLERK_KEY = "pk_live_Y2xlcmsuYW55c3BhY2UuZGV2JA";
+const DEFAULT_API_BASE = "https://api.anyspace.dev";
+
 const publishableKey =
-  (import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY as string | undefined) ?? "";
+  (import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY as string | undefined) ||
+  DEFAULT_CLERK_KEY;
 const apiBase =
-  (import.meta.env.PUBLIC_ANYSPACE_API_URL as string | undefined) ?? "";
+  (import.meta.env.PUBLIC_ANYSPACE_API_URL as string | undefined) ||
+  DEFAULT_API_BASE;
 ---
 
 <Base title={title} description={description}>
