@@ -23,6 +23,9 @@ function buildModel(endpoint: string, modelId: string): Model<"openai-completion
     api: "openai-completions",
     provider: "openai",
     baseUrl: endpoint,
+    // Override the OpenAI SDK's default `OpenAI/JS x.y.z` UA — Cloudflare's
+    // bot rules on api.anyspace.dev block it. The webview UA is unflagged.
+    headers: { "User-Agent": navigator.userAgent },
     reasoning: false,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
