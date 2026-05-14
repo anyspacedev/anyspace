@@ -10,6 +10,17 @@ on:
         description: 'Version to release (no leading v, e.g. 0.1.1)'
         required: true
         type: string
+      only:
+        description: 'Build a single platform for testing (skips the publish job). Use "all" for a real release.'
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - linux-x64
+          - mac-arm64
+          - mac-x64
+          - windows-x64
 
 permissions:
   contents: write
@@ -20,16 +31,39 @@ env:
   PUBLIC_BASE: https://get.anyspace.dev
 
 jobs:
+  setup:
+    name: Resolve build matrix
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Compute matrix
+        id: matrix
+        shell: bash
+        env:
+          # Empty on tag-push events; the chosen platform (or "all") on dispatch.
+          ONLY: ${{ inputs.only }}
+        run: |
+          set -euo pipefail
+          full='[
+            {"os":"macos-latest","target":"aarch64-apple-darwin","label":"mac-arm64"},
+            {"os":"macos-15-intel","target":"x86_64-apple-darwin","label":"mac-x64"},
+            {"os":"windows-latest","target":"x86_64-pc-windows-msvc","label":"windows-x64"},
+            {"os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","label":"linux-x64"}
+          ]'
+          if [ -n "${ONLY:-}" ] && [ "${ONLY}" != "all" ]; then
+            include=$(echo "$full" | jq -c --arg l "$ONLY" '[.[] | select(.label==$l)]')
+          else
+            include=$(echo "$full" | jq -c '.')
+          fi
+          echo "matrix={\"include\":${include}}" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.label }}
+    needs: setup
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { os: macos-latest,    target: aarch64-apple-darwin,     label: mac-arm64 }
-          - { os: macos-15-intel,  target: x86_64-apple-darwin,      label: mac-x64 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc,   label: windows-x64 }
-          - { os: ubuntu-22.04,   target: x86_64-unknown-linux-gnu, label: linux-x64 }
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +103,13 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libsoup-3.0-dev \
-            patchelf
+            patchelf \
+            libvulkan-dev \
+            glslc
+          # whisper-rs is built with the `vulkan` feature on Linux
+          # (src-tauri/Cargo.toml). whisper.cpp's ggml CMake needs the Vulkan
+          # loader headers/lib (libvulkan-dev) and the glslc shader compiler
+          # at build time, or `find_package(Vulkan)` aborts the build.
 
       - name: Cache node_modules
         id: node-cache
@@ -120,6 +160,10 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_ANYSPACE_CLOUD_URL: https://api.anyspace.dev/v1
           VITE_GIT_SHA: ${{ steps.gitsha.outputs.sha }}
+          # tauri-action runs `npm run build` (tsc + vite) as beforeBuildCommand.
+          # The production vite build peaks just over Node's ~2 GB default heap
+          # and OOMs on the 7 GB macOS runners; give it headroom.
+          NODE_OPTIONS: --max-old-space-size=4096
         with:
           args: --target ${{ matrix.target }}
 
@@ -173,6 +217,10 @@ jobs:
   publish:
     name: Publish to R2 + landing
     needs: build
+    # Tag-push always publishes (inputs.only is empty); dispatch publishes only
+    # for a full "all" run. Single-platform test dispatches skip publish so they
+    # never touch R2, the landing site, or cut a GitHub Release.
+    if: ${{ inputs.only == '' || inputs.only == 'all' }}
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout (with bot token for landing commit)
