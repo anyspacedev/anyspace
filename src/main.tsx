@@ -12,6 +12,7 @@ import "@xterm/xterm/css/xterm.css";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-react";
 import { dark } from "@clerk/themes";
 import { setAuthReady, setSignedInState, setTokenGetter } from "./lib/auth";
+import { createClerkInstance } from "./lib/clerkInstance";
 import { useThemeStore } from "./stores/themeStore";
 
 const ua = navigator.userAgent;
@@ -24,6 +25,12 @@ document.documentElement.dataset.platform = /Mac|iPhone|iPad/.test(ua)
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as
   | string
   | undefined;
+
+/** Native-mode Clerk instance — constructed once at module load so its FAPI
+ *  interceptors are registered before ClerkProvider calls `.load()`. */
+const clerkInstance = PUBLISHABLE_KEY
+  ? createClerkInstance(PUBLISHABLE_KEY)
+  : null;
 
 /** Mirrors Clerk auth state into the non-React lib/auth singleton so the
  * Zustand STT store can fetch a fresh JWT at transcribe time, and writes
@@ -68,11 +75,13 @@ function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
   const accent = useThemeStore((s) => s.resolved.ui.accent);
   return (
     <ClerkProvider
+      // Native-mode Clerk: the pre-built instance carries the client JWT in
+      // an Authorization header (see clerkInstance.ts), and standardBrowser
+      // false stops clerk-js depending on cross-site cookies that the Tauri
+      // webview can't send. Without this, the session `touch` 401s into an
+      // auto-logout a few seconds after sign-in.
+      Clerk={clerkInstance!}
       publishableKey={PUBLISHABLE_KEY!}
-      // Tauri webview runs at localhost:1420, cross-site to clerk.anyspace.dev,
-      // so SameSite=Lax cookies never reach the Frontend API and the periodic
-      // session `touch` 401s into an auto-logout. `false` puts clerk-js in
-      // native mode: client JWT in localStorage, sent as an Authorization header.
       standardBrowser={false}
       afterSignOutUrl="/"
       appearance={{

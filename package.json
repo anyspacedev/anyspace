@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@clerk/clerk-js": "^5.125.10",
     "@clerk/clerk-react": "^5.61.6",
     "@clerk/themes": "^2.4.57",
     "@dnd-kit/core": "^6.1.0",
