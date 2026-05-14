@@ -69,6 +69,11 @@ function ThemedClerkProvider({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
       publishableKey={PUBLISHABLE_KEY!}
+      // Tauri webview runs at localhost:1420, cross-site to clerk.anyspace.dev,
+      // so SameSite=Lax cookies never reach the Frontend API and the periodic
+      // session `touch` 401s into an auto-logout. `false` puts clerk-js in
+      // native mode: client JWT in localStorage, sent as an Authorization header.
+      standardBrowser={false}
       afterSignOutUrl="/"
       appearance={{
         baseTheme: themeKind === "dark" ? dark : undefined,
