@@ -6,9 +6,9 @@
  *   2. Call `desktopAuthBegin` — Rust binds 127.0.0.1:0, returns the port
  *      + a random nonce.
  *   3. Open the bridge URL in the user's default browser via plugin-shell.
- *      Bridge defaults to the in-process fake page until
- *      `VITE_DESKTOP_AUTH_BRIDGE_URL` is set to the real
- *      anyspace.dev/desktop/sign-in page.
+ *      Bridge defaults to the real anyspace.dev/desktop/sign-in page;
+ *      `VITE_DESKTOP_AUTH_BRIDGE_URL` overrides it (e.g. to point at a
+ *      local landing dev server).
  *   4. Await the `desktop:auth:ticket` event (or 130s timeout).
  *   5. Redeem the ticket via `signIn.create({ strategy: "ticket" })`, then
  *      `setActive({ session })`.
@@ -37,13 +37,13 @@ import {
  *  Rust side reports first if the user just walks away. */
 const OVERALL_TIMEOUT_MS = 130_000;
 
-/** Override the bridge page host. When unset, we point at the in-process
- *  fake bridge served by the same Rust listener — enough to smoke-test
- *  the loopback + event plumbing without anyspace.dev/desktop/sign-in
- *  shipping. Set this once the real bridge is live, e.g.:
- *
- *      VITE_DESKTOP_AUTH_BRIDGE_URL=https://anyspace.dev/desktop/sign-in
- */
+/** The real bridge page. Used unless `VITE_DESKTOP_AUTH_BRIDGE_URL`
+ *  overrides it — e.g. to point at a local landing dev server, or back
+ *  at the in-process `http://127.0.0.1:<port>/fake-bridge` stub the Rust
+ *  listener still serves for smoke-testing loopback + event plumbing. */
+const DEFAULT_BRIDGE_URL = "https://anyspace.dev/desktop/sign-in";
+
+/** Override for the bridge page URL. Unset → `DEFAULT_BRIDGE_URL`. */
 const BRIDGE_OVERRIDE: string | undefined =
   (import.meta.env.VITE_DESKTOP_AUTH_BRIDGE_URL as string | undefined) ||
   undefined;
@@ -96,8 +96,7 @@ export async function desktopSignIn(
   try {
     const { port, nonce } = await desktopAuthBegin();
     const returnTo = `http://127.0.0.1:${port}/callback`;
-    const bridgeBase =
-      BRIDGE_OVERRIDE ?? `http://127.0.0.1:${port}/fake-bridge`;
+    const bridgeBase = BRIDGE_OVERRIDE ?? DEFAULT_BRIDGE_URL;
     const url =
       `${bridgeBase}?return_to=${encodeURIComponent(returnTo)}` +
       `&nonce=${encodeURIComponent(nonce)}` +
