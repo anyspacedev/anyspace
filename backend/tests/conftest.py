@@ -26,6 +26,11 @@ os.environ["RATE_LIMIT_PER_MIN"] = "5"
 os.environ["RATE_LIMIT_PER_HOUR"] = "20"
 os.environ["CLERK_FRONTEND_API"] = "https://test.clerk.example"
 os.environ["CLERK_WEBHOOK_SIGNING_SECRET"] = "whsec_dGVzdC1zZWNyZXQ="  # base64 "test-secret"
+# Explicitly nullify Stripe env so tests don't pick up live values from a host
+# .env file. Tests that need billing configured opt in via _enable_stripe.
+for _k in ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
+           "STRIPE_PRICE_ID_MONTHLY", "STRIPE_PRICE_ID_ANNUAL"):
+    os.environ[_k] = ""
 
 
 def _apply_migrations() -> None:
