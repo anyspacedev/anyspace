@@ -28,6 +28,8 @@ dependencies = [
     # Clerk JWT verification (RS256 via JWKS) + Svix webhook signatures
     "pyjwt[crypto]>=2.8",
     "svix>=1.20",
+    # Stripe billing (phase 3) — checkout, portal, webhooks
+    "stripe>=9.0",
 ]
 
 [dependency-groups]

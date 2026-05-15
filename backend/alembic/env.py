@@ -18,7 +18,10 @@ from sqlalchemy import engine_from_config, pool
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db import Base  # noqa: E402
-from app.models import api_keys, audit_log, user  # noqa: E402,F401  (registers models)
+import app.models.api_keys  # noqa: E402,F401  (registers models)
+import app.models.audit_log  # noqa: E402,F401  (registers models)
+import app.models.subscription  # noqa: E402,F401  (registers models)
+import app.models.user  # noqa: E402,F401  (registers models)
 from app.settings import get_settings  # noqa: E402
 
 config = context.config
