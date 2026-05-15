@@ -85,6 +85,15 @@ class Settings(BaseSettings):
     pro_quota_ai_per_period: int = 10_000
     pro_quota_stt_secs_per_period: int = 18_000     # 5 hours
 
+    # Auto-updater (phase 5). /updates/{target}/{arch}/{ver} returns a Tauri v2
+    # manifest assembled from the latest GitHub Release of {owner}/{repo}.
+    # GITHUB_TOKEN is optional but recommended in prod — lifts the API rate
+    # limit from 60/hr → 5000/hr (only need `public_repo` scope).
+    github_owner: str = "anyspacedev"
+    github_repo: str = "anyspace"
+    github_token: str = ""
+    updater_cache_ttl_sec: int = 300
+
     @property
     def clerk_jwks_url(self) -> str:
         return f"{self.clerk_frontend_api.rstrip('/')}/.well-known/jwks.json"
