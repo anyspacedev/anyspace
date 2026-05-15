@@ -17,7 +17,7 @@ export const FAQS = [
   },
   {
     q: "How does cancellation work?",
-    a: "Cancel anytime from the desktop app: Settings → Subscription → Manage subscription opens the Stripe Billing Portal. You keep Pro through the end of your current billing period. Need a refund? Email hi@anyspace.dev within 30 days of the charge.",
+    a: "Cancel anytime from the desktop app: Settings → Subscription → Manage subscription opens the Stripe Billing Portal. You keep Pro through the end of your current billing period. Need a refund? Email hi@anyspace.dev within 30 days of the charge. Full details in /docs/billing/cancel-and-refund.",
   },
   {
     q: "Is the source available?",

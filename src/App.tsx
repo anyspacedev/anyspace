@@ -226,6 +226,39 @@ export default function App() {
     };
   }, []);
 
+  // "Welcome to AnySpace Pro" celebration on the Free→Pro license transition.
+  // Detection is purely client-side: we just watched license.plan flip from
+  // "free" to "pro" via the focus-driven refresh after Stripe Checkout. Gated
+  // by seenProWelcome so a flapping webhook can't re-fire it and so signing
+  // in as already-Pro doesn't trigger out-of-context.
+  useEffect(() => {
+    let prevPlan = useSubscriptionStore.getState().license?.plan;
+    const unsub = useSubscriptionStore.subscribe((s) => {
+      const next = s.license?.plan;
+      if (prevPlan === "free" && next === "pro") {
+        const ui = useUiHintsStore.getState();
+        if (!ui.hints.seenProWelcome) {
+          void import("./stores/toastStore").then(({ useToastStore }) => {
+            useToastStore.getState().push({
+              id: "pro-welcome",
+              kind: "success",
+              title: "🎉 Welcome to AnySpace Pro",
+              body: "Unlimited cloud AI and speech-to-text are now active. Manage your subscription anytime in Settings → Subscription.",
+              action: {
+                label: "Open Settings",
+                onClick: () => useWorkspaceStore.getState().setView("settings"),
+              },
+              ttlMs: 8_000,
+            });
+          });
+          void ui.mark("seenProWelcome");
+        }
+      }
+      prevPlan = next;
+    });
+    return unsub;
+  }, []);
+
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
   // `over` event is the only reliable cursor source. Hit-testing iterates

@@ -54,7 +54,12 @@ import PricingToggle from "../islands/PricingToggle.tsx";
               <span class={`ml-1 text-sm ${suffixClass}`} data-price-suffix>{p.perSeat ? "/seat/mo" : "/mo"}</span>
             </div>
             <p class={`-mt-2 min-h-[1.2em] text-xs ${noteClass}`}>{p.annualNote ?? ""}</p>
-            <a href="#" class={ctaClass}>{p.cta}</a>
+            {/* Both plans point at /#download — Pro upgrades happen from
+                inside the desktop app (Settings → Subscription → Upgrade),
+                which is where Stripe Checkout actually fires with the user's
+                Clerk session. Marketing-side, the entry point is "get the
+                app". */}
+            <a href="/#download" class={ctaClass}>{p.cta}</a>
             <ul class="mt-2 flex flex-col gap-2.5">
               {p.features.map((f) => (
                 <li class={`flex items-start gap-2.5 text-sm ${featClass}`}>
