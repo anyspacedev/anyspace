@@ -21,6 +21,14 @@ export type LicenseState = {
   cancel_at_period_end?: boolean;
 };
 
+export type UsageState = {
+  plan: "free" | "pro";
+  window_start: string;            // ISO-Z
+  window_end: string;
+  ai: { used: number; limit: number; kind: "ai" };
+  stt: { used_sec: number; limit_sec: number; kind: "stt" };
+};
+
 export type CheckoutInterval = "monthly" | "annual";
 
 export class BillingApiError extends Error {}
@@ -70,6 +78,11 @@ export async function fetchLicense(): Promise<LicenseState> {
 /** Force a re-read of subscription state (same shape as `fetchLicense`). */
 export async function refreshLicense(): Promise<LicenseState> {
   return authedFetch("/license/refresh", { method: "POST" }) as Promise<LicenseState>;
+}
+
+/** Current quota window + usage. Feeds the Settings → Subscription meter. */
+export async function fetchUsage(): Promise<UsageState> {
+  return authedFetch("/usage") as Promise<UsageState>;
 }
 
 /** Start a Stripe Checkout session; returns the hosted checkout URL. */

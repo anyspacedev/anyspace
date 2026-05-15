@@ -19,6 +19,7 @@ from ..db import get_db
 from ..deps import current_user
 from ..models.subscription import Subscription
 from ..models.user import User
+from ..services.usage_quota import usage_snapshot
 
 router = APIRouter(prefix="/v1")
 
@@ -111,3 +112,16 @@ def license_refresh(
     db: Session = Depends(get_db),
 ) -> dict:
     return _license_for(db, user)
+
+
+@router.get("/usage")
+def usage_get(
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Current quota window + usage. Feeds the Settings → Subscription meter.
+
+    Window resolution follows the user's plan: Free → calendar month UTC,
+    Pro → their Stripe billing period.
+    """
+    return usage_snapshot(db, user)

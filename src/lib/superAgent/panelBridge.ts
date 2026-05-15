@@ -23,6 +23,7 @@ import type {
 } from "@earendil-works/pi-agent-core";
 
 import { maybeAutoNameSession } from "./autoName";
+import { tryHandleQuotaError } from "../quotaError";
 import { runPiPrompt, type RunPiPromptOptions } from "./piRunner";
 import {
   useSuperAgentStore,
@@ -318,6 +319,10 @@ export async function sendUserMessageViaPi(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // 402 from the backend's quota gate — show the inline Upgrade toast in
+    // addition to writing the error into the chat (so the user sees the
+    // affordance even if the rail is scrolled away).
+    tryHandleQuotaError(err);
     await store.appendMessage({
       sessionId,
       role: "assistant",

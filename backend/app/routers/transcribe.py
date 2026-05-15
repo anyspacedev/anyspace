@@ -21,6 +21,7 @@ from ..models.user import User
 from ..services.asr import LANG_MAP, transcribe_pcm
 from ..services.audio import AudioDecodeError, decode_to_pcm
 from ..services.ratelimit import get_limiter
+from ..services.usage_quota import check_or_raise as check_quota
 from ..settings import get_settings
 
 router = APIRouter(prefix="/v1")
@@ -51,6 +52,10 @@ async def transcribe(
 
     if response_format and response_format != "json":
         raise HTTPException(400, "only response_format=json is supported in phase 1")
+
+    # Free-tier quota gate. Raises 402 with a structured body the desktop app
+    # parses to surface the upgrade affordance. Skipped silently for Pro.
+    check_quota(db, user, "stt")
 
     audio_bytes = await file.read()
     if not audio_bytes:

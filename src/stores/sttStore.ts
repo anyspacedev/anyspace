@@ -7,6 +7,7 @@ import {
   sttTranscribeLocal,
 } from "../lib/tauri";
 import { ANYSPACE_CLOUD_URL, getAuthToken, isSignedIn } from "../lib/auth";
+import { tryHandleQuotaError } from "../lib/quotaError";
 import {
   cancelRecording,
   isRecording,
@@ -580,9 +581,15 @@ export const useSttStore = create<SttState>((set, get) => ({
         return;
       }
       console.error("[stt] transcribe/inject failed provider=%s:", provider, e);
+      // 402 quota: handled by quotaError (toast + meter refresh). The bubble
+      // still shows a brief "limit reached" message so the user knows their
+      // recording was dropped on purpose, not silently lost.
+      const handledAsQuota = tryHandleQuotaError(e);
       set({
         phase: "error",
-        message: e instanceof Error ? e.message : String(e),
+        message: handledAsQuota
+          ? "Free speech-to-text limit reached"
+          : (e instanceof Error ? e.message : String(e)),
         analyser: null,
       });
       scheduleDismiss(set, 4000);

@@ -190,6 +190,13 @@ def _period_end(sub: Any) -> datetime | None:
     return datetime.utcfromtimestamp(ts) if ts else None
 
 
+def _period_start(sub: Any) -> datetime | None:
+    """Same dual location as `_period_end`. Used by the quota service to scope
+    Pro's fair-use window to the current billing period."""
+    ts = sub.get("current_period_start") or _first_item(sub).get("current_period_start")
+    return datetime.utcfromtimestamp(ts) if ts else None
+
+
 def upsert_subscription_from_stripe(db: Session, sub: Any) -> bool:
     """Mirror a Stripe Subscription object into the `subscriptions` table.
 
@@ -235,6 +242,7 @@ def upsert_subscription_from_stripe(db: Session, sub: Any) -> bool:
     row.status = status
     row.plan = plan
     row.price_id = price_id
+    row.current_period_start = _period_start(sub)
     row.current_period_end = _period_end(sub)
     row.cancel_at_period_end = bool(sub.get("cancel_at_period_end"))
     db.commit()
