@@ -32,6 +32,8 @@ import { SettingsSearch } from "./SettingsSearch";
 import { TestAiConnection } from "./TestConnection";
 import { PromptsSection } from "./PromptsSection";
 import { SubscriptionSection } from "./SubscriptionSection";
+import { useUpdaterStore } from "../../stores/updaterStore";
+import { checkForUpdate, downloadAndApply } from "../../lib/updater";
 
 /**
  * Per-section keyword bag for the search filter. Adding a field means adding
@@ -311,6 +313,7 @@ export function Settings() {
                 editor, live preview, and Kanban-driven AI agent launcher.
               </div>
             </div>
+            <UpdaterStatusRow />
           </div>
         </section>
       </div>
@@ -1890,6 +1893,83 @@ function TeamTemplatesBlock({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Updater status + manual "Check now" / "Install" affordance in About. The
+ * status-bar `UpdaterPill` covers passive notification; this row exists for
+ * users who want to deliberately poll (e.g. they saw release notes elsewhere
+ * and want to grab the build right now).
+ */
+function UpdaterStatusRow() {
+  const state = useUpdaterStore((s) => s.state);
+  const setState = useUpdaterStore((s) => s.set);
+  const [busy, setBusy] = useState(false);
+
+  const onCheckNow = async () => {
+    setBusy(true);
+    setState({ phase: "checking" });
+    setState(await checkForUpdate());
+    setBusy(false);
+  };
+
+  const onInstall = () => void downloadAndApply(setState);
+
+  let summary: React.ReactNode;
+  switch (state.phase) {
+    case "idle":
+      summary = <span className="stt-field-hint">You're on the latest release.</span>;
+      break;
+    case "checking":
+      summary = <span className="stt-field-hint">Checking…</span>;
+      break;
+    case "available":
+      summary = (
+        <span>
+          <strong>AnySpace {state.version}</strong> is available.
+        </span>
+      );
+      break;
+    case "downloading": {
+      const pct = state.total > 0
+        ? Math.round((state.downloaded / state.total) * 100)
+        : 0;
+      summary = <span className="stt-field-hint">Downloading… {pct}%</span>;
+      break;
+    }
+    case "ready":
+      summary = <span className="stt-field-hint">Update applied — relaunching.</span>;
+      break;
+    case "error":
+      summary = <span className="stt-field-hint">Check failed: {state.message}</span>;
+      break;
+  }
+
+  return (
+    <div className="stt-form" style={{ marginTop: 12 }}>
+      <div className="stt-field">
+        <span className="stt-field-label">Updates</span>
+        <div className="stt-tc-account">
+          {summary}
+          {state.phase === "available" && (
+            <button type="button" className="btn btn-primary" onClick={onInstall}>
+              Install + Restart
+            </button>
+          )}
+          {state.phase !== "downloading" && state.phase !== "ready" && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={() => void onCheckNow()}
+            >
+              {busy ? "Checking…" : "Check now"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

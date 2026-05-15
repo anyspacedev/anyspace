@@ -259,6 +259,32 @@ export default function App() {
     return unsub;
   }, []);
 
+  // Auto-updater poll. Tauri's plugin-updater hits our backend; the backend
+  // talks to GitHub Releases. First check fires 60s after launch (don't block
+  // first paint, don't hammer GitHub on dev hot-reloads); subsequent checks
+  // every 6h while the app stays open. Result lands in `useUpdaterStore`; the
+  // status-bar `UpdaterPill` renders any update that comes back.
+  useEffect(() => {
+    let timer: number | null = null;
+    let cancelled = false;
+    const tick = () => {
+      void import("./lib/updater").then(async ({ checkForUpdate }) => {
+        if (cancelled) return;
+        const { useUpdaterStore } = await import("./stores/updaterStore");
+        useUpdaterStore.getState().set({ phase: "checking" });
+        const result = await checkForUpdate();
+        if (!cancelled) useUpdaterStore.getState().set(result);
+      });
+    };
+    const initial = window.setTimeout(tick, 60_000);
+    timer = window.setInterval(tick, 6 * 60 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+      if (timer != null) window.clearInterval(timer);
+    };
+  }, []);
+
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
   // `over` event is the only reliable cursor source. Hit-testing iterates

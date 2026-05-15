@@ -48,7 +48,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://updates.anyspace.dev/{{target}}/{{arch}}/{{current_version}}"
+        "https://api.anyspace.dev/updates/{{target}}/{{arch}}/{{current_version}}"
       ],
       "dialog": false,
       "pubkey": ""
