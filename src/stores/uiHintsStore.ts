@@ -10,10 +10,15 @@ const SETTINGS_KEY = "uiHints";
  */
 type Hints = {
   seenPaneDragCoachmark: boolean;
+  /** First time a signed-in Free user lands in the app, we surface a one-time
+   *  toast explaining the cloud allowance (200 AI calls + 30 min STT / mo)
+   *  and that BYO-API-key usage is unlimited. Marked once shown. */
+  seenFreeCloudHint: boolean;
 };
 
 const DEFAULTS: Hints = {
   seenPaneDragCoachmark: false,
+  seenFreeCloudHint: false,
 };
 
 type State = {

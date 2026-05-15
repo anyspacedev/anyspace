@@ -12,21 +12,16 @@ import PricingToggle from "../islands/PricingToggle.tsx";
         <span class="text-fg-muted">Pro when AI joins your loop.</span>
       </h2>
       <p class="mx-auto mt-5 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
-        Cancel anytime. 30-day money-back on Pro. The full local app is free —
-        paid features unlock once you sign in.
+        The whole desktop app is free forever — including bring-your-own-key
+        AI and STT. Pro removes the meter on AnySpace Cloud (200 AI calls
+        and 30 minutes of speech-to-text are free every month).
       </p>
-      <div class="mx-auto mt-7 inline-flex items-center gap-2 rounded-full border border-border bg-bg-elev px-3 py-1.5">
-        <span class="inline-block h-1.5 w-1.5 rounded-full bg-fg" />
-        <span class="font-mono text-[11px] uppercase tracking-[0.12em] text-fg-muted">
-          Currently in Early Access — <span class="text-fg">all plans free for now</span>
-        </span>
-      </div>
       <div class="mt-7 flex justify-center">
         <PricingToggle client:load />
       </div>
     </div>
 
-    <ul class="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-3 lg:grid-cols-3">
+    <ul class="mx-auto mt-14 grid max-w-3xl grid-cols-1 gap-3 lg:grid-cols-2">
       {PLANS.map((p) => {
         const featured = p.featured;
         const wrapClass = featured

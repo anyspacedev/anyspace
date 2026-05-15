@@ -11,56 +11,43 @@ export type Plan = {
   features: string[];
 };
 
+// Two plans, one boundary. Pro doesn't unlock features — it removes the meter
+// on hosted AnySpace Cloud (STT + AI chat). Every local feature and BYO-API-key
+// usage stays free forever. See `~/.claude/plans/business-strategy-pro-tier-and-quotas.md`
+// + `backend/README.md#pricing-model` for the rationale.
 export const PLANS: Plan[] = [
   {
     id: "free",
     name: "Free",
-    tagline: "For solo projects and casual use.",
+    tagline: "The whole desktop app, plus a taste of the cloud.",
     monthly: "0",
     annual: "0",
     cta: "Download free",
     features: [
-      "Up to 4 panes per workspace",
-      "2 saved layouts",
-      "Warp-style command blocks",
-      "Live preview pane",
+      "Every local feature — unlimited",
+      "Bring your own OpenAI / Anthropic / Groq / Ollama key — unlimited",
+      "200 AnySpace Cloud AI calls / month",
+      "30 min of AnySpace Cloud speech-to-text / month",
+      "Multi-agent Team mode, Super Agent, Kanban, Live Preview",
       "Community support",
     ],
   },
   {
     id: "pro",
     name: "Pro",
-    tagline: "For developers shipping with AI agents.",
-    monthly: "12",
-    annual: "120",
-    annualNote: "$10/mo billed annually",
-    cta: "Start 14-day free trial",
+    tagline: "Unmetered cloud for when AI joins your loop.",
+    monthly: "9.90",
+    annual: "99",
+    annualNote: "$8.25/mo billed annually — 17% off",
+    cta: "Upgrade to Pro",
     featured: true,
     features: [
-      "Unlimited panes & workspaces",
-      "AI agent orchestration & Kanban",
-      "Keystroke broadcast & Super Brain",
-      "Speech-to-text dictation",
-      "Element picker → agent context",
-      "Priority support, BYO API keys",
-    ],
-  },
-  {
-    id: "team",
-    name: "Team",
-    tagline: "Shared agents & layouts for small teams.",
-    monthly: "20",
-    annual: "200",
-    perSeat: true,
-    annualNote: "$16.66/seat/mo billed annually",
-    cta: "Contact sales",
-    features: [
-      "Everything in Pro, per seat",
-      "Shared agent templates",
-      "Workspace presets across the team",
-      "SSO (Google, GitHub, Okta)",
-      "Centralized billing",
-      "Onboarding session",
+      "Everything in Free",
+      "Unlimited AnySpace Cloud AI calls",
+      "Unlimited AnySpace Cloud speech-to-text",
+      "No API keys to manage — sign in and go",
+      "Priority support",
+      "Cancel anytime via Stripe Billing Portal",
     ],
   },
 ];

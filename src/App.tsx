@@ -184,6 +184,48 @@ export default function App() {
     };
   }, []);
 
+  // First-run free-cloud hint. Show once per user, when:
+  //   1. uiHints is loaded (so we know if it's been seen),
+  //   2. the user is signed in,
+  //   3. usage is loaded and the user is on the Free plan,
+  //   4. they haven't seen the hint before.
+  // Pro users skip it — they paid; pitching them their own allowance is rude.
+  useEffect(() => {
+    const tryShow = () => {
+      const ui = useUiHintsStore.getState();
+      if (!ui.loaded || ui.hints.seenFreeCloudHint) return;
+      const auth = useAuthStore.getState();
+      if (!auth.ready || !auth.signedIn) return;
+      const sub = useSubscriptionStore.getState();
+      if (!sub.usage || sub.usage.plan !== "free") return;
+      void import("./stores/toastStore").then(({ useToastStore }) => {
+        useToastStore.getState().push({
+          id: "free-cloud-hint",
+          kind: "info",
+          title: "Welcome to AnySpace Cloud",
+          body: `You have ${sub.usage!.ai.limit} AI calls and ${Math.round(
+            sub.usage!.stt.limit_sec / 60,
+          )} minutes of speech-to-text free this month. Need more? Upgrade in Settings → Subscription, or paste your own API key for unlimited.`,
+          action: {
+            label: "View plan",
+            onClick: () => useWorkspaceStore.getState().setView("settings"),
+          },
+          ttlMs: 12_000,
+        });
+      });
+      void ui.mark("seenFreeCloudHint");
+    };
+    const unsubA = useAuthStore.subscribe(tryShow);
+    const unsubS = useSubscriptionStore.subscribe(tryShow);
+    const unsubU = useUiHintsStore.subscribe(tryShow);
+    // Initial check after a tick — by which time stores may have hydrated.
+    const t = window.setTimeout(tryShow, 0);
+    return () => {
+      unsubA(); unsubS(); unsubU();
+      window.clearTimeout(t);
+    };
+  }, []);
+
   // Global OS drag-drop dispatcher. WebKitGTK's `drop` payload reports the
   // drag-entry position rather than the cursor at release, so the latest
   // `over` event is the only reliable cursor source. Hit-testing iterates
