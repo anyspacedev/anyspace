@@ -68,7 +68,7 @@ deps_module.verify_clerk_jwt = lambda _token: dict(_CLAIMS)  # type: ignore[assi
 clerk_module.verify_clerk_jwt = lambda _token: dict(_CLAIMS)  # type: ignore[assignment]
 
 # Skip the sherpa-onnx model load — irrelevant to billing, and slow.
-main_module.build_recognizer = lambda: object()  # type: ignore[assignment]
+main_module.build_recognizer = object  # type: ignore[assignment]
 
 # Fake the Stripe SDK surface that services/stripe_billing.py touches. The
 # service module itself (customer dedup, the subscription upsert, price→plan
