@@ -232,11 +232,65 @@ phase 1. (No auth header yet; phase 2 adds Bearer.)
 
 ## What's NOT in phase 1
 
-Email, real Tauri update file hosting, cloud AI chat endpoint, usage
-metering, multi-tenancy. (User accounts + JWT landed in phase 2; Stripe
-billing — `/v1/billing/*`, the `subscriptions` table, `/v1/license` — landed
-in phase 3 but does not yet gate rate limits.) See `PLAN.md` for the
-phase 2/3/4 roadmap.
+Email, real Tauri update file hosting, multi-tenancy. (User accounts + JWT
+landed in phase 2; Stripe billing — `/v1/billing/*`, the `subscriptions`
+table, `/v1/license`, the Free/Pro quota gate on `/v1/audio/transcriptions`
++ `/v1/chat/completions`, and `/v1/usage` for the desktop meter — landed
+in phase 3.) See `PLAN.md` for the phase 2/3/4 roadmap and "Pricing model"
+above for the gating shape.
+
+## Pricing model
+
+Phase 3 ships a paid Pro tier. The monetization boundary is **hosted
+AnySpace Cloud only** — every local feature and BYO-API-key usage stays
+free forever. Pro doesn't unlock features, it removes the meter on the
+hosted endpoints that cost real money per request.
+
+| | Free | Pro — $9.90/mo or $99/yr |
+|---|---|---|
+| All local features (terminal, editor, preview, Kanban, Team mode, SSH…) | ✅ | ✅ |
+| BYO-API-key for STT / AI / Super Agent (OpenAI, Anthropic, Groq…) | ✅ unlimited | ✅ unlimited |
+| Hosted `POST /v1/audio/transcriptions` (cloud STT) | **1,800 s / month UTC** | unlimited * |
+| Hosted `POST /v1/chat/completions` (cloud AI Explain, Super Agent) | **200 calls / month UTC** | unlimited * |
+| Reset window | calendar month UTC | Stripe billing period |
+| Over-quota | `402` with structured body + Upgrade affordance | quiet 10K-AI / 18,000s-STT/period abuse ceiling |
+
+\* Pro is marketed as unlimited; the internal fair-use ceiling exists for
+abuse mitigation (runaway agents, credential sharing). On hit, returns
+`402` with `quota_kind="pro_abuse"` and a `hi@anyspace.dev` contact
+message — Pro paid us, they deserve a human.
+
+The numbers are env-tunable (`FREE_QUOTA_AI_PER_MONTH`,
+`FREE_QUOTA_STT_SECS_PER_MONTH`, `PRO_QUOTA_AI_PER_PERIOD`,
+`PRO_QUOTA_STT_SECS_PER_PERIOD`) so you can dial without a redeploy.
+
+### How gating works
+
+`services/usage_quota.py:check_or_raise(db, user, kind)` is called at the
+top of `routers/transcribe.py` and `routers/chat.py` (after `current_user`,
+before the upstream call). It sums the existing `audit_log` table within
+the user's window (status<500, kind-discriminated by path). At-or-past the
+cap, it raises `HTTPException(402, …)` with:
+
+```json
+{
+  "detail":      "Free monthly AI quota exceeded (201/200 calls). Upgrade to Pro or use your own API key.",
+  "plan":        "free",
+  "quota_kind":  "ai",
+  "used":        201,
+  "limit":       200,
+  "resets_at":   "2026-06-01T00:00:00Z",
+  "upgrade_url": "/v1/billing/checkout"
+}
+```
+
+The desktop app's `src/lib/quotaError.ts` parses this from all three
+transports (fetch, pi-ai openai-completions error, Rust STT IPC error
+string) and surfaces an inline "Upgrade or paste your own API key" toast
+with a one-click Stripe Checkout action.
+
+`GET /v1/usage` returns the same window/limit/used data without raising,
+so the desktop Settings panel can render a usage meter.
 
 ## Operational notes
 
