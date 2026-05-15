@@ -3,7 +3,7 @@ import { open as openExternal } from "@tauri-apps/plugin-shell";
 
 import { useAuthStore } from "../../stores/authStore";
 import { useSubscriptionStore } from "../../stores/subscriptionStore";
-import { openPortal, startCheckout } from "../../lib/billingApi";
+import { openPortal, startCheckout, type UsageState } from "../../lib/billingApi";
 import { toast } from "../../stores/toastStore";
 import { AnySpaceCloudAccount } from "../auth/AnySpaceCloudAccount";
 
@@ -21,6 +21,7 @@ export function SubscriptionSection() {
   const clerkConfigured = useAuthStore((s) => s.clerkConfigured);
 
   const license = useSubscriptionStore((s) => s.license);
+  const usage = useSubscriptionStore((s) => s.usage);
   const loading = useSubscriptionStore((s) => s.loading);
   const error = useSubscriptionStore((s) => s.error);
   const pendingCheckout = useSubscriptionStore((s) => s.pendingCheckout);
@@ -69,6 +70,10 @@ export function SubscriptionSection() {
           <span className="stt-field-label">Account</span>
           <AnySpaceCloudAccount />
         </div>
+
+        {clerkConfigured && ready && signedIn && usage && (
+          <UsageMeter usage={usage} />
+        )}
 
         {clerkConfigured && ready && signedIn && (
           <div className="stt-field">
@@ -159,4 +164,88 @@ function formatDate(iso: string): string {
     month: "short",
     day: "numeric",
   });
+}
+
+/**
+ * Two-bar usage meter. Pro users see only the "unlimited" pill — their internal
+ * fair-use ceiling is deliberately not surfaced (per the business plan: Pro is
+ * marketed as unlimited; the quiet 10K-call cap exists for abuse mitigation,
+ * not as a feature to advertise).
+ */
+function UsageMeter({ usage }: { usage: UsageState }) {
+  if (usage.plan === "pro") {
+    return (
+      <div className="stt-field">
+        <span className="stt-field-label">Usage</span>
+        <div className="stt-tc-account stt-tc-account-muted">
+          AnySpace Pro — unlimited cloud AI &amp; STT.
+        </div>
+      </div>
+    );
+  }
+
+  const aiPct = pct(usage.ai.used, usage.ai.limit);
+  const sttPct = pct(usage.stt.used_sec, usage.stt.limit_sec);
+  return (
+    <div className="stt-field">
+      <span className="stt-field-label">Usage</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Bar
+          label="AI calls"
+          used={`${usage.ai.used} / ${usage.ai.limit}`}
+          pct={aiPct}
+        />
+        <Bar
+          label="Speech-to-text"
+          used={`${formatSecs(usage.stt.used_sec)} / ${formatSecs(usage.stt.limit_sec)}`}
+          pct={sttPct}
+        />
+        <span className="stt-field-hint">
+          Resets {formatDate(usage.window_end)}. Upgrade for unlimited cloud usage
+          — or use your own API key in the AI / STT sections (always free).
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Bar({ label, used, pct: p }: { label: string; used: string; pct: number }) {
+  const atCap = p >= 100;
+  return (
+    <div>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        fontSize: 12, marginBottom: 4,
+      }}>
+        <span>{label}</span>
+        <span style={{ opacity: 0.75 }}>{used}</span>
+      </div>
+      <div style={{
+        height: 6, borderRadius: 3,
+        background: "var(--color-border, rgba(127,127,127,0.2))",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          height: "100%",
+          width: `${Math.min(100, Math.max(0, p))}%`,
+          background: atCap
+            ? "var(--color-danger, #d04848)"
+            : "var(--color-accent, var(--color-primary, #6c8df0))",
+          transition: "width 200ms ease",
+        }} />
+      </div>
+    </div>
+  );
+}
+
+function pct(used: number, limit: number): number {
+  if (limit <= 0) return 0;
+  return (used / limit) * 100;
+}
+
+function formatSecs(s: number): string {
+  if (s < 60) return `${Math.round(s)}s`;
+  const m = Math.floor(s / 60);
+  const rem = Math.round(s - m * 60);
+  return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
 }

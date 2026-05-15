@@ -41,6 +41,10 @@ class Subscription(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="free")
     plan: Mapped[str] = mapped_column(String(32), nullable=False, default="free")
     price_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Both ends of the current Stripe billing period. `current_period_start`
+    # was added in migration 0004 to scope Pro's per-period quota window;
+    # `current_period_end` was already in 0003 for the renewal-date UI.
+    current_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancel_at_period_end: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False,

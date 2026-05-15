@@ -30,6 +30,7 @@ from ..services.llm import (
     resolve_model,
 )
 from ..services.ratelimit import get_limiter
+from ..services.usage_quota import check_or_raise as check_quota
 
 router = APIRouter(prefix="/v1")
 
@@ -55,6 +56,10 @@ async def chat_completions(
             content={"detail": "rate limited", "retry_after_sec": round(retry_after, 1)},
             headers={"Retry-After": str(int(retry_after) + 1)},
         )
+
+    # Free-tier quota gate. Raises 402 with a structured body the desktop app
+    # parses to surface the upgrade affordance. Skipped silently for Pro.
+    check_quota(db, user, "ai")
 
     ip = client_ip(request)
     stream = bool(body.get("stream", False))

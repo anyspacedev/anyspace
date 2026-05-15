@@ -15,6 +15,7 @@
 import { completeSimple, type Model, type TextContent } from "@earendil-works/pi-ai";
 
 import type { AiChatArgs } from "../tauri";
+import { tryHandleQuotaError } from "../quotaError";
 
 function buildModel(endpoint: string, modelId: string): Model<"openai-completions"> {
   return {
@@ -53,7 +54,14 @@ export async function piAiChat(args: AiChatArgs, opts: PiAiChatOptions = {}): Pr
     { apiKey: args.apiKey },
   );
   if (reply.stopReason === "error" || reply.stopReason === "aborted") {
-    throw new Error(reply.errorMessage || `pi-ai ${reply.stopReason}`);
+    const err = new Error(reply.errorMessage || `pi-ai ${reply.stopReason}`);
+    // Intercept 402: the backend's structured quota body is smuggled in
+    // errorMessage by pi-ai (it stringifies the upstream openai SDK error).
+    // Surfacing the inline Upgrade toast is more useful to the user than the
+    // raw error bubble — but we still throw so the caller's normal error UI
+    // gets a chance for non-quota errors.
+    tryHandleQuotaError(err);
+    throw err;
   }
   return reply.content
     .filter((b): b is TextContent => b.type === "text")

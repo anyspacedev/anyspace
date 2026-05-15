@@ -77,6 +77,14 @@ class Settings(BaseSettings):
     stripe_checkout_cancel_url: str = "https://anyspace.dev/billing/cancel"
     stripe_portal_return_url: str = "https://anyspace.dev/billing/portal-return"
 
+    # Cloud usage quotas. Free is the marketed allowance per calendar month
+    # UTC; Pro is a quiet fair-use ceiling per Stripe billing period (catches
+    # abuse without bothering normal users). Tune via env without a deploy.
+    free_quota_ai_per_month: int = 200
+    free_quota_stt_secs_per_month: int = 1800       # 30 min
+    pro_quota_ai_per_period: int = 10_000
+    pro_quota_stt_secs_per_period: int = 18_000     # 5 hours
+
     @property
     def clerk_jwks_url(self) -> str:
         return f"{self.clerk_frontend_api.rstrip('/')}/.well-known/jwks.json"
