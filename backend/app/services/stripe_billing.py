@@ -16,6 +16,7 @@ row this module writes.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -111,7 +112,7 @@ def create_checkout_session(
         )
     except stripe.StripeError as e:
         raise StripeBillingError(f"checkout session failed: {e}") from e
-    url = session.get("url")
+    url = getattr(session, "url", None)  # StripeObject — see _as_dict comment
     if not url:
         raise StripeBillingError("checkout session missing url")
     return url
@@ -127,30 +128,45 @@ def create_portal_session(customer_id: str, return_url: str) -> str:
         )
     except stripe.StripeError as e:
         raise StripeBillingError(f"portal session failed: {e}") from e
-    url = session.get("url")
+    url = getattr(session, "url", None)
     if not url:
         raise StripeBillingError("portal session missing url")
     return url
 
 
+def _as_dict(obj: Any) -> Any:
+    """Normalize a `StripeObject` (what the SDK returns from real API/webhook
+    payloads) to a plain dict, recursively, so downstream code can use `.get()`
+    uniformly. `StripeObject` is NOT a `dict` subclass and intercepts attribute
+    access via `__getattr__`, which turns `.get(...)` into a lookup for a key
+    named "get" and raises AttributeError. JSON round-trip uses `StripeObject`'s
+    public `__str__` (JSON-serialized form), which is recursive. Plain dicts
+    (from tests/e2e) pass through unchanged.
+    """
+    if isinstance(obj, dict):
+        return obj
+    return json.loads(str(obj))
+
+
 def parse_webhook_event(payload: bytes, sig_header: str) -> dict[str, Any]:
-    """Verify the Stripe signature and return the decoded event."""
+    """Verify the Stripe signature and return the decoded event as a plain dict."""
     settings = get_settings()
     if not settings.stripe_webhook_secret:
         raise StripeBillingError("STRIPE_WEBHOOK_SECRET not configured")
     try:
-        return stripe.Webhook.construct_event(
+        event = stripe.Webhook.construct_event(
             payload, sig_header, settings.stripe_webhook_secret,
         )
     except (ValueError, stripe.SignatureVerificationError) as e:
         raise StripeBillingError(f"invalid webhook signature: {e}") from e
+    return _as_dict(event)
 
 
 def retrieve_subscription(subscription_id: str) -> dict[str, Any]:
-    """Fetch a full Subscription object by id."""
+    """Fetch a full Subscription object by id (returned as a plain dict)."""
     _client()
     try:
-        return stripe.Subscription.retrieve(subscription_id)
+        return _as_dict(stripe.Subscription.retrieve(subscription_id))
     except stripe.StripeError as e:
         raise StripeBillingError(f"subscription retrieve failed: {e}") from e
 
@@ -182,6 +198,7 @@ def upsert_subscription_from_stripe(db: Session, sub: Any) -> bool:
     Returns False (and logs) when no local row matches, e.g. the webhook
     raced ahead of the `/checkout` commit; Stripe's retry reconciles.
     """
+    sub = _as_dict(sub)  # tolerate StripeObject from direct callers
     customer_id = sub.get("customer")
     subscription_id = sub.get("id")
     row = (

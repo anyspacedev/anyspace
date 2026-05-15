@@ -295,6 +295,63 @@ def test_webhook_checkout_completed_retrieves_subscription(
     assert lic["plan"] == "pro"
 
 
+def test_webhook_accepts_real_stripe_object_payload(
+    client, auth_headers, monkeypatch,
+):
+    """Regression: real Stripe webhooks deliver `StripeObject`, not plain dicts.
+    `StripeObject.get(...)` raises AttributeError because attribute access goes
+    through `__getattr__`. parse_webhook_event must normalize to a dict so the
+    routers + upsert don't 500. The unit-mocked event dicts above DIDN'T catch
+    this — the real-env e2e on 2026-05-15 did."""
+    from stripe._stripe_object import StripeObject
+
+    _enable_stripe(monkeypatch)
+    uid = _user_id(client, auth_headers)
+    _clear_subscription(uid)
+    db = SessionLocal()
+    try:
+        db.add(Subscription(user_id=uid, stripe_customer_id="cus_so_test"))
+        db.commit()
+    finally:
+        db.close()
+
+    # Build a StripeObject the way the SDK does after construct_event().
+    real_event = StripeObject.construct_from({
+        "type": "customer.subscription.created",
+        "data": {
+            "object": {
+                "id": "sub_so_test",
+                "customer": "cus_so_test",
+                "status": "active",
+                "cancel_at_period_end": False,
+                "items": {
+                    "data": [
+                        {
+                            "price": {"id": "price_monthly"},
+                            "current_period_end": _PERIOD_END_TS,
+                        },
+                    ],
+                },
+            },
+        },
+    }, "sk_test_dummy")
+    assert not isinstance(real_event, dict)  # would defeat the test otherwise
+
+    monkeypatch.setattr(
+        stripe_billing, "parse_webhook_event",
+        # Route through the actual normalizer, not just `lambda: dict_payload`.
+        lambda payload, sig: stripe_billing._as_dict(real_event),
+    )
+    r = client.post(
+        "/v1/billing/webhook",
+        headers={"stripe-signature": "t=1,v1=ok"},
+        content=b"{}",
+    )
+    assert r.status_code == 200, r.text
+    lic = client.get("/v1/license", headers=auth_headers).json()
+    assert lic["plan"] == "pro"
+
+
 def test_webhook_unhandled_event_is_acked(client, monkeypatch):
     _enable_stripe(monkeypatch)
     event = {"type": "invoice.paid", "data": {"object": {}}}
