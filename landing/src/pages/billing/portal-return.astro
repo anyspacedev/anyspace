@@ -1,0 +1,46 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const title = "Subscription updated — AnySpace";
+const description = "Your subscription was updated — head back to AnySpace.";
+---
+
+<Base title={title} description={description}>
+  <meta slot="head" name="robots" content="noindex, nofollow" />
+
+  <section class="pt-28 pb-32 sm:pt-36 sm:pb-40">
+    <div class="container">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="eyebrow mb-5">Subscription</p>
+        <h1 class="text-display text-fg">
+          Subscription updated.
+        </h1>
+        <p class="mx-auto mt-7 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
+          Your changes are live. AnySpace will reflect them within a few
+          seconds &mdash; you can close this tab and head back to the app.
+        </p>
+        <div class="mt-8 flex justify-center gap-3">
+          <button
+            id="close-tab"
+            type="button"
+            class="inline-flex h-11 items-center justify-center rounded-lg bg-fg px-5 text-sm font-medium text-bg transition-colors duration-fast hover:bg-fg/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            Close tab
+          </button>
+          <a
+            href="/"
+            class="inline-flex h-11 items-center justify-center rounded-lg border border-border-strong bg-transparent px-5 text-sm font-medium text-fg transition-colors duration-fast hover:bg-bg-elev focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            Back to anyspace.dev
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    document.getElementById("close-tab")?.addEventListener("click", () => {
+      window.close();
+    });
+  </script>
+</Base>

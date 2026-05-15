@@ -14,11 +14,17 @@ type Hints = {
    *  toast explaining the cloud allowance (200 AI calls + 30 min STT / mo)
    *  and that BYO-API-key usage is unlimited. Marked once shown. */
   seenFreeCloudHint: boolean;
+  /** Fires on the Free→Pro license transition (i.e. the user just paid).
+   *  One-shot celebration toast; guarded so a flapping webhook doesn't
+   *  re-fire it, and so reinstalling-while-already-Pro doesn't trigger it
+   *  out of context. */
+  seenProWelcome: boolean;
 };
 
 const DEFAULTS: Hints = {
   seenPaneDragCoachmark: false,
   seenFreeCloudHint: false,
+  seenProWelcome: false,
 };
 
 type State = {

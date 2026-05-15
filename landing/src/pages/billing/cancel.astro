@@ -1,0 +1,43 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const title = "Checkout cancelled — AnySpace";
+const description = "No charge. You can resume anytime from the desktop app.";
+---
+
+<Base title={title} description={description}>
+  <meta slot="head" name="robots" content="noindex, nofollow" />
+
+  <section class="pt-28 pb-32 sm:pt-36 sm:pb-40">
+    <div class="container">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="eyebrow mb-5">Subscription</p>
+        <h1 class="text-display text-fg">
+          Checkout cancelled.
+          <span class="text-fg-muted">No charge.</span>
+        </h1>
+        <p class="mx-auto mt-7 max-w-xl text-balance text-base text-fg-muted sm:text-lg">
+          You can resume anytime from inside AnySpace via
+          <strong class="text-fg">Settings &rarr; Subscription &rarr;
+          Upgrade to Pro</strong>. The Free tier (200 AI calls and 30
+          minutes of speech-to-text per month, plus unlimited bring-your-own-key)
+          keeps working unchanged.
+        </p>
+        <div class="mt-8 flex justify-center gap-3">
+          <a
+            href="/#pricing"
+            class="inline-flex h-11 items-center justify-center rounded-lg bg-fg px-5 text-sm font-medium text-bg transition-colors duration-fast hover:bg-fg/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            Review pricing
+          </a>
+          <a
+            href="/"
+            class="inline-flex h-11 items-center justify-center rounded-lg border border-border-strong bg-transparent px-5 text-sm font-medium text-fg transition-colors duration-fast hover:bg-bg-elev focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            Back to anyspace.dev
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
