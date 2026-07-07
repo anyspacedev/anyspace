@@ -222,6 +222,37 @@ The ast-test demo (`../ast-test/scripts/server.py`) listens on `:9000` and
 its Funnel mapping is on `:8443`. Phase-1 backend can run alongside it on
 different ports until cutover, then we retire the demo to free RAM.
 
+## Release engineering — signed auto-updates (phase 5)
+
+`GET /updates/{target}/{arch}/{current_version}` is backed by the latest
+GitHub Release of `anyspacedev/anyspace`. The Tauri updater plugin (in the
+desktop app) requires signed bundles — the `.app.tar.gz` / `.AppImage.tar.gz`
+/ `.nsis.zip` archives plus their matching `.sig` files. A release missing
+those falls back to 204 (no update available).
+
+Required GitHub repo secrets at
+`https://github.com/anyspacedev/anyspace/settings/secrets/actions`:
+
+| Secret | Source | Purpose |
+|---|---|---|
+| `TAURI_PRIVATE_KEY` | Generated locally with `npx tauri signer generate -w ~/.tauri/anyspace.key` — paste the **file contents** | Signs every updater bundle in CI |
+| `TAURI_KEY_PASSWORD` | Whatever password you chose during `signer generate` | Unlocks the private key in CI |
+
+The matching **public** key lives in `src-tauri/tauri.conf.json` under
+`plugins.updater.pubkey` (committed; public-by-design — it ships in every
+client bundle anyway to verify downloads). Rotation: regenerate locally,
+update both the GitHub secret AND the `pubkey` value, then cut a new
+release. Old clients on the previous pubkey can't apply updates signed
+with the new key — they'll need a manual reinstall.
+
+The release workflow (`.github/workflows/release.yml`) reads
+`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` env
+(populated from those secrets) when running `tauri-action`. `tauri-action`
+then emits the updater bundles + their `.sig` partners alongside the
+user-facing DMG/MSI/AppImage. All artifacts get uploaded as one set to
+the GitHub Release (`dist-release/*` glob in the publish step) and the
+backend's `routers/updates.py` finds them by name.
+
 ## How the desktop app talks to this
 
 `src-tauri/src/stt/commands.rs:69` already builds

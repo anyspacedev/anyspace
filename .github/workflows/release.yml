@@ -167,6 +167,13 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_ANYSPACE_CLOUD_URL: https://api.anyspace.dev/v1
           VITE_GIT_SHA: ${{ steps.gitsha.outputs.sha }}
+          # Updater signing — pairs with the pubkey in tauri.conf.json. With
+          # these set, tauri-action produces *.app.tar.gz / *.AppImage.tar.gz /
+          # *.nsis.zip alongside the user-facing installers, each with a .sig
+          # file alongside. The backend manifest endpoint reads those off the
+          # GitHub Release to assemble update responses.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           # tauri-action runs `npm run build` (tsc + vite) as beforeBuildCommand.
           # The production vite build peaks just over Node's ~2 GB default heap
           # and OOMs on the 7 GB macOS runners; give it headroom.
@@ -187,10 +194,28 @@ jobs:
           BUNDLE="src-tauri/target/${TARGET}/release/bundle"
           shopt -s nullglob
 
+          # `copy_sig` mirrors a renamed bundle's matching .sig file. Tauri
+          # writes the signature alongside its source bundle with the suffix
+          # ".sig"; the updater plugin expects the same convention on the
+          # release. Skips silently if the .sig isn't there (build without
+          # signing keys → unsigned, no .sig produced).
+          copy_sig() {
+            local src="$1" dst="$2"
+            if [[ -f "${src}.sig" ]]; then
+              cp "${src}.sig" "${dst}.sig"
+            fi
+          }
+
           case "$LABEL" in
             mac-*)
               for f in "$BUNDLE"/dmg/*.dmg; do
                 cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}.dmg"
+              done
+              # Updater bundle for macOS — a tar.gz of the .app, signed.
+              for f in "$BUNDLE"/macos/*.app.tar.gz; do
+                dst="$OUT/AnySpace-${VERSION}-${LABEL}.app.tar.gz"
+                cp "$f" "$dst"
+                copy_sig "$f" "$dst"
               done
               ;;
             windows-*)
@@ -200,6 +225,12 @@ jobs:
               for f in "$BUNDLE"/nsis/*-setup.exe; do
                 cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}-setup.exe"
               done
+              # Updater bundle for Windows — NSIS zipped, signed.
+              for f in "$BUNDLE"/nsis/*.nsis.zip; do
+                dst="$OUT/AnySpace-${VERSION}-${LABEL}.nsis.zip"
+                cp "$f" "$dst"
+                copy_sig "$f" "$dst"
+              done
               ;;
             linux-*)
               for f in "$BUNDLE"/deb/*.deb; do
@@ -207,6 +238,12 @@ jobs:
               done
               for f in "$BUNDLE"/appimage/*.AppImage; do
                 cp "$f" "$OUT/AnySpace-${VERSION}-${LABEL}.AppImage"
+              done
+              # Updater bundle for Linux — tar.gz of the AppImage, signed.
+              for f in "$BUNDLE"/appimage/*.AppImage.tar.gz; do
+                dst="$OUT/AnySpace-${VERSION}-${LABEL}.AppImage.tar.gz"
+                cp "$f" "$dst"
+                copy_sig "$f" "$dst"
               done
               ;;
           esac
